@@ -32,3 +32,9 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Test temporary files
+backend/.test-tmp/
+
+# Package manager cache
+.pnpm-store/
