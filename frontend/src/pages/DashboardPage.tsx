@@ -11,6 +11,7 @@ import {
   getWatchlistQuotes,
   type WatchlistQuote,
 } from "../services/watchlist";
+import { IntelligencePanel } from "../components/IntelligencePanel";
 
 
 function money(value: number) {
@@ -523,6 +524,8 @@ export default function DashboardPage() {
           )}
 
         </section>
+
+        <IntelligencePanel />
 
       </div>
 

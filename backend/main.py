@@ -1,3 +1,6 @@
+from app.api.v1.signals import router as signals_router
+from app.api.v1.advanced_analytics import router as advanced_analytics_router
+from app.api.v1.reconciliation import router as reconciliation_router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -69,7 +72,9 @@ app.include_router(
     market_router,
     prefix="/api/v1",
 )
-
+app.include_router(reconciliation_router, prefix="/api/v1")
+app.include_router(advanced_analytics_router, prefix="/api/v1")
+app.include_router(signals_router, prefix="/api/v1")
 
 @app.on_event("startup")
 def startup_event():

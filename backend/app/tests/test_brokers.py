@@ -16,6 +16,8 @@ from app.db.database import SessionLocal
 from app.models.broker_connection import (
     BrokerConnection,
 )
+from app.models.holding import Holding
+from app.models.transaction import Transaction
 from app.models.user import User
 from app.services.auth_service import hash_password
 
@@ -33,6 +35,39 @@ TEST_KEY = (
 os.environ[
     "TRADEPILOT_BROKER_ENCRYPTION_KEY"
 ] = TEST_KEY
+
+
+def _clear_broker_test_data():
+    """Remove only records owned by this module's dedicated test user."""
+    db = SessionLocal()
+
+    try:
+        user = db.query(User).filter(User.email == EMAIL).first()
+
+        if user is None:
+            return
+
+        db.query(Transaction).filter(
+            Transaction.user_id == user.id,
+        ).delete(synchronize_session=False)
+        db.query(Holding).filter(
+            Holding.user_id == user.id,
+        ).delete(synchronize_session=False)
+        db.query(BrokerConnection).filter(
+            BrokerConnection.user_id == user.id,
+        ).delete(synchronize_session=False)
+        db.delete(user)
+        db.commit()
+
+    finally:
+        db.close()
+
+
+@pytest.fixture(autouse=True)
+def isolated_broker_test_data():
+    _clear_broker_test_data()
+    yield
+    _clear_broker_test_data()
 
 
 def create_user():
