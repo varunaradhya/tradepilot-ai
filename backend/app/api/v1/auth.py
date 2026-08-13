@@ -1,6 +1,4 @@
-﻿import os
-
-from fastapi import APIRouter, Depends, HTTPException, status
+﻿from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -12,6 +10,7 @@ from app.services.auth_service import (
     create_user,
     get_user_by_email,
 )
+
 
 router = APIRouter(
     prefix="/auth",
@@ -68,14 +67,8 @@ def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    secret_key = os.getenv(
-        "TRADEPILOT_JWT_SECRET",
-        "development-only-secret-change-before-production",
-    )
-
     access_token = create_access_token(
         user_id=user.id,
-        secret_key=secret_key,
     )
 
     return {

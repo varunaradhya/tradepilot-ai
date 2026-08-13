@@ -5,15 +5,17 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.config import (
+    JWT_ALGORITHM,
+    JWT_EXPIRE_MINUTES,
+    JWT_SECRET_KEY,
+)
 from app.core.security import hash_password, verify_password
 from app.models.user import User
 
 
-JWT_ALGORITHM = "HS256"
-
-
 def get_user_by_email(db: Session, email: str) -> User | None:
-    """Return a user by email address, or None when the user does not exist."""
+    """Return a user by email address."""
 
     normalized_email = email.strip().lower()
 
@@ -22,6 +24,12 @@ def get_user_by_email(db: Session, email: str) -> User | None:
     )
 
     return db.execute(statement).scalar_one_or_none()
+
+
+def get_user_by_id(db: Session, user_id: int) -> User | None:
+    """Return a user by primary key."""
+
+    return db.get(User, user_id)
 
 
 def authenticate_user(
@@ -74,8 +82,7 @@ def create_user(
 
 def create_access_token(
     user_id: int,
-    secret_key: str,
-    expires_minutes: int = 60,
+    expires_minutes: int = JWT_EXPIRE_MINUTES,
 ) -> str:
     """Create a JWT access token."""
 
@@ -84,11 +91,23 @@ def create_access_token(
     payload = {
         "sub": str(user_id),
         "iat": now,
-        "exp": now + timedelta(minutes=expires_minutes),
+        "exp": now + timedelta(
+            minutes=expires_minutes
+        ),
     }
 
     return jwt.encode(
         payload,
-        secret_key,
+        JWT_SECRET_KEY,
         algorithm=JWT_ALGORITHM,
+    )
+
+
+def decode_access_token(token: str) -> dict:
+    """Validate and decode a JWT access token."""
+
+    return jwt.decode(
+        token,
+        JWT_SECRET_KEY,
+        algorithms=[JWT_ALGORITHM],
     )
