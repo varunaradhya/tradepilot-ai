@@ -1,4 +1,5 @@
-﻿from app.models.user import User
+from app.models.user import User
+from app.models.transaction import Transaction
 from app.models.holding import Holding
 
 from app.db.database import Base, engine
