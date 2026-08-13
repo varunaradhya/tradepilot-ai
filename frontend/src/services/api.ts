@@ -10,6 +10,10 @@ export type User = {
   updated_at: string;
 };
 
+export class ApiError extends Error {
+  constructor(public readonly status: number, message: string) { super(message); }
+}
+
 const apiUrl = (import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1").replace(
   /\/$/,
   "",
@@ -28,7 +32,10 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new Error(`Request failed with status ${response.status}`);
+    let message = `Request failed with status ${response.status}`;
+    try { message = (await response.json() as { detail?: string }).detail ?? message; } catch { /* non-JSON response */ }
+    if (response.status === 401) { localStorage.removeItem("access_token"); window.dispatchEvent(new Event("tradepilot:logout")); }
+    throw new ApiError(response.status, message);
   }
 
   if (response.status === 204) return undefined as T;

@@ -24,7 +24,12 @@ function money(value: number) {
 }
 
 
-export default function DashboardPage() {
+type DashboardPageProps = {
+  onLogout: () => void;
+};
+
+
+export default function DashboardPage({ onLogout }: DashboardPageProps) {
 
   const [analytics, setAnalytics] =
     useState<PortfolioAnalytics | null>(null);
@@ -146,7 +151,16 @@ export default function DashboardPage() {
 
 
   if (!analytics) {
-    return null;
+    return (
+      <main className="min-h-screen bg-slate-50 p-6">
+        <div className="mx-auto max-w-2xl rounded-xl border bg-white p-8 text-center shadow-sm">
+          <h1 className="text-2xl font-bold text-slate-900">TradePilot AI</h1>
+          <p className="mt-3 text-slate-600">We could not load your portfolio dashboard.</p>
+          {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
+          <button type="button" onClick={() => void loadDashboard()} className="mt-5 rounded-lg bg-slate-900 px-4 py-2 text-white">Try again</button>
+        </div>
+      </main>
+    );
   }
 
 
@@ -173,13 +187,10 @@ export default function DashboardPage() {
 
           </div>
 
-          <button
-            type="button"
-            onClick={() => void loadDashboard()}
-            className="rounded-lg bg-slate-900 px-4 py-2 text-white"
-          >
-            Refresh
-          </button>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => void loadDashboard()} className="rounded-lg bg-slate-900 px-4 py-2 text-white">Refresh</button>
+            <button type="button" onClick={onLogout} className="rounded-lg border border-slate-300 px-4 py-2 text-slate-700">Logout</button>
+          </div>
 
         </div>
 
@@ -202,7 +213,7 @@ export default function DashboardPage() {
             </p>
 
             <p className="mt-2 text-2xl font-bold">
-              â‚¹{money(
+              {"\u20B9"}{money(
                 analytics.total_invested
               )}
             </p>
@@ -217,7 +228,7 @@ export default function DashboardPage() {
             </p>
 
             <p className="mt-2 text-2xl font-bold">
-              â‚¹{money(
+              {"\u20B9"}{money(
                 analytics.current_value
               )}
             </p>
@@ -233,7 +244,7 @@ export default function DashboardPage() {
 
             <p className="mt-2 text-2xl font-bold">
               {profitPositive ? "+" : ""}
-              â‚¹{money(
+              {"\u20B9"}{money(
                 analytics.total_profit_loss
               )}
             </p>
@@ -266,7 +277,7 @@ export default function DashboardPage() {
             </p>
 
             <p className="mt-2 text-xl font-semibold">
-              â‚¹{money(
+              {"\u20B9"}{money(
                 analytics.realized_profit_loss
               )}
             </p>
@@ -281,7 +292,7 @@ export default function DashboardPage() {
             </p>
 
             <p className="mt-2 text-xl font-semibold">
-              â‚¹{money(
+              {"\u20B9"}{money(
                 analytics.unrealized_profit_loss
               )}
             </p>
@@ -367,6 +378,10 @@ export default function DashboardPage() {
 
               <tbody>
 
+                {analytics.stocks.length === 0 && (
+                  <tr className="border-t"><td className="px-5 py-6 text-center text-slate-500" colSpan={6}>No holdings yet.</td></tr>
+                )}
+
                 {analytics.stocks.map(
                   (stock) => (
 
@@ -384,19 +399,19 @@ export default function DashboardPage() {
                       </td>
 
                       <td className="px-5 py-4">
-                        â‚¹{money(
+                        {"\u20B9"}{money(
                           stock.invested_amount
                         )}
                       </td>
 
                       <td className="px-5 py-4">
-                        â‚¹{money(
+                        {"\u20B9"}{money(
                           stock.current_value
                         )}
                       </td>
 
                       <td className="px-5 py-4">
-                        â‚¹{money(
+                        {"\u20B9"}{money(
                           stock.unrealized_profit_loss
                         )}
                       </td>
@@ -501,7 +516,7 @@ export default function DashboardPage() {
                     </div>
 
                     <p className="mt-3 text-xl font-bold">
-                      â‚¹{money(item.price)}
+                      {"\u20B9"}{money(item.price)}
                     </p>
 
                     <p className="mt-1 text-sm">
