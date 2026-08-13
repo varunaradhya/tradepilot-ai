@@ -1,12 +1,5 @@
-import { AppLayout } from "./layouts/AppLayout";
-import { HomePage } from "./pages/HomePage";
+﻿import MarketPage from "./pages/MarketPage";
 
-function App() {
-  return (
-    <AppLayout>
-      <HomePage />
-    </AppLayout>
-  );
+export default function App() {
+  return <MarketPage />;
 }
-
-export default App;
