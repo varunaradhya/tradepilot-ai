@@ -1,5 +1,5 @@
-﻿import MarketPage from "./pages/MarketPage";
+﻿import DashboardPage from "./pages/DashboardPage";
 
 export default function App() {
-  return <MarketPage />;
+  return <DashboardPage />;
 }
