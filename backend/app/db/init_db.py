@@ -1,5 +1,7 @@
+﻿from app.models.user import User
+from app.models.holding import Holding
+
 from app.db.database import Base, engine
-from app.models.user import User
 
 
 def init_db():
