@@ -1,6 +1,7 @@
 from app.models.user import User
 from app.models.transaction import Transaction
 from app.models.watchlist import Watchlist
+from app.models.broker_connection import BrokerConnection
 from app.models.holding import Holding
 
 from app.db.database import Base, engine
