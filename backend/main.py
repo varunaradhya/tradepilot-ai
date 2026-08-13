@@ -5,6 +5,8 @@ from app.api.v1.auth import router as auth_router
 from app.api.v1.portfolio import router as portfolio_router
 from app.api.v1.valuation import router as valuation_router
 from app.api.v1.transactions import router as transactions_router
+from app.api.v1.analytics import router as analytics_router
+from app.api.v1.watchlist import router as watchlist_router
 from app.api.v1.users import router as users_router
 from app.api.v1.market import router as market_router
 from app.db.init_db import init_db
@@ -48,6 +50,14 @@ app.include_router(
 )
 app.include_router(
     transactions_router,
+    prefix="/api/v1",
+)
+app.include_router(
+    analytics_router,
+    prefix="/api/v1",
+)
+app.include_router(
+    watchlist_router,
     prefix="/api/v1",
 )
 app.include_router(

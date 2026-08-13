@@ -1,23 +1,38 @@
 ﻿import { useEffect, useState } from "react";
 
 import {
-  getPortfolioValuation,
-  type PortfolioValuation,
-} from "../services/valuation";
+  getPortfolioAnalytics,
+  type PortfolioAnalytics,
+} from "../services/analytics";
+
+import {
+  addWatchlistSymbol,
+  deleteWatchlistSymbol,
+  getWatchlistQuotes,
+  type WatchlistQuote,
+} from "../services/watchlist";
 
 
 function money(value: number) {
+
   return value.toLocaleString("en-IN", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+
 }
 
 
 export default function DashboardPage() {
 
-  const [portfolio, setPortfolio] =
-    useState<PortfolioValuation | null>(null);
+  const [analytics, setAnalytics] =
+    useState<PortfolioAnalytics | null>(null);
+
+  const [watchlist, setWatchlist] =
+    useState<WatchlistQuote[]>([]);
+
+  const [newSymbol, setNewSymbol] =
+    useState("");
 
   const [loading, setLoading] =
     useState(true);
@@ -28,22 +43,28 @@ export default function DashboardPage() {
 
   async function loadDashboard() {
 
-    setLoading(true);
-    setError("");
-
     try {
 
-      const result =
-        await getPortfolioValuation();
+      setLoading(true);
+      setError("");
 
-      setPortfolio(result);
+      const [
+        analyticsData,
+        watchlistData,
+      ] = await Promise.all([
+        getPortfolioAnalytics(),
+        getWatchlistQuotes(),
+      ]);
+
+      setAnalytics(analyticsData);
+      setWatchlist(watchlistData);
 
     } catch (err) {
 
       setError(
         err instanceof Error
           ? err.message
-          : "Unable to load portfolio.",
+          : "Unable to load dashboard.",
       );
 
     } finally {
@@ -51,6 +72,7 @@ export default function DashboardPage() {
       setLoading(false);
 
     }
+
   }
 
 
@@ -59,14 +81,62 @@ export default function DashboardPage() {
   }, []);
 
 
+  async function addSymbol() {
+
+    const symbol = newSymbol.trim();
+
+    if (!symbol) {
+      return;
+    }
+
+    try {
+
+      await addWatchlistSymbol(symbol);
+
+      setNewSymbol("");
+
+      await loadDashboard();
+
+    } catch (err) {
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to add symbol.",
+      );
+
+    }
+
+  }
+
+
+  async function removeSymbol(id: number) {
+
+    try {
+
+      await deleteWatchlistSymbol(id);
+
+      await loadDashboard();
+
+    } catch (err) {
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to remove symbol.",
+      );
+
+    }
+
+  }
+
+
   if (loading) {
 
     return (
       <main className="min-h-screen bg-slate-50 p-6">
         <div className="mx-auto max-w-7xl">
-          <p className="text-slate-600">
-            Loading portfolio...
-          </p>
+          <p>Loading dashboard...</p>
         </div>
       </main>
     );
@@ -74,40 +144,13 @@ export default function DashboardPage() {
   }
 
 
-  if (error) {
-
-    return (
-      <main className="min-h-screen bg-slate-50 p-6">
-        <div className="mx-auto max-w-7xl">
-
-          <h1 className="text-3xl font-bold text-slate-900">
-            Portfolio Dashboard
-          </h1>
-
-          <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
-            {error}
-          </div>
-
-        </div>
-      </main>
-    );
-
-  }
-
-
-  if (!portfolio) {
+  if (!analytics) {
     return null;
   }
 
 
-  const {
-    summary,
-    holdings,
-  } = portfolio;
-
-
   const profitPositive =
-    summary.profit_loss >= 0;
+    analytics.total_profit_loss >= 0;
 
 
   return (
@@ -120,11 +163,11 @@ export default function DashboardPage() {
           <div>
 
             <h1 className="text-3xl font-bold text-slate-900">
-              Portfolio Dashboard
+              TradePilot AI
             </h1>
 
             <p className="mt-2 text-slate-600">
-              Track your investments and current performance.
+              Portfolio intelligence dashboard
             </p>
 
           </div>
@@ -132,7 +175,7 @@ export default function DashboardPage() {
           <button
             type="button"
             onClick={() => void loadDashboard()}
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white"
+            className="rounded-lg bg-slate-900 px-4 py-2 text-white"
           >
             Refresh
           </button>
@@ -140,57 +183,72 @@ export default function DashboardPage() {
         </div>
 
 
+        {error && (
+
+          <div className="mt-5 rounded-lg bg-red-50 p-4 text-red-700">
+            {error}
+          </div>
+
+        )}
+
+
         <section className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
 
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="rounded-xl border bg-white p-5 shadow-sm">
 
             <p className="text-sm text-slate-500">
               Invested
             </p>
 
-            <p className="mt-2 text-2xl font-bold text-slate-900">
-              â‚¹{money(summary.total_invested)}
+            <p className="mt-2 text-2xl font-bold">
+              â‚¹{money(
+                analytics.total_invested
+              )}
             </p>
 
           </div>
 
 
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="rounded-xl border bg-white p-5 shadow-sm">
 
             <p className="text-sm text-slate-500">
               Current Value
             </p>
 
-            <p className="mt-2 text-2xl font-bold text-slate-900">
-              â‚¹{money(summary.current_value)}
+            <p className="mt-2 text-2xl font-bold">
+              â‚¹{money(
+                analytics.current_value
+              )}
             </p>
 
           </div>
 
 
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="rounded-xl border bg-white p-5 shadow-sm">
 
             <p className="text-sm text-slate-500">
-              Profit / Loss
+              Total P/L
             </p>
 
-            <p className="mt-2 text-2xl font-bold text-slate-900">
+            <p className="mt-2 text-2xl font-bold">
               {profitPositive ? "+" : ""}
-              â‚¹{money(summary.profit_loss)}
+              â‚¹{money(
+                analytics.total_profit_loss
+              )}
             </p>
 
           </div>
 
 
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="rounded-xl border bg-white p-5 shadow-sm">
 
             <p className="text-sm text-slate-500">
               Return
             </p>
 
-            <p className="mt-2 text-2xl font-bold text-slate-900">
+            <p className="mt-2 text-2xl font-bold">
               {profitPositive ? "+" : ""}
-              {summary.profit_loss_percent.toFixed(2)}%
+              {analytics.total_return_percent.toFixed(2)}%
             </p>
 
           </div>
@@ -198,125 +256,267 @@ export default function DashboardPage() {
         </section>
 
 
-        <section className="mt-8 rounded-xl border border-slate-200 bg-white shadow-sm">
+        <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
 
-          <div className="border-b border-slate-200 p-5">
+          <div className="rounded-xl border bg-white p-5">
 
-            <h2 className="text-xl font-semibold text-slate-900">
-              Holdings
-            </h2>
+            <p className="text-sm text-slate-500">
+              Realized P/L
+            </p>
 
-            <p className="mt-1 text-sm text-slate-500">
-              {summary.holdings_count} position
-              {summary.holdings_count === 1 ? "" : "s"}
+            <p className="mt-2 text-xl font-semibold">
+              â‚¹{money(
+                analytics.realized_profit_loss
+              )}
             </p>
 
           </div>
 
 
-          {holdings.length === 0 ? (
+          <div className="rounded-xl border bg-white p-5">
 
-            <div className="p-8 text-center text-slate-500">
-              No holdings yet.
-            </div>
+            <p className="text-sm text-slate-500">
+              Unrealized P/L
+            </p>
 
-          ) : (
+            <p className="mt-2 text-xl font-semibold">
+              â‚¹{money(
+                analytics.unrealized_profit_loss
+              )}
+            </p>
 
-            <div className="overflow-x-auto">
-
-              <table className="w-full text-left text-sm">
-
-                <thead className="bg-slate-50 text-slate-500">
-
-                  <tr>
-
-                    <th className="px-5 py-3">
-                      Symbol
-                    </th>
-
-                    <th className="px-5 py-3">
-                      Qty
-                    </th>
-
-                    <th className="px-5 py-3">
-                      Avg. Price
-                    </th>
-
-                    <th className="px-5 py-3">
-                      Current
-                    </th>
-
-                    <th className="px-5 py-3">
-                      Invested
-                    </th>
-
-                    <th className="px-5 py-3">
-                      Value
-                    </th>
-
-                    <th className="px-5 py-3">
-                      P/L
-                    </th>
-
-                  </tr>
-
-                </thead>
+          </div>
 
 
-                <tbody>
+          <div className="rounded-xl border bg-white p-5">
 
-                  {holdings.map((holding) => (
+            <p className="text-sm text-slate-500">
+              Best Performer
+            </p>
+
+            <p className="mt-2 text-xl font-semibold">
+              {analytics.best_performer ?? "-"}
+            </p>
+
+          </div>
+
+
+          <div className="rounded-xl border bg-white p-5">
+
+            <p className="text-sm text-slate-500">
+              Worst Performer
+            </p>
+
+            <p className="mt-2 text-xl font-semibold">
+              {analytics.worst_performer ?? "-"}
+            </p>
+
+          </div>
+
+        </section>
+
+
+        <section className="mt-8 rounded-xl border bg-white shadow-sm">
+
+          <div className="border-b p-5">
+
+            <h2 className="text-xl font-semibold">
+              Holdings Performance
+            </h2>
+
+          </div>
+
+
+          <div className="overflow-x-auto">
+
+            <table className="w-full text-left text-sm">
+
+              <thead className="bg-slate-50 text-slate-500">
+
+                <tr>
+
+                  <th className="px-5 py-3">
+                    Symbol
+                  </th>
+
+                  <th className="px-5 py-3">
+                    Quantity
+                  </th>
+
+                  <th className="px-5 py-3">
+                    Invested
+                  </th>
+
+                  <th className="px-5 py-3">
+                    Current
+                  </th>
+
+                  <th className="px-5 py-3">
+                    P/L
+                  </th>
+
+                  <th className="px-5 py-3">
+                    Return
+                  </th>
+
+                </tr>
+
+              </thead>
+
+
+              <tbody>
+
+                {analytics.stocks.map(
+                  (stock) => (
 
                     <tr
-                      key={holding.id}
-                      className="border-t border-slate-100"
+                      key={stock.symbol}
+                      className="border-t"
                     >
 
-                      <td className="px-5 py-4 font-semibold text-slate-900">
-                        {holding.symbol}
+                      <td className="px-5 py-4 font-semibold">
+                        {stock.symbol}
                       </td>
 
                       <td className="px-5 py-4">
-                        {holding.quantity}
+                        {stock.quantity}
                       </td>
 
                       <td className="px-5 py-4">
-                        â‚¹{money(holding.average_buy_price)}
+                        â‚¹{money(
+                          stock.invested_amount
+                        )}
                       </td>
 
                       <td className="px-5 py-4">
-                        â‚¹{money(holding.current_price)}
+                        â‚¹{money(
+                          stock.current_value
+                        )}
                       </td>
 
                       <td className="px-5 py-4">
-                        â‚¹{money(holding.invested_amount)}
+                        â‚¹{money(
+                          stock.unrealized_profit_loss
+                        )}
                       </td>
 
                       <td className="px-5 py-4">
-                        â‚¹{money(holding.current_value)}
-                      </td>
-
-                      <td className="px-5 py-4">
-
-                        <div>
-                          {holding.profit_loss >= 0 ? "+" : ""}
-                          â‚¹{money(holding.profit_loss)}
-                        </div>
-
-                        <div className="text-xs text-slate-500">
-                          {holding.profit_loss_percent >= 0 ? "+" : ""}
-                          {holding.profit_loss_percent.toFixed(2)}%
-                        </div>
-
+                        {stock.unrealized_profit_loss_percent.toFixed(2)}%
                       </td>
 
                     </tr>
 
-                  ))}
+                  )
+                )}
 
-                </tbody>
+              </tbody>
 
-              </table>
+            </table>
+
+          </div>
+
+        </section>
+
+
+        <section className="mt-8 rounded-xl border bg-white shadow-sm">
+
+          <div className="flex flex-col gap-4 border-b p-5 md:flex-row md:items-center md:justify-between">
+
+            <div>
+
+              <h2 className="text-xl font-semibold">
+                Watchlist
+              </h2>
+
+              <p className="text-sm text-slate-500">
+                Track stocks before you buy.
+              </p>
+
+            </div>
+
+
+            <div className="flex gap-2">
+
+              <input
+                value={newSymbol}
+                onChange={(event) =>
+                  setNewSymbol(
+                    event.target.value
+                  )
+                }
+                placeholder="TCS"
+                className="rounded-lg border px-3 py-2"
+              />
+
+              <button
+                type="button"
+                onClick={() => void addSymbol()}
+                className="rounded-lg bg-slate-900 px-4 py-2 text-white"
+              >
+                Add
+              </button>
+
+            </div>
+
+          </div>
+
+
+          {watchlist.length === 0 ? (
+
+            <div className="p-8 text-center text-slate-500">
+              Your watchlist is empty.
+            </div>
+
+          ) : (
+
+            <div className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-4">
+
+              {watchlist.map(
+                (item) => (
+
+                  <div
+                    key={item.id}
+                    className="rounded-lg border p-4"
+                  >
+
+                    <div className="flex items-center justify-between">
+
+                      <span className="font-semibold">
+                        {item.symbol}
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void removeSymbol(
+                            item.id
+                          )
+                        }
+                        className="text-xs text-red-600"
+                      >
+                        Remove
+                      </button>
+
+                    </div>
+
+                    <p className="mt-3 text-xl font-bold">
+                      â‚¹{money(item.price)}
+                    </p>
+
+                    <p className="mt-1 text-sm">
+                      {item.change >= 0 ? "+" : ""}
+                      {money(item.change)}
+                      {" "}
+                      (
+                      {item.change_percent >= 0 ? "+" : ""}
+                      {item.change_percent.toFixed(2)}%
+                      )
+                    </p>
+
+                  </div>
+
+                )
+              )}
 
             </div>
 
