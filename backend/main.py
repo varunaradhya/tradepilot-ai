@@ -1,5 +1,6 @@
 from app.api.v1.signals import router as signals_router
 from app.api.v1.intelligence import router as intelligence_router
+from app.api.v1.alerts import router as alerts_router
 from app.api.v1.advanced_analytics import router as advanced_analytics_router
 from app.api.v1.reconciliation import router as reconciliation_router
 from fastapi import FastAPI
@@ -77,6 +78,7 @@ app.include_router(reconciliation_router, prefix="/api/v1")
 app.include_router(advanced_analytics_router, prefix="/api/v1")
 app.include_router(signals_router, prefix="/api/v1")
 app.include_router(intelligence_router, prefix="/api/v1")
+app.include_router(alerts_router, prefix="/api/v1")
 
 @app.on_event("startup")
 def startup_event():

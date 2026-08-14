@@ -55,3 +55,14 @@ class TradingViewResponse(BaseModel):
     unavailable_symbols: list[str]
     data_quality: str
     disclaimer: str
+
+
+class HistoryResponse(BaseModel):
+    id: int
+    analysis_type: str
+    symbol: str | None
+    provider: str
+    signal: str
+    confidence: int
+    summary: str
+    generated_at: datetime

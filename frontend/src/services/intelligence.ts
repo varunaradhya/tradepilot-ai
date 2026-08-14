@@ -70,6 +70,27 @@ export interface TradingViewResponse {
   disclaimer: string;
 }
 
+export interface DailyBriefing {
+  headline: string;
+  portfolio_summary: string;
+  risk_summary: string;
+  top_opportunities: Opportunity[];
+  top_risks: string[];
+  watch_items: string[];
+  generated_at: string;
+}
+
+export interface HistoryItem {
+  id: number;
+  analysis_type: string;
+  symbol: string | null;
+  provider: string;
+  signal: string;
+  confidence: number;
+  summary: string;
+  generated_at: string;
+}
+
 export interface IntelligenceResponse {
   analysis: AIAnalysis;
   context_summary: Record<string, unknown>;
@@ -87,3 +108,5 @@ export function getPortfolioIntelligence(): Promise<IntelligenceResponse> { retu
 export function getStockIntelligence(symbol: string): Promise<IntelligenceResponse> { return apiRequest<IntelligenceResponse>(`/intelligence/stock/${encodeURIComponent(symbol)}`); }
 export function getOpportunities(): Promise<OpportunityResponse> { return apiRequest<OpportunityResponse>("/intelligence/opportunities"); }
 export function getTradingView(): Promise<TradingViewResponse> { return apiRequest<TradingViewResponse>("/intelligence/trading-view"); }
+export function getDailyBriefing(): Promise<DailyBriefing> { return apiRequest<DailyBriefing>("/intelligence/daily-briefing"); }
+export function getAnalysisHistory(): Promise<HistoryItem[]> { return apiRequest<HistoryItem[]>("/intelligence/history"); }

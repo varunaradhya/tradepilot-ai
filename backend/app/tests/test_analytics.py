@@ -203,6 +203,24 @@ def test_analytics_calculates_realized_pnl():
     assert data["realized_profit_loss"] == 150
 
 
+def test_realized_pnl_uses_weighted_average_for_multiple_buys_and_sell():
+    create_user()
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.email == EMAIL).first()
+        db.add_all([
+            Transaction(user_id=user.id, symbol="TCS", transaction_type="BUY", quantity=10, price=100),
+            Transaction(user_id=user.id, symbol="TCS", transaction_type="BUY", quantity=10, price=200),
+            Transaction(user_id=user.id, symbol="TCS", transaction_type="SELL", quantity=5, price=180),
+        ])
+        db.commit()
+    finally:
+        db.close()
+    response = client.get("/api/v1/analytics/portfolio", headers=headers())
+    assert response.status_code == 200
+    assert response.json()["realized_profit_loss"] == 150
+
+
 def test_empty_analytics():
 
     create_user()

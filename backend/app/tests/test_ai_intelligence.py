@@ -5,15 +5,21 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from app.ai.context import build_portfolio_context, build_stock_context
+from app.ai.cache import clear as clear_ai_cache
 from app.ai.providers.mock import MockAIProvider
 from app.core.security import hash_password
 from app.db.database import SessionLocal
+from app.db.init_db import init_db
 from app.models.broker_connection import BrokerConnection
+from app.models.ai_analysis_history import AIAnalysisHistory
+from app.models.alert import Alert
 from app.models.holding import Holding
 from app.models.user import User
 from app.models.watchlist import Watchlist
 from app.providers.market_data import HistoricalData, QuoteData
 from main import app
+
+init_db()
 
 client = TestClient(app)
 EMAIL = "ai-intelligence-test@example.com"
@@ -30,10 +36,13 @@ def _history(symbol, range_="6mo", interval="1d"):
 
 
 def _clean():
+    clear_ai_cache()
     db = SessionLocal()
     try:
         user = db.query(User).filter(User.email == EMAIL).first()
         if user:
+            db.query(AIAnalysisHistory).filter(AIAnalysisHistory.user_id == user.id).delete()
+            db.query(Alert).filter(Alert.user_id == user.id).delete()
             db.query(BrokerConnection).filter(BrokerConnection.user_id == user.id).delete()
             db.query(Watchlist).filter(Watchlist.user_id == user.id).delete()
             db.query(Holding).filter(Holding.user_id == user.id).delete()
@@ -127,3 +136,23 @@ def test_portfolio_and_empty_watchlist_endpoints(mock_quote, mock_history):
 def test_new_intelligence_endpoints_require_authentication():
     assert client.get("/api/v1/intelligence/opportunities").status_code == 401
     assert client.get("/api/v1/intelligence/trading-view").status_code == 401
+
+
+@patch("app.ai.context.get_history", side_effect=_history)
+@patch("app.ai.context.get_quote", side_effect=_quote)
+def test_analysis_history_cache_briefing_and_alerts(mock_quote, mock_history):
+    _, headers = _user_and_headers()
+    try:
+        first = client.get("/api/v1/intelligence/portfolio", headers=headers)
+        second = client.get("/api/v1/intelligence/portfolio", headers=headers)
+        assert first.status_code == 200
+        assert second.json()["context_summary"]["cached"] is True
+        history = client.get("/api/v1/intelligence/history?analysis_type=portfolio", headers=headers)
+        assert history.status_code == 200
+        assert len(history.json()) == 1
+        briefing = client.get("/api/v1/intelligence/daily-briefing", headers=headers)
+        assert briefing.status_code == 200
+        assert "headline" in briefing.json()
+        assert client.get("/api/v1/alerts", headers=headers).status_code == 200
+    finally:
+        _clean()
