@@ -7,7 +7,9 @@ from app.models.ai_analysis_history import AIAnalysisHistory
 from app.models.alert import Alert
 
 from app.db.database import Base, engine
+from app.core.config import TRADEPILOT_AUTO_CREATE_SCHEMA
 
 
 def init_db():
-    Base.metadata.create_all(bind=engine)
+    if TRADEPILOT_AUTO_CREATE_SCHEMA:
+        Base.metadata.create_all(bind=engine)

@@ -5,6 +5,7 @@ from app.api.v1.advanced_analytics import router as advanced_analytics_router
 from app.api.v1.reconciliation import router as reconciliation_router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from app.api.v1.auth import router as auth_router
 from app.api.v1.portfolio import router as portfolio_router
@@ -16,6 +17,8 @@ from app.api.v1.brokers import router as brokers_router
 from app.api.v1.users import router as users_router
 from app.api.v1.market import router as market_router
 from app.db.init_db import init_db
+from app.db.database import engine
+from app.core.config import TRADEPILOT_CORS_ORIGINS
 
 
 app = FastAPI(
@@ -27,10 +30,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=TRADEPILOT_CORS_ORIGINS,
     allow_credentials=False,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
@@ -98,3 +98,13 @@ def health_check():
     return {
         "status": "healthy",
     }
+
+
+@app.get("/ready", tags=["Operations"], summary="Check critical dependency readiness")
+def readiness_check():
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+    except Exception:
+        return {"status": "not_ready", "database": "unavailable"}
+    return {"status": "ok", "database": "available"}

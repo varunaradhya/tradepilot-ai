@@ -1,1 +1,45 @@
 services:
+  database:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: tradepilot
+      POSTGRES_USER: tradepilot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-before-deployment}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tradepilot -d tradepilot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    environment:
+      TRADEPILOT_DATABASE_URL: postgresql+psycopg://tradepilot:${POSTGRES_PASSWORD:-change-me-before-deployment}@database:5432/tradepilot
+      TRADEPILOT_AUTO_CREATE_SCHEMA: "false"
+      TRADEPILOT_JWT_SECRET: ${TRADEPILOT_JWT_SECRET:?set-in-your-environment}
+      TRADEPILOT_BROKER_ENCRYPTION_KEY: ${TRADEPILOT_BROKER_ENCRYPTION_KEY:?set-in-your-environment}
+      TRADEPILOT_CORS_ORIGINS: ${TRADEPILOT_CORS_ORIGINS:-http://localhost:8080}
+      TRADEPILOT_AI_PROVIDER: ${TRADEPILOT_AI_PROVIDER:-mock}
+      TRADEPILOT_AI_API_KEY: ${TRADEPILOT_AI_API_KEY:-}
+      TRADEPILOT_AI_BASE_URL: ${TRADEPILOT_AI_BASE_URL:-}
+      TRADEPILOT_AI_MODEL: ${TRADEPILOT_AI_MODEL:-}
+    depends_on:
+      database:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000/api/v1}
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+
+volumes:
+  postgres_data:
