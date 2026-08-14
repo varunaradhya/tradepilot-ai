@@ -1,4 +1,4 @@
-﻿import { apiRequest } from "./api";
+import { apiRequest } from "./api";
 
 export interface SignalResponse {
   symbol: string;
@@ -103,7 +103,7 @@ export async function getTechnicalSignal(symbol: string): Promise<SignalResponse
 }
 
 export function getAdvancedAnalytics(): Promise<AdvancedAnalytics> { return apiRequest<AdvancedAnalytics>("/analytics/advanced"); }
-export function getReconciliation(): Promise<ReconciliationResponse> { return apiRequest<ReconciliationResponse>("/reconciliation"); }
+export function getReconciliation(): Promise<ReconciliationResponse> { return apiRequest<ReconciliationResponse>("/reconciliation/"); }
 export function getPortfolioIntelligence(): Promise<IntelligenceResponse> { return apiRequest<IntelligenceResponse>("/intelligence/portfolio"); }
 export function getStockIntelligence(symbol: string): Promise<IntelligenceResponse> { return apiRequest<IntelligenceResponse>(`/intelligence/stock/${encodeURIComponent(symbol)}`); }
 export function getOpportunities(): Promise<OpportunityResponse> { return apiRequest<OpportunityResponse>("/intelligence/opportunities"); }
