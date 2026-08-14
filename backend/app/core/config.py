@@ -14,3 +14,8 @@ JWT_EXPIRE_MINUTES = int(
         "60",
     )
 )
+
+TRADEPILOT_AI_PROVIDER = os.getenv(
+    "TRADEPILOT_AI_PROVIDER",
+    "mock",
+).strip().lower()
