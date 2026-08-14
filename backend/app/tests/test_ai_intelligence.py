@@ -122,3 +122,8 @@ def test_portfolio_and_empty_watchlist_endpoints(mock_quote, mock_history):
         assert watchlist.json()["analysis"]["watch_items"] == []
     finally:
         _clean()
+
+
+def test_new_intelligence_endpoints_require_authentication():
+    assert client.get("/api/v1/intelligence/opportunities").status_code == 401
+    assert client.get("/api/v1/intelligence/trading-view").status_code == 401

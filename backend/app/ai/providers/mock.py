@@ -118,5 +118,6 @@ class MockAIProvider(AIProvider):
             "opportunities": opportunities,
             "watch_items": watch_items,
             "data_quality": data_quality,
+            "limitations": ["This is informational analysis, not financial advice or a trade instruction.", "The analysis uses supplied market and portfolio data only."],
             "generated_at": datetime.now(timezone.utc),
         }
