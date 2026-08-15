@@ -1,11 +1,17 @@
-﻿from app.providers.market_data import (
+from app.providers.market_data import (
     HistoricalData,
     MarketDataProviderError,
     QuoteData,
     YahooFinanceProvider,
 )
+from app.providers.market_search import (
+    MarketSearchProviderError,
+    SearchInstrument,
+    YahooFinanceSearchProvider,
+)
 
 _provider = YahooFinanceProvider()
+_search_provider = YahooFinanceSearchProvider()
 
 
 def get_quote(symbol: str) -> QuoteData:
@@ -24,8 +30,14 @@ def get_history(
     )
 
 
+def search_instruments(query: str) -> list[SearchInstrument]:
+    return _search_provider.search(query)
+
+
 __all__ = [
     "get_quote",
     "get_history",
+    "search_instruments",
     "MarketDataProviderError",
+    "MarketSearchProviderError",
 ]
