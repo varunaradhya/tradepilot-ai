@@ -51,6 +51,8 @@ def authorize_order(context: ExecutionContext, order: CanonicalOrder) -> Executi
         return ExecutionDecision(False, "RISK_NOT_APPROVED", broker, mode)
 
     capabilities = get_broker_capabilities(broker)
+    if capabilities.integration_status == "UNSUPPORTED":
+        return ExecutionDecision(False, "BROKER_UNSUPPORTED", broker, mode)
     if not capabilities.paper_orders:
         return ExecutionDecision(False, "PAPER_ORDERS_UNSUPPORTED", broker, mode)
 
