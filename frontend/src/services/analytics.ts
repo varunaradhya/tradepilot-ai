@@ -1,15 +1,15 @@
-﻿import { api } from "./api";
-
+import { api } from "./api";
 
 export interface StockPerformance {
   symbol: string;
   quantity: number;
   invested_amount: number;
-  current_value: number;
-  unrealized_profit_loss: number;
-  unrealized_profit_loss_percent: number;
+  current_price: number | null;
+  current_value: number | null;
+  unrealized_profit_loss: number | null;
+  unrealized_profit_loss_percent: number | null;
+  market_data_available: boolean;
 }
-
 
 export interface PortfolioAnalytics {
   total_invested: number;
@@ -23,14 +23,11 @@ export interface PortfolioAnalytics {
   worst_performer: string | null;
   holdings_count: number;
   transactions_count: number;
+  market_data_complete: boolean;
+  unavailable_symbols: string[];
   stocks: StockPerformance[];
 }
 
-
 export async function getPortfolioAnalytics() {
-
-  return api.get<PortfolioAnalytics>(
-    "/analytics/portfolio",
-  );
-
+  return api.get<PortfolioAnalytics>("/analytics/portfolio");
 }
