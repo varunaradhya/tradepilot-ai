@@ -44,6 +44,8 @@ class PaperTradingOrchestrator:
         trade = self.engine.on_bar(session, high, low, close)
         snapshot = self.engine.snapshot()
         snapshot["last_event"] = "EXIT" if trade else ("POSITION_OPEN" if before is not None and self.engine.position is not None else "MARK")
+        if trade:
+            snapshot["trade"] = trade
         return snapshot
 
     def on_signal(self, session: str, signal: dict[str, Any]) -> dict[str, Any]:
@@ -67,6 +69,15 @@ class PaperTradingOrchestrator:
             return {"accepted": False, "reason": "ORDER_REJECTED", **self.engine.snapshot()}
         self.session_trades += 1
         return {"accepted": True, "reason": "PAPER_ORDER_OPENED", **self.engine.snapshot()}
+
+    def close_session(self, session: str, close: float) -> dict[str, Any]:
+        """Force an end-of-day virtual exit without sending a broker order."""
+        self._sync_session(session)
+        trade = self.engine.close(float(close), "SESSION_CLOSE")
+        return {"mode": "SIMULATION_ONLY", "trade": trade, **self.engine.snapshot()}
+
+    def trades(self) -> list[dict[str, Any]]:
+        return [dict(trade) for trade in self.engine.trades]
 
     def summary(self) -> dict[str, Any]:
         snapshot = self.engine.snapshot()
