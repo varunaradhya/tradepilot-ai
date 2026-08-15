@@ -1,0 +1,74 @@
+from datetime import date, timedelta
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
+
+from app.brokers.dhan import DhanAPIError, DhanClient
+from app.db.database import get_db
+from app.dependencies.auth import get_current_user
+from app.models.user import User
+from app.services.broker_service import get_access_token, get_user_broker
+from app.services.instrument_master_service import InstrumentMasterError, instrument_master
+from app.services.research_service import download_daily_dataset
+
+router = APIRouter(prefix="/research", tags=["Research"])
+
+
+@router.get("/instruments")
+def search_research_instruments(
+    q: str = Query(min_length=2, max_length=80),
+    current_user: User = Depends(get_current_user),
+):
+    del current_user
+    try:
+        return [
+            {
+                "security_id": item.security_id,
+                "symbol": item.symbol,
+                "name": item.name,
+                "exchange": "NSE",
+                "exchange_segment": item.exchange_segment,
+                "isin": item.isin,
+            }
+            for item in instrument_master.search(q)
+        ]
+    except InstrumentMasterError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+
+
+@router.post("/daily")
+def download_research_daily(
+    symbol: str = Query(min_length=1, max_length=30),
+    start: date | None = None,
+    end: date | None = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    end_date = end or date.today()
+    start_date = start or (end_date - timedelta(days=365 * 5))
+    if start_date >= end_date:
+        raise HTTPException(status_code=422, detail="start must be before end")
+    if (end_date - start_date).days > 365 * 10:
+        raise HTTPException(status_code=422, detail="Research history is limited to 10 years per request")
+
+    connection = get_user_broker(db, current_user.id, "dhan")
+    if connection is None:
+        raise HTTPException(status_code=404, detail="Dhan is not connected.")
+
+    try:
+        client = DhanClient(connection.client_id, get_access_token(connection))
+        result = download_daily_dataset(client, symbol, start_date, end_date)
+    except (ValueError, InstrumentMasterError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except DhanAPIError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return {
+        "status": "stored",
+        "symbol": result.symbol,
+        "dataset": result.dataset,
+        "bars": result.bars,
+        "start": result.start,
+        "end": result.end,
+        "valid": result.valid,
+    }
