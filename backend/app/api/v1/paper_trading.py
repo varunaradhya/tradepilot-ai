@@ -97,9 +97,43 @@ def create_paper_trade(payload: PaperTradeCreate, current_user: User = Depends(g
 
 
 @router.get("/trades")
-def get_paper_trades(status_filter: str | None = Query(default=None, alias="status", pattern="^(OPEN|CLOSED)$"), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def get_paper_trades(status_filter: str | None = Query(default=None, alias="status", pattern="^(OPEN|CLOSED)$"), strategy_version: str | None = Query(default=None, pattern="^(V1|V2)$"), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     trades = list_paper_trades(db, current_user.id, status_filter)
+    if strategy_version:
+        trades = [trade for trade in trades if trade.strategy_version == strategy_version]
     return {"trades": trades, "summary": paper_summary(trades), "mode": "SIMULATION_ONLY"}
+
+
+@router.get("/dashboard")
+def paper_dashboard(strategy_version: str | None = Query(default=None, pattern="^(V1|V2)$"), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict[str, Any]:
+    trades = list_paper_trades(db, current_user.id)
+    if strategy_version:
+        trades = [trade for trade in trades if trade.strategy_version == strategy_version]
+    performance = aggregate_paper_performance(trades)
+    return {
+        "mode": "SIMULATION_ONLY",
+        "summary": paper_summary(trades),
+        "performance": performance,
+        "open_positions": [
+            {
+                "id": trade.id,
+                "symbol": trade.symbol,
+                "quantity": trade.quantity,
+                "entry_price": trade.entry_price,
+                "stop_price": trade.stop_price,
+                "target_price": trade.target_price,
+                "pnl": trade.pnl,
+                "strategy_version": trade.strategy_version,
+            }
+            for trade in trades if trade.status == "OPEN"
+        ],
+        "risk": {
+            "trade_direction": "LONG_ONLY",
+            "broker_orders_enabled": False,
+            "max_daily_loss_enforced": True,
+            "strategy_version_filter": strategy_version or "ALL",
+        },
+    }
 
 
 @router.get("/performance")
