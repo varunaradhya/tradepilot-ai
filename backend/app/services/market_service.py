@@ -1,5 +1,6 @@
 from app.providers.market_data import (
     HistoricalData,
+    MarketDataNotFoundError,
     MarketDataProviderError,
     QuoteData,
     YahooFinanceProvider,
@@ -39,5 +40,6 @@ __all__ = [
     "get_history",
     "search_instruments",
     "MarketDataProviderError",
+    "MarketDataNotFoundError",
     "MarketSearchProviderError",
 ]
