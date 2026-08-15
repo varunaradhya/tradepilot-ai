@@ -14,10 +14,7 @@ export class ApiError extends Error {
   constructor(public readonly status: number, message: string) { super(message); }
 }
 
-const apiUrl = (import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1").replace(
-  /\/$/,
-  "",
-);
+const apiUrl = (import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1").replace(/\/$/, "");
 const healthUrl = new URL("/health", apiUrl).toString();
 
 async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
@@ -53,5 +50,6 @@ export const api = {
   getUsers: () => get<User[]>(`${apiUrl}/users/`),
   get: apiRequest,
   post: <T>(path: string, body?: unknown) => request<T>(`${apiUrl}${path}`, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) }),
+  put: <T>(path: string, body?: unknown) => request<T>(`${apiUrl}${path}`, { method: "PUT", body: body === undefined ? undefined : JSON.stringify(body) }),
   delete: <T>(path: string) => request<T>(`${apiUrl}${path}`, { method: "DELETE" }),
 };
