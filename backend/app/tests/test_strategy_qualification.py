@@ -14,9 +14,9 @@ def _robustness(**overrides):
 
 
 def _wf(**overrides):
-    summary = {"window_count": 10, "success_rate_percent": 70.0}
+    summary = {"success_rate_percent": 70.0}
     summary.update(overrides)
-    return {"summary": summary}
+    return {"windows": 10, "v2": {"summary": summary}}
 
 
 def test_qualifies_only_when_all_research_gates_pass():
