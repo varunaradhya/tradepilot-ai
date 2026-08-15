@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.services.historical_data_service import MarketBar
 from app.services.intraday_batch_research import run_multi_stock_research
@@ -16,9 +16,10 @@ class FakeStore(ResearchStore):
 def _bars(start=100.0):
     bars = []
     price = start
+    base = datetime(2025, 1, 2, 9, 15)
     for i in range(60):
         price += 0.2
-        bars.append(MarketBar(datetime(2025, 1, 2, 9, 15 + (i % 60)), price - .1, price + .2, price - .2, price, 1000))
+        bars.append(MarketBar(base + timedelta(minutes=5 * i), price - .1, price + .2, price - .2, price, 1000))
     return bars
 
 
