@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
+import re
 
 
 class BrokerCapability(str, Enum):
@@ -27,8 +28,15 @@ BROKER_CAPABILITIES = {
 
 
 def normalize_broker_name(name: str) -> str:
-    value = name.strip().upper().replace(" ", "")
-    aliases = {"ANGELONE": "ANGELONE", "ANGELONE_SMARTAPI": "ANGELONE", "SMARTAPI": "ANGELONE"}
+    """Normalize common broker display names and provider aliases."""
+    value = re.sub(r"[^A-Z0-9]", "", name.strip().upper())
+    aliases = {
+        "DHAN": "DHAN",
+        "GROWW": "GROWW",
+        "ANGELONE": "ANGELONE",
+        "ANGELONESMARTAPI": "ANGELONE",
+        "SMARTAPI": "ANGELONE",
+    }
     return aliases.get(value, value)
 
 
