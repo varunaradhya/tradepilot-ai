@@ -12,6 +12,8 @@ class ExecutionContext:
     strategy_ready: bool = False
     risk_approved: bool = False
     long_only: bool = True
+    max_quantity: int | None = None
+    max_order_value: float | None = None
 
 
 @dataclass(frozen=True)
@@ -46,6 +48,13 @@ def authorize_order(context: ExecutionContext, order: CanonicalOrder) -> Executi
         return ExecutionDecision(False, "STRATEGY_NOT_READY", broker, mode)
     if not context.risk_approved:
         return ExecutionDecision(False, "RISK_NOT_APPROVED", broker, mode)
+    if context.max_quantity is not None and order.quantity > context.max_quantity:
+        return ExecutionDecision(False, "QUANTITY_LIMIT_EXCEEDED", broker, mode)
+    if context.max_order_value is not None:
+        if order.price is None:
+            return ExecutionDecision(False, "ORDER_VALUE_UNVERIFIABLE", broker, mode)
+        if order.quantity * order.price > context.max_order_value:
+            return ExecutionDecision(False, "ORDER_VALUE_LIMIT_EXCEEDED", broker, mode)
     capabilities = get_broker_capabilities(broker)
     if capabilities.integration_status == "UNSUPPORTED":
         return ExecutionDecision(False, "BROKER_UNSUPPORTED", broker, mode)
