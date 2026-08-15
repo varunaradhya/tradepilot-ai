@@ -84,3 +84,9 @@ def test_groww_uses_same_paper_safety_policy():
     result = authorize_order(ready(broker="Groww"), order())
     assert result.allowed is True
     assert result.normalized_broker == "GROWW"
+
+
+def test_unknown_broker_is_rejected_even_when_all_other_gates_pass():
+    result = authorize_order(ready(broker="UnknownBroker"), order())
+    assert result.allowed is False
+    assert result.reason == "BROKER_UNSUPPORTED"
