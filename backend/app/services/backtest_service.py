@@ -15,8 +15,7 @@ class BacktestConfig:
 
 
 def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestConfig()) -> dict:
-    capital = float(config.initial_capital)
-    cash = capital
+    cash = float(config.initial_capital)
     quantity = 0
     entry_price = 0.0
     stop = 0.0
@@ -24,13 +23,11 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
     trades: list[dict] = []
     equity_curve: list[float] = []
 
-    for i in range(len(rows)):
-        row = rows[i]
+    for i, row in enumerate(rows):
         close = float(row["close"])
         high = float(row["high"])
         low = float(row["low"])
-        equity = cash + quantity * close
-        equity_curve.append(equity)
+        equity_curve.append(cash + quantity * close)
 
         if quantity:
             exit_price = None
@@ -76,7 +73,6 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
         cash += gross - costs
         pnl = quantity * (final_price - entry_price) - costs
         trades.append({"entry": entry_price, "exit": final_price, "quantity": quantity, "pnl": pnl, "reason": "END_OF_TEST"})
-        quantity = 0
         equity_curve[-1] = cash
 
     ending = cash
@@ -104,4 +100,5 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
         "gross_profit": round(gross_profit, 2),
         "gross_loss": round(gross_loss, 2),
         "trades_detail": trades,
+        "equity_curve": [round(value, 2) for value in equity_curve],
     }
