@@ -1,5 +1,4 @@
-﻿import { api } from "./api";
-
+import { api } from "./api";
 
 export interface Transaction {
   id: number;
@@ -10,7 +9,6 @@ export interface Transaction {
   transaction_date: string;
 }
 
-
 export interface TransactionSummary {
   total_transactions: number;
   total_buy_value: number;
@@ -18,35 +16,23 @@ export interface TransactionSummary {
   realized_profit_loss: number;
 }
 
-
 export interface TransactionListResponse {
   transactions: Transaction[];
   summary: TransactionSummary;
 }
-
 
 export interface TransactionCreate {
   symbol: string;
   transaction_type: "BUY" | "SELL";
   quantity: number;
   price: number;
+  transaction_date?: string;
 }
 
-
-export async function createTransaction(
-  transaction: TransactionCreate,
-): Promise<Transaction> {
-
-  return api.post<Transaction>(
-    "/transactions",
-    transaction,
-  );
+export async function createTransaction(transaction: TransactionCreate): Promise<Transaction> {
+  return api.post<Transaction>("/transactions", transaction);
 }
-
 
 export async function getTransactions(): Promise<TransactionListResponse> {
-
-  return api.get<TransactionListResponse>(
-    "/transactions",
-  );
+  return api.get<TransactionListResponse>("/transactions");
 }
