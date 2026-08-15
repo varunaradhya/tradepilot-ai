@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from app.dependencies.auth import get_current_user
+from app.db.database import get_db
 from app.models.user import User
 from app.services.intraday_backtest import IntradayBacktestConfig, run_intraday_backtest
 from app.services.intraday_strategy import IntradayConfig
@@ -114,17 +115,16 @@ def qualify_strategy_for_paper(symbol: str = Query(min_length=1, max_length=30),
     del current_user
     dataset, rows = _rows(symbol, interval)
     if not rows: raise HTTPException(status_code=404, detail=f"Intraday dataset not found: {dataset}")
-    strategy, config, backtest, robustness, walk_forward, qualification = _qualification(request, rows, train_size, validation_size, step)
+    _, _, backtest, robustness, walk_forward, qualification = _qualification(request, rows, train_size, validation_size, step)
     return {"symbol": symbol.strip().upper(), "interval": interval, "dataset": dataset, "qualification": qualification, "backtest": {k: v for k, v in backtest.items() if k != "trades_detail"}, "robustness": robustness["summary"], "walk_forward": {"windows": walk_forward["windows"], "v2_summary": walk_forward["v2"]["summary"]}}
 
 @router.post("/readiness")
-def strategy_readiness(symbol: str = Query(min_length=1, max_length=30), symbols: str = Query(default="", max_length=2000), interval: str = Query(default="5", pattern="^(1|5|15|25|60)$"), train_size: int = Query(default=60, ge=10, le=5000), validation_size: int = Query(default=20, ge=5, le=2000), step: int | None = Query(default=None, ge=1, le=2000), request: StrategyBuildRequest = ..., current_user: User = Depends(get_current_user), db: Session = Depends(__import__("app.db.database", fromlist=["get_db"]).get_db)):
+def strategy_readiness(symbol: str = Query(min_length=1, max_length=30), symbols: str = Query(default="", max_length=2000), interval: str = Query(default="5", pattern="^(1|5|15|25|60)$"), train_size: int = Query(default=60, ge=10, le=5000), validation_size: int = Query(default=20, ge=5, le=2000), step: int | None = Query(default=None, ge=1, le=2000), request: StrategyBuildRequest = ..., current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     dataset, rows = _rows(symbol, interval)
     if not rows: raise HTTPException(status_code=404, detail=f"Intraday dataset not found: {dataset}")
     _, _, backtest, robustness, walk_forward, qualification = _qualification(request, rows, train_size, validation_size, step)
     requested = list(dict.fromkeys([item.strip().upper() for item in (symbols or symbol).split(",") if item.strip()]))
-    datasets = {}
-    missing = []
+    datasets = {}; missing = []
     for item in requested:
         _, item_rows = _rows(item, interval)
         if item_rows: datasets[item] = item_rows
