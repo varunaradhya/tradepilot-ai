@@ -10,6 +10,7 @@ from app.services.auth_service import hash_password
 client = TestClient(app)
 EMAIL = "transaction-test@example.com"
 PASSWORD = "TestPassword123!"
+OTHER_EMAIL = "transaction-other@example.com"
 
 
 def create_user():
@@ -121,11 +122,7 @@ def test_transaction_history():
 def test_transaction_summary_realized_pnl_uses_fifo():
     create_user()
     headers = auth_headers()
-    for payload in [
-        ("TCS", "BUY", 10, 100),
-        ("TCS", "BUY", 10, 200),
-        ("TCS", "SELL", 5, 180),
-    ]:
+    for payload in [("TCS", "BUY", 10, 100), ("TCS", "BUY", 10, 200), ("TCS", "SELL", 5, 180)]:
         assert post_trade(headers, *payload).status_code == 201
     data = client.get("/api/v1/transactions", headers=headers).json()
     assert data["summary"]["realized_profit_loss"] == 400
@@ -137,11 +134,7 @@ def test_edit_transaction_rebuilds_fifo_holdings():
     first = post_trade(headers, "TCS", "BUY", 10, 100).json()
     assert post_trade(headers, "TCS", "BUY", 10, 200).status_code == 201
     assert post_trade(headers, "TCS", "SELL", 5, 180).status_code == 201
-    response = client.put(
-        f"/api/v1/transactions/{first['id']}",
-        json={"symbol": "TCS", "transaction_type": "BUY", "quantity": 20, "price": 100, "transaction_date": first["transaction_date"]},
-        headers=headers,
-    )
+    response = client.put(f"/api/v1/transactions/{first['id']}", json={"symbol": "TCS", "transaction_type": "BUY", "quantity": 20, "price": 100, "transaction_date": first["transaction_date"]}, headers=headers)
     assert response.status_code == 200
     holding = get_holding("TCS")
     assert holding is not None
@@ -154,11 +147,7 @@ def test_edit_transaction_that_creates_invalid_sell_rolls_back():
     headers = auth_headers()
     post_trade(headers, "INFY", "BUY", 5, 100)
     sell = post_trade(headers, "INFY", "SELL", 2, 120).json()
-    response = client.put(
-        f"/api/v1/transactions/{sell['id']}",
-        json={"symbol": "INFY", "transaction_type": "SELL", "quantity": 10, "price": 120, "transaction_date": sell["transaction_date"]},
-        headers=headers,
-    )
+    response = client.put(f"/api/v1/transactions/{sell['id']}", json={"symbol": "INFY", "transaction_type": "SELL", "quantity": 10, "price": 120, "transaction_date": sell["transaction_date"]}, headers=headers)
     assert response.status_code == 400
     holding = get_holding("INFY")
     assert holding is not None
@@ -185,19 +174,17 @@ def test_edit_and_delete_require_ownership():
     trade = post_trade(headers, "TCS", "BUY", 10, 3000).json()
     db = SessionLocal()
     try:
-        other = User(full_name="Other User", email="transaction-other@example.com", password_hash=hash_password(PASSWORD))
-        db.add(other)
-        db.commit()
+        other = db.query(User).filter(User.email == OTHER_EMAIL).first()
+        if other is None:
+            other = User(full_name="Other User", email=OTHER_EMAIL, password_hash=hash_password(PASSWORD))
+            db.add(other)
+            db.commit()
     finally:
         db.close()
-    other_login = client.post("/api/v1/auth/login", json={"email": "transaction-other@example.com", "password": PASSWORD})
+    other_login = client.post("/api/v1/auth/login", json={"email": OTHER_EMAIL, "password": PASSWORD})
     assert other_login.status_code == 200
     other_headers = {"Authorization": f"Bearer {other_login.json()['access_token']}"}
-    edit_response = client.put(
-        f"/api/v1/transactions/{trade['id']}",
-        json={"symbol": "TCS", "transaction_type": "BUY", "quantity": 20, "price": 3000, "transaction_date": trade["transaction_date"]},
-        headers=other_headers,
-    )
+    edit_response = client.put(f"/api/v1/transactions/{trade['id']}", json={"symbol": "TCS", "transaction_type": "BUY", "quantity": 20, "price": 3000, "transaction_date": trade["transaction_date"]}, headers=other_headers)
     assert edit_response.status_code == 404
     assert client.delete(f"/api/v1/transactions/{trade['id']}", headers=other_headers).status_code == 404
 
