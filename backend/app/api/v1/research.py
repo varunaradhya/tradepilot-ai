@@ -15,6 +15,7 @@ from app.services.intraday_experiment import run_intraday_experiment
 from app.services.intraday_batch_research import run_multi_stock_research
 from app.services.intraday_regime_analysis import build_benchmark_regime_analysis
 from app.services.intraday_regime_report import build_intraday_regime_report
+from app.services.intraday_research_lab import run_research_lab
 
 router = APIRouter(prefix="/research", tags=["Research"])
 
@@ -81,6 +82,13 @@ def batch_research_intraday(symbols: str=Query(min_length=1, max_length=1000), i
         return run_multi_stock_research([item for item in symbols.split(",")], interval=interval)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+@router.get("/intraday/research-lab")
+def intraday_research_lab(symbol: str=Query(min_length=1,max_length=30), interval: str=Query(default="5",pattern="^(1|5|15|25|60)$"), current_user: User=Depends(get_current_user)):
+    del current_user
+    dataset, rows = _dataset_rows(symbol, interval)
+    if not rows: raise HTTPException(status_code=404, detail=f"Intraday dataset not found: {dataset}")
+    return {"symbol": symbol.strip().upper(), "interval": interval, "dataset": dataset, **run_research_lab(rows)}
 
 @router.get("/intraday/regime-analysis")
 def intraday_regime_analysis(benchmark: str=Query(default="NIFTY", min_length=1, max_length=30), interval: str=Query(default="5",pattern="^(1|5|15|25|60)$"), lookback: int=Query(default=50, ge=20, le=500), step: int=Query(default=25, ge=1, le=500), current_user: User=Depends(get_current_user)):
