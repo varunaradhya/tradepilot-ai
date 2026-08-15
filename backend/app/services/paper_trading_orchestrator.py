@@ -22,11 +22,16 @@ class PaperTradingOrchestrator:
         if config.max_trades_per_session < 1:
             raise ValueError("max_trades_per_session must be positive")
         self.config = config
+        # The paper engine itself only supports long positions today. Keep its
+        # risk model valid even when the caller asks for an unsupported mode;
+        # the orchestrator then rejects the order through the explicit safety
+        # gate below instead of failing during construction.
+        engine_direction = "LONG_ONLY"
         self.engine = PaperTradingEngine(PaperRiskConfig(
             initial_capital=config.initial_capital,
             risk_per_trade=config.risk_per_trade,
             max_daily_loss=config.max_daily_loss,
-            trade_direction=config.trade_direction,
+            trade_direction=engine_direction,
         ))
         self.session_trades = 0
         self.last_signal: dict[str, Any] | None = None
