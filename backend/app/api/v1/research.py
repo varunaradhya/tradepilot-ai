@@ -16,6 +16,7 @@ from app.services.intraday_batch_research import run_multi_stock_research
 from app.services.intraday_regime_analysis import build_benchmark_regime_analysis
 from app.services.intraday_regime_report import build_intraday_regime_report
 from app.services.intraday_research_lab import run_research_lab
+from app.services.intraday_scorecard import build_intraday_scorecard, ScorecardConfig
 
 router = APIRouter(prefix="/research", tags=["Research"])
 
@@ -41,6 +42,15 @@ def _dataset_rows(symbol: str, interval: str):
         row["session"] = row["timestamp"].date().isoformat()
         rows.append(row)
     return dataset, rows
+
+def _requested_rows(symbols: str, interval: str):
+    datasets = {}
+    missing = []
+    for symbol in dict.fromkeys(s.strip().upper() for s in symbols.split(",") if s.strip()):
+        _, rows = _dataset_rows(symbol, interval)
+        if rows: datasets[symbol] = rows
+        else: missing.append(symbol)
+    return datasets, missing
 
 @router.post("/daily")
 def download_research_daily(symbol: str = Query(min_length=1, max_length=30), start: date | None = None, end: date | None = None, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -82,6 +92,15 @@ def batch_research_intraday(symbols: str=Query(min_length=1, max_length=1000), i
         return run_multi_stock_research([item for item in symbols.split(",")], interval=interval)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+@router.get("/intraday/scorecard")
+def intraday_scorecard(symbols: str=Query(min_length=1, max_length=2000), interval: str=Query(default="5",pattern="^(1|5|15|25|60)$"), min_trades: int=Query(default=20, ge=1, le=100000), slippage: float=Query(default=0.001, ge=0, le=0.01), current_user: User=Depends(get_current_user)):
+    del current_user
+    datasets, missing = _requested_rows(symbols, interval)
+    result = build_intraday_scorecard(datasets, ScorecardConfig(minimum_trades=min_trades, slippage_rate=slippage))
+    result["missing_datasets"] = missing
+    result["interval"] = interval
+    return result
 
 @router.get("/intraday/research-lab")
 def intraday_research_lab(symbol: str=Query(min_length=1,max_length=30), interval: str=Query(default="5",pattern="^(1|5|15|25|60)$"), current_user: User=Depends(get_current_user)):
