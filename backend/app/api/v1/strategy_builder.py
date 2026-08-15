@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 from app.dependencies.auth import get_current_user
 from app.models.user import User
 from app.services.intraday_backtest import IntradayBacktestConfig, run_intraday_backtest
@@ -8,7 +9,11 @@ from app.services.intraday_strategy_comparison import compare_intraday_strategie
 from app.services.intraday_walk_forward import run_fixed_parameter_walk_forward
 from app.services.intraday_robustness import run_robustness_analysis
 from app.services.strategy_qualification import QualificationPolicy, qualify_strategy
+from app.services.strategy_readiness import ReadinessPolicy, build_strategy_readiness
 from app.services.research_store import research_store
+from app.services.intraday_scorecard import build_intraday_scorecard, ScorecardConfig
+from app.services.intraday_evidence_aggregation import aggregate_scorecards
+from app.models.paper_trade import PaperTrade
 
 router = APIRouter(prefix="/strategy-builder", tags=["Strategy Builder"])
 
@@ -58,6 +63,16 @@ def _backtest_config(request: StrategyBuildRequest, strategy: IntradayConfig, ve
 def _policy(request: StrategyBuildRequest) -> QualificationPolicy:
     return QualificationPolicy(min_trades=request.min_trades, min_profit_factor=request.min_profit_factor, min_positive_return_percent=request.min_positive_sensitivity_percent, min_pf_above_one_percent=request.min_stable_profit_factor_percent, max_drawdown_percent=request.max_drawdown_percent, min_walk_forward_success_percent=request.min_walk_forward_success_percent)
 
+def _qualification(request: StrategyBuildRequest, rows: list[dict], train_size: int, validation_size: int, step: int | None):
+    strategy = _strategy(request); config = _backtest_config(request, strategy)
+    if train_size + validation_size > len(rows):
+        raise HTTPException(status_code=422, detail="Not enough bars for the requested train and validation windows")
+    backtest = run_intraday_backtest(rows, config)
+    robustness = run_robustness_analysis(rows, config, stress_costs=True)
+    walk_forward = run_fixed_parameter_walk_forward(rows, train_size, validation_size, step, config)
+    qualification = qualify_strategy(backtest, robustness, walk_forward, _policy(request))
+    return strategy, config, backtest, robustness, walk_forward, qualification
+
 @router.post("/backtest")
 def build_and_backtest(symbol: str = Query(min_length=1, max_length=30), interval: str = Query(default="5", pattern="^(1|5|15|25|60)$"), request: StrategyBuildRequest = ..., current_user: User = Depends(get_current_user)):
     del current_user
@@ -99,8 +114,23 @@ def qualify_strategy_for_paper(symbol: str = Query(min_length=1, max_length=30),
     del current_user
     dataset, rows = _rows(symbol, interval)
     if not rows: raise HTTPException(status_code=404, detail=f"Intraday dataset not found: {dataset}")
-    if train_size + validation_size > len(rows): raise HTTPException(status_code=422, detail="Not enough bars for the requested train and validation windows")
-    strategy = _strategy(request); config = _backtest_config(request, strategy)
-    backtest = run_intraday_backtest(rows, config); robustness = run_robustness_analysis(rows, config, stress_costs=True); walk_forward = run_fixed_parameter_walk_forward(rows, train_size, validation_size, step, config)
-    qualification = qualify_strategy(backtest, robustness, walk_forward, _policy(request))
+    strategy, config, backtest, robustness, walk_forward, qualification = _qualification(request, rows, train_size, validation_size, step)
     return {"symbol": symbol.strip().upper(), "interval": interval, "dataset": dataset, "qualification": qualification, "backtest": {k: v for k, v in backtest.items() if k != "trades_detail"}, "robustness": robustness["summary"], "walk_forward": {"windows": walk_forward["windows"], "v2_summary": walk_forward["v2"]["summary"]}}
+
+@router.post("/readiness")
+def strategy_readiness(symbol: str = Query(min_length=1, max_length=30), symbols: str = Query(default="", max_length=2000), interval: str = Query(default="5", pattern="^(1|5|15|25|60)$"), train_size: int = Query(default=60, ge=10, le=5000), validation_size: int = Query(default=20, ge=5, le=2000), step: int | None = Query(default=None, ge=1, le=2000), request: StrategyBuildRequest = ..., current_user: User = Depends(get_current_user), db: Session = Depends(__import__("app.db.database", fromlist=["get_db"]).get_db)):
+    dataset, rows = _rows(symbol, interval)
+    if not rows: raise HTTPException(status_code=404, detail=f"Intraday dataset not found: {dataset}")
+    _, _, backtest, robustness, walk_forward, qualification = _qualification(request, rows, train_size, validation_size, step)
+    requested = list(dict.fromkeys([item.strip().upper() for item in (symbols or symbol).split(",") if item.strip()]))
+    datasets = {}
+    missing = []
+    for item in requested:
+        _, item_rows = _rows(item, interval)
+        if item_rows: datasets[item] = item_rows
+        else: missing.append(item)
+    scorecard = build_intraday_scorecard(datasets, ScorecardConfig(minimum_trades=request.min_trades, slippage_rate=request.slippage_rate))
+    evidence = aggregate_scorecards(scorecard.get("ranked", []), interval=interval, requested_symbols=requested, missing_symbols=missing)
+    paper_trades = db.query(PaperTrade).filter(PaperTrade.user_id == current_user.id).all()
+    readiness = build_strategy_readiness(qualification, evidence, paper_trades, ReadinessPolicy())
+    return {"symbol": symbol.strip().upper(), "interval": interval, "dataset": dataset, "qualification": qualification, "backtest": {k: v for k, v in backtest.items() if k != "trades_detail"}, "robustness": robustness["summary"], "walk_forward": {"windows": walk_forward["windows"], "v1_summary": walk_forward["v1"]["summary"], "v2_summary": walk_forward["v2"]["summary"]}, "cross_stock": evidence, "readiness": readiness}
