@@ -1,3 +1,5 @@
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -7,8 +9,10 @@ from app.dependencies.auth import get_current_user
 from app.models.user import User
 from app.services.paper_trading_service import close_paper_trade, list_paper_trades, open_paper_trade, paper_summary, update_paper_trade
 from app.models.paper_trade import PaperTrade
+from app.services.paper_trading_orchestrator import PaperOrchestratorConfig, PaperTradingOrchestrator
 
 router = APIRouter(prefix="/paper-trading", tags=["Paper Trading"])
+_sessions: dict[int, PaperTradingOrchestrator] = {}
 
 
 class PaperTradeCreate(BaseModel):
@@ -31,11 +35,31 @@ class PaperCloseRequest(BaseModel):
     reason: str = Field(default="MANUAL", min_length=1, max_length=40)
 
 
+class PaperSignalRequest(BaseModel):
+    session: str = Field(min_length=1, max_length=40)
+    action: str = Field(min_length=1, max_length=20)
+    entry: float = Field(gt=0)
+    stop: float = Field(gt=0)
+    target: float = Field(gt=0)
+    symbol: str = Field(default="", max_length=30)
+
+
+class PaperBarRequest(BaseModel):
+    session: str = Field(min_length=1, max_length=40)
+    high: float = Field(gt=0)
+    low: float = Field(gt=0)
+    close: float = Field(gt=0)
+
+
 def _owned(db: Session, user_id: int, trade_id: int) -> PaperTrade:
     trade = db.query(PaperTrade).filter(PaperTrade.id == trade_id, PaperTrade.user_id == user_id).first()
     if trade is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Paper trade not found")
     return trade
+
+
+def _orchestrator(user_id: int) -> PaperTradingOrchestrator:
+    return _sessions.setdefault(user_id, PaperTradingOrchestrator(PaperOrchestratorConfig(trade_direction="LONG_ONLY")))
 
 
 @router.post("/trades", status_code=status.HTTP_201_CREATED)
@@ -68,3 +92,28 @@ def close_trade(trade_id: int, payload: PaperCloseRequest, current_user: User = 
         return close_paper_trade(db, trade, payload.exit_price, payload.reason)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+
+
+@router.get("/session")
+def paper_session_summary(current_user: User = Depends(get_current_user)) -> dict[str, Any]:
+    return {"mode": "SIMULATION_ONLY", **_orchestrator(current_user.id).summary()}
+
+
+@router.post("/session/signal")
+def paper_session_signal(payload: PaperSignalRequest, current_user: User = Depends(get_current_user)) -> dict[str, Any]:
+    result = _orchestrator(current_user.id).on_signal(payload.session, payload.model_dump())
+    return {"mode": "SIMULATION_ONLY", **result}
+
+
+@router.post("/session/bar")
+def paper_session_bar(payload: PaperBarRequest, current_user: User = Depends(get_current_user)) -> dict[str, Any]:
+    if payload.low > payload.high:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="low cannot exceed high")
+    result = _orchestrator(current_user.id).on_bar(payload.session, payload.high, payload.low, payload.close)
+    return {"mode": "SIMULATION_ONLY", **result}
+
+
+@router.post("/session/reset")
+def paper_session_reset(current_user: User = Depends(get_current_user)) -> dict[str, Any]:
+    _sessions[current_user.id] = PaperTradingOrchestrator(PaperOrchestratorConfig(trade_direction="LONG_ONLY"))
+    return {"mode": "SIMULATION_ONLY", "reset": True}
