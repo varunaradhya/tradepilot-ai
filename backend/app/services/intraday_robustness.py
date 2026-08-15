@@ -40,8 +40,22 @@ def run_robustness_analysis(
 
     This is diagnostic only: no variant is selected or fed back into the strategy.
     """
+    method = "fixed local sensitivity; no parameter optimization"
     if not rows:
-        return {"variants": [], "summary": {"variant_count": 0, "positive_return_percent": 0.0, "median_return_percent": 0.0}}
+        return {
+            "method": method,
+            "variants": [],
+            "summary": {
+                "variant_count": 0,
+                "positive_return_percent": 0.0,
+                "profit_factor_above_1_percent": 0.0,
+                "median_return_percent": 0.0,
+                "worst_return_percent": 0.0,
+                "best_return_percent": 0.0,
+                "base_return_percent": 0.0,
+                "base_max_drawdown_percent": 0.0,
+            },
+        }
 
     base = config.strategy if isinstance(config.strategy, IntradayConfig) else IntradayConfig()
     results: list[dict] = []
@@ -75,7 +89,7 @@ def run_robustness_analysis(
     base_result = next(item for item in results if item["name"] == "BASE")
     stable_pf = sum(1 for item in results if item["profit_factor"] is not None and item["profit_factor"] > 1)
     return {
-        "method": "fixed local sensitivity; no parameter optimization",
+        "method": method,
         "variants": results,
         "summary": {
             "variant_count": len(results),
