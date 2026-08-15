@@ -9,6 +9,10 @@ class MarketDataProviderError(Exception):
     """Raised when a market-data provider cannot return valid data."""
 
 
+class MarketDataNotFoundError(MarketDataProviderError):
+    """Raised when the provider is reachable but the symbol has no data."""
+
+
 @dataclass
 class QuoteData:
     symbol: str
@@ -88,6 +92,7 @@ class YahooFinanceProvider:
 
     def _get_chart(self, symbol: str, range_: str, interval: str) -> tuple[dict, str]:
         last_error: Exception | None = None
+        symbol_not_found = True
 
         for provider_symbol in self._candidate_provider_symbols(symbol):
             key = (provider_symbol, range_, interval)
@@ -111,6 +116,7 @@ class YahooFinanceProvider:
                         headers={"User-Agent": "Mozilla/5.0 TradePilotAI/0.1"},
                     )
                     if response.status_code == 429:
+                        symbol_not_found = False
                         last_error = httpx.HTTPStatusError(
                             "429 Too Many Requests",
                             request=response.request,
@@ -128,12 +134,14 @@ class YahooFinanceProvider:
                         continue
                     results = chart.get("result") or []
                     if not results:
-                        last_error = MarketDataProviderError(
+                        last_error = MarketDataNotFoundError(
                             f"No market data found for symbol {symbol.strip().upper()}"
                         )
                         continue
+                    symbol_not_found = False
                     return self._store_cache(key, results[0]), "LIVE"
                 except (httpx.HTTPError, ValueError) as exc:
+                    symbol_not_found = False
                     last_error = exc
                     continue
 
@@ -141,6 +149,8 @@ class YahooFinanceProvider:
             raise MarketDataProviderError(
                 "Market data provider is temporarily rate-limiting requests. Please try again in a few seconds."
             ) from last_error
+        if symbol_not_found and isinstance(last_error, MarketDataNotFoundError):
+            raise last_error
         if isinstance(last_error, ValueError):
             raise MarketDataProviderError("Market data provider returned invalid JSON") from last_error
         if last_error is not None:
@@ -153,7 +163,7 @@ class YahooFinanceProvider:
         meta = result.get("meta", {})
         price = meta.get("regularMarketPrice")
         if price is None:
-            raise MarketDataProviderError(f"Current price unavailable for {requested_symbol}")
+            raise MarketDataNotFoundError(f"Current price unavailable for {requested_symbol}")
 
         previous_close = meta.get("previousClose")
         change = None
