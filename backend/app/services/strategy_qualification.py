@@ -29,7 +29,7 @@ def qualify_strategy(backtest: dict, robustness: dict, walk_forward: dict | None
     check("profit_factor", pf is not None and float(pf) >= policy.min_profit_factor, pf, policy.min_profit_factor, "Profit factor must clear the research floor.")
     check("drawdown", drawdown <= policy.max_drawdown_percent, drawdown, policy.max_drawdown_percent, "Drawdown must remain within the risk ceiling.")
     check("positive_sensitivity", float(summary.get("positive_return_percent", 0.0)) >= policy.min_positive_return_percent, summary.get("positive_return_percent", 0.0), policy.min_positive_return_percent, "Most local sensitivity variants should remain profitable.")
-    check("stable_profit_factor", float(summary.get("profit_factor_above_1_percent", 0.0)) >= policy.min_pf_above_one_percent, summary.get("profit_factor_above_1_percent", 0.0), policy.min_pf_above_1_percent, "Most sensitivity variants should retain PF above one.")
+    check("stable_profit_factor", float(summary.get("profit_factor_above_1_percent", 0.0)) >= policy.min_pf_above_one_percent, summary.get("profit_factor_above_1_percent", 0.0), policy.min_pf_above_one_percent, "Most sensitivity variants should retain PF above one.")
 
     wf_summary = (walk_forward or {}).get("v2", {}).get("summary", {}) if walk_forward else {}
     wf_windows = int((walk_forward or {}).get("windows", 0)) if walk_forward else 0
