@@ -1,52 +1,96 @@
-# \# TradePilot AI
+# TradePilot AI
 
-# 
+TradePilot AI is a risk-first stock research, strategy validation and paper-trading platform built for disciplined intraday experimentation.
 
-# AI-powered stock portfolio tracking and analysis platform.
+## Current status
 
-# 
+**V1 stabilization / paper-trading ready foundation**
 
-# \## Tech Stack
+The project currently includes:
 
-# 
+- React + TypeScript + Tailwind frontend
+- FastAPI + Python backend
+- SQLAlchemy persistence
+- SQLite for local development and PostgreSQL for cloud deployment
+- Deterministic long-first intraday signal engine
+- Position risk and sizing engine
+- Central execution safety gate
+- Paper-risk controls for daily loss, trade count, loss streak and open positions
+- Auditable paper trade-decision endpoint and command center
+- Strategy qualification, robustness and walk-forward validation
+- Strategy readiness / deployment gates
+- Market-data quality checks
+- Multi-broker abstraction for Dhan, Groww and Angel One foundations
+- Docker Compose deployment stack
+- GitHub Actions CI for backend tests and frontend production builds
 
-# \### Frontend
+## Safety boundary
 
-# \- React
+TradePilot is intentionally **paper-first**.
 
-# \- TypeScript
+Live order execution is disabled by the execution safety layer. Broker adapters may expose capabilities and paper workflows, but a real-money order must not be inferred from a successful paper decision.
 
-# \- Tailwind CSS
+The intended flow is:
 
-# 
+```text
+Market data
+    -> signal
+    -> strategy readiness
+    -> position sizing
+    -> paper risk guard
+    -> execution safety gate
+    -> paper trade
+    -> performance evidence
+```
 
-# \### Backend
+A strategy should demonstrate sufficient historical robustness and real paper performance before any future live-execution review.
 
-# \- FastAPI
+## Local development
 
-# \- Python
+### Backend
 
-# \- SQLAlchemy
+```powershell
+cd backend
+.\.venv\Scripts\python.exe -m pytest
+```
 
-# 
+### Frontend
 
-# \### Database
+```powershell
+cd frontend
+npm.cmd run build
+```
 
-# \- SQLite — Phase 1
+### Docker
 
-# \- PostgreSQL — Cloud
+Set production secrets in the environment before starting the stack. Do not commit secrets.
 
-# 
+```powershell
+$env:POSTGRES_PASSWORD = "<strong-password>"
+$env:TRADEPILOT_JWT_SECRET = "<strong-secret>"
+$env:TRADEPILOT_BROKER_ENCRYPTION_KEY = "<strong-encryption-key>"
+docker compose config
+docker compose up --build
+```
 
-# \### Infrastructure
+The backend exposes `/health` for liveness and `/ready` for database readiness.
 
-# \- Docker
+## Verification baseline
 
-# 
+The current verified development checkpoint is **362 backend tests passing** with a successful Vite production build. Always rerun the local test/build commands after pulling changes.
 
-# \## Project Status
+## Project structure
 
-# 
+```text
+tradepilot-ai/
+├── backend/           FastAPI application, domain services and tests
+├── frontend/          React/TypeScript application
+├── docs/              Architecture and operational documentation
+├── scripts/            Development/operations helpers
+├── docker-compose.yml Local production-like stack
+└── .github/workflows/ CI
+```
 
-# 🚧 Sprint 1 — Project Initialization
+## Important disclaimer
 
+TradePilot is a software and research platform, not financial advice. Paper results and historical backtests do not guarantee future performance. Keep live execution disabled until the strategy, data quality, operational controls and broker integration have been independently reviewed.
