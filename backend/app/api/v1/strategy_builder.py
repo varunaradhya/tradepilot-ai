@@ -5,6 +5,7 @@ from app.models.user import User
 from app.services.intraday_backtest import IntradayBacktestConfig, run_intraday_backtest
 from app.services.intraday_strategy import IntradayConfig
 from app.services.intraday_strategy_comparison import compare_intraday_strategies
+from app.services.intraday_walk_forward import run_fixed_parameter_walk_forward
 from app.services.research_store import research_store
 
 router = APIRouter(prefix="/strategy-builder", tags=["Strategy Builder"])
@@ -64,3 +65,23 @@ def compare_versions(symbol: str = Query(min_length=1, max_length=30), interval:
     strategy = _strategy(request)
     comparison = compare_intraday_strategies(rows, _backtest_config(request, strategy))
     return {"symbol": symbol.strip().upper(), "interval": interval, "dataset": dataset, **comparison}
+
+@router.post("/walk-forward")
+def walk_forward_validation(
+    symbol: str = Query(min_length=1, max_length=30),
+    interval: str = Query(default="5", pattern="^(1|5|15|25|60)$"),
+    train_size: int = Query(default=60, ge=10, le=5000),
+    validation_size: int = Query(default=20, ge=5, le=2000),
+    step: int | None = Query(default=None, ge=1, le=2000),
+    request: StrategyBuildRequest = ...,
+    current_user: User = Depends(get_current_user),
+):
+    del current_user
+    dataset, rows = _rows(symbol, interval)
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"Intraday dataset not found: {dataset}")
+    if train_size + validation_size > len(rows):
+        raise HTTPException(status_code=422, detail="Not enough bars for the requested train and validation windows")
+    strategy = _strategy(request)
+    result = run_fixed_parameter_walk_forward(rows, train_size, validation_size, step, _backtest_config(request, strategy))
+    return {"symbol": symbol.strip().upper(), "interval": interval, "dataset": dataset, **result}
