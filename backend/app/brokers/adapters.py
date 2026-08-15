@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from decimal import Decimal
 from typing import Any
@@ -14,6 +14,10 @@ class DhanBrokerAdapter(BrokerAdapter):
 
     def __init__(self, client: DhanClient) -> None:
         self.client = client
+
+    @property
+    def capabilities(self) -> frozenset[str]:
+        return frozenset({"profile", "holdings", "positions", "orders", "trades", "historical_data"})
 
     def get_profile(self) -> dict[str, Any]:
         return self.client.profile()
@@ -54,6 +58,10 @@ class UnsupportedBrokerAdapter(BrokerAdapter):
 
     def __init__(self, *args: Any, broker_name: str = "unknown", **kwargs: Any) -> None:
         self.name = broker_name
+
+    @property
+    def capabilities(self) -> frozenset[str]:
+        return frozenset()
 
     def _unsupported(self) -> None:
         raise NotImplementedError(
