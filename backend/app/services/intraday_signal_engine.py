@@ -33,7 +33,11 @@ def generate_long_intraday_signal(
     stop_buffer: float = 0.002,
     reward_multiple: float = 2.0,
 ) -> IntradaySignal:
-    """Deterministic long-first intraday signal; no order execution."""
+    """Deterministic long-first intraday signal; no order execution.
+
+    Confidence is an evidence score, not a probability. It intentionally tops
+    out below 100 so an unusually high threshold can still suppress a setup.
+    """
     if min_confidence < 0 or min_confidence > 100:
         raise ValueError("INVALID_CONFIDENCE")
     if reward_multiple <= 0 or stop_buffer < 0:
@@ -51,7 +55,7 @@ def generate_long_intraday_signal(
     score = 0.0
     reasons: list[str] = []
     if fast > slow:
-        score += 30
+        score += 25
         reasons.append("TREND_UP")
     if close > fast:
         score += 20
@@ -60,7 +64,7 @@ def generate_long_intraday_signal(
         score += 20
         reasons.append("VOLUME_CONFIRMATION")
     if opening_high is not None and close > opening_high:
-        score += 30
+        score += 25
         reasons.append("OPENING_HIGH_BREAKOUT")
 
     if score < min_confidence:
@@ -73,4 +77,4 @@ def generate_long_intraday_signal(
         return IntradaySignal("NEUTRAL", round(score, 2), None, None, None, None, tuple(reasons + ["INVALID_STOP"]))
     target = close + risk * reward_multiple
     rr = (target - close) / risk
-    return IntradaySignal("BUY", round(min(score, 100.0), 2), close, round(stop, 4), round(target, 4), round(rr, 2), tuple(reasons))
+    return IntradaySignal("BUY", round(min(score, 90.0), 2), close, round(stop, 4), round(target, 4), round(rr, 2), tuple(reasons))
