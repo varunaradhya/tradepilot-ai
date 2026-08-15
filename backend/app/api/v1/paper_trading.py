@@ -13,6 +13,7 @@ from app.services.paper_trading_orchestrator import PaperOrchestratorConfig, Pap
 from app.services.paper_market_service import PaperMarketCoordinator
 from app.services.paper_dhan_service import run_dhan_paper_session
 from app.services.intraday_evidence_aggregation import aggregate_paper_performance
+from app.services.strategy_readiness import build_strategy_readiness
 
 router = APIRouter(prefix="/paper-trading", tags=["Paper Trading"])
 _sessions: dict[int, PaperTradingOrchestrator] = {}
@@ -134,6 +135,26 @@ def paper_dashboard(strategy_version: str | None = Query(default=None, pattern="
             "strategy_version_filter": strategy_version or "ALL",
         },
     }
+
+
+@router.get("/readiness")
+def paper_readiness(
+    qualification_status: str = Query(default="PAPER_CANDIDATE", pattern="^(PAPER_CANDIDATE|NOT_QUALIFIED)$"),
+    robust_percent: float = Query(default=0.0, ge=0, le=100),
+    symbols_tested: int = Query(default=0, ge=0),
+    strategy_version: str | None = Query(default=None, pattern="^(V1|V2)$"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    trades = list_paper_trades(db, current_user.id)
+    if strategy_version:
+        trades = [trade for trade in trades if trade.strategy_version == strategy_version]
+    result = build_strategy_readiness(
+        {"status": qualification_status},
+        {"summary": {"symbols_tested": symbols_tested, "robust_percent": robust_percent}},
+        trades,
+    )
+    return {"mode": "SIMULATION_ONLY", "strategy_version": strategy_version or "ALL", **result}
 
 
 @router.get("/performance")
