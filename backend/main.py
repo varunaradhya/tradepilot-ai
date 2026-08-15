@@ -4,6 +4,7 @@ from app.api.v1.alerts import router as alerts_router
 from app.api.v1.advanced_analytics import router as advanced_analytics_router
 from app.api.v1.reconciliation import router as reconciliation_router
 from app.api.v1.trading_general import router as trading_general_router
+from app.api.v1.algo import router as algo_router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
@@ -23,7 +24,7 @@ from app.core.config import TRADEPILOT_CORS_ORIGINS
 app = FastAPI(title="TradePilot AI", description="AI-powered stock portfolio tracking and analysis platform", version="0.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=TRADEPILOT_CORS_ORIGINS, allow_credentials=False, allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], allow_headers=["*"])
 for router in [users_router, auth_router, portfolio_router, valuation_router, transactions_router, analytics_router, watchlist_router, brokers_router, market_router]: app.include_router(router, prefix="/api/v1")
-for router in [reconciliation_router, advanced_analytics_router, signals_router, intelligence_router, alerts_router, trading_general_router]: app.include_router(router, prefix="/api/v1")
+for router in [reconciliation_router, advanced_analytics_router, signals_router, intelligence_router, alerts_router, trading_general_router, algo_router]: app.include_router(router, prefix="/api/v1")
 
 @app.on_event("startup")
 def startup_event(): init_db()
