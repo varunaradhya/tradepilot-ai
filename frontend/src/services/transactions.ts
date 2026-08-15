@@ -33,6 +33,14 @@ export async function createTransaction(transaction: TransactionCreate): Promise
   return api.post<Transaction>("/transactions", transaction);
 }
 
+export async function updateTransaction(id: number, transaction: TransactionCreate): Promise<Transaction> {
+  return api.put<Transaction>(`/transactions/${id}`, transaction);
+}
+
+export async function deleteTransaction(id: number): Promise<void> {
+  return api.delete<void>(`/transactions/${id}`);
+}
+
 export async function getTransactions(): Promise<TransactionListResponse> {
   return api.get<TransactionListResponse>("/transactions");
 }
