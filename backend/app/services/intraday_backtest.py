@@ -61,7 +61,7 @@ def run_intraday_backtest(rows: Sequence[dict], config: IntradayBacktestConfig =
     session_trade_count = 0
     session_halted = False
 
-    def close_position(price: float, reason: str) -> None:
+    def close_position(price: float, reason: str, exit_time: object = None) -> None:
         nonlocal cash, position, session_pnl
         if position is None:
             return
@@ -71,15 +71,26 @@ def run_intraday_backtest(rows: Sequence[dict], config: IntradayBacktestConfig =
         costs = gross * config.brokerage_rate
         cash += gross - costs
         pnl = qty * (exit_price - position["entry"]) - costs - position["entry_cost"]
+        trade = {
+            "entry": position["entry"],
+            "exit": exit_price,
+            "quantity": qty,
+            "pnl": pnl,
+            "reason": reason,
+        }
+        if position.get("entry_time") is not None:
+            trade["entry_time"] = position["entry_time"]
+        if exit_time is not None:
+            trade["exit_time"] = exit_time
         session_pnl += pnl
-        trades.append({"entry": position["entry"], "exit": exit_price, "quantity": qty, "pnl": pnl, "reason": reason})
+        trades.append(trade)
         position = None
 
     for i, row in enumerate(rows):
         session = row.get("session")
         if session is not None and current_session is not None and session != current_session:
             if position is not None:
-                close_position(float(rows[i - 1]["close"]), "SESSION_CLOSE")
+                close_position(float(rows[i - 1]["close"]), "SESSION_CLOSE", rows[i - 1].get("timestamp", rows[i - 1].get("time")))
             session_rows = []
             session_start_cash = cash
             session_pnl = 0.0
@@ -92,9 +103,9 @@ def run_intraday_backtest(rows: Sequence[dict], config: IntradayBacktestConfig =
             high = float(row["high"])
             low = float(row["low"])
             if low <= position["stop"]:
-                close_position(position["stop"], "STOP")
+                close_position(position["stop"], "STOP", row.get("timestamp", row.get("time")))
             elif high >= position["target"]:
-                close_position(position["target"], "TARGET")
+                close_position(position["target"], "TARGET", row.get("timestamp", row.get("time")))
 
             if session_start_cash and (-session_pnl / session_start_cash * 100) >= config.max_daily_loss_percent:
                 session_halted = True
@@ -127,9 +138,16 @@ def run_intraday_backtest(rows: Sequence[dict], config: IntradayBacktestConfig =
                 if quantity > 0:
                     entry_cost = quantity * entry * config.brokerage_rate
                     cash -= quantity * entry + entry_cost
-                    position = {"entry": entry, "stop": signal["stop"], "target": signal["target"], "quantity": quantity, "entry_cost": entry_cost}
+                    position = {
+                        "entry": entry,
+                        "stop": signal["stop"],
+                        "target": signal["target"],
+                        "quantity": quantity,
+                        "entry_cost": entry_cost,
+                        "entry_time": row.get("timestamp", row.get("time")),
+                    }
                     session_trade_count += 1
 
     if position is not None:
-        close_position(float(rows[-1]["close"]), "END_OF_TEST")
+        close_position(float(rows[-1]["close"]), "END_OF_TEST", rows[-1].get("timestamp", rows[-1].get("time")))
     return _metrics(config.initial_capital, cash, trades) | {"trades_detail": trades}
