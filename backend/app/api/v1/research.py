@@ -12,6 +12,7 @@ from app.services.research_lab import analyze_dataset
 from app.services.research_service import download_daily_dataset
 from app.services.research_store import research_store
 from app.services.intraday_experiment import run_intraday_experiment
+from app.services.intraday_batch_research import run_multi_stock_research
 
 router = APIRouter(prefix="/research", tags=["Research"])
 
@@ -64,6 +65,14 @@ def experiment_research_intraday(symbol: str=Query(min_length=1,max_length=30), 
     for bar in bars:
         row=bar.as_row(); row["session"]=row["timestamp"].date().isoformat(); rows.append(row)
     return {"symbol":symbol.strip().upper(),"interval":interval,"dataset":dataset,**run_intraday_experiment(rows)}
+
+@router.get("/intraday/batch")
+def batch_research_intraday(symbols: str=Query(min_length=1, max_length=1000), interval: str=Query(default="5",pattern="^(1|5|15|25|60)$"), current_user: User=Depends(get_current_user)):
+    del current_user
+    try:
+        return run_multi_stock_research([item for item in symbols.split(",")], interval=interval)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 @router.get("/analyze")
 def analyze_research_dataset(symbol: str=Query(min_length=1,max_length=30), current_user: User=Depends(get_current_user)):
