@@ -67,6 +67,9 @@ def build_paper_trade_decision(
 
     This composes signal, position risk, paper-session risk and execution
     authorization. It never sends a broker order and never enables LIVE mode.
+    When an opening-high reference is supplied, this composer treats a break
+    above it as a required intraday trigger rather than allowing weaker trend
+    evidence to authorize a paper trade.
     """
     normalized_symbol = symbol.strip().upper()
     if not normalized_symbol or not session.strip():
@@ -78,7 +81,7 @@ def build_paper_trade_decision(
         min_confidence=min_confidence,
     )
     signal_id = _signal_id(normalized_symbol, session, signal)
-    if signal.action != "BUY":
+    if signal.action != "BUY" or (opening_high is not None and float(closes[-1]) <= float(opening_high)):
         return TradeDecision(signal_id, normalized_symbol, "NEUTRAL", "NO_TRADE", "SIGNAL_NOT_BUY", signal.confidence, None, None, None, None, 0, 0.0, 0.0, broker.upper())
 
     if not strategy_ready:
@@ -98,14 +101,16 @@ def build_paper_trade_decision(
         equity=equity, daily_risk_used=daily_risk_used, config=position_config,
     )
     if not plan.approved:
-        return TradeDecision(signal_id, normalized_symbol, "BUY", "BLOCKED", plan.reason, signal.confidence, signal.entry, signal.stop, signal.target, signal.risk_reward, plan.quantity, plan.capital_required, plan.max_loss, broker.upper())
+        return TradeDecision(signal_id, normalized_symbol, "BUY", "BLOCKED", plan.reason, signal.confidence, signal.entry, signal.stop, signal.target, plan.risk_reward, plan.quantity, plan.capital_required, plan.max_loss, broker.upper())
 
+    risk_reward = round(plan.risk_reward, 2) if plan.risk_reward is not None else None
+    position_config = position_config or PositionRiskConfig()
     execution = authorize_order(
         ExecutionContext(
             broker=broker, mode="PAPER", market_data_healthy=market_data_healthy,
             strategy_ready=True, risk_approved=risk_approved, long_only=True,
-            max_quantity=(position_config or PositionRiskConfig()).max_quantity,
-            max_order_value=(position_config or PositionRiskConfig()).max_order_value,
+            max_quantity=position_config.max_quantity,
+            max_order_value=position_config.max_order_value,
         ),
         CanonicalOrder(
             symbol=normalized_symbol, side="BUY", quantity=plan.quantity,
@@ -114,6 +119,6 @@ def build_paper_trade_decision(
         ),
     )
     if not execution.allowed:
-        return TradeDecision(signal_id, normalized_symbol, "BUY", "BLOCKED", execution.reason, signal.confidence, plan.entry, plan.stop, plan.target, plan.risk_reward, plan.quantity, plan.capital_required, plan.max_loss, execution.normalized_broker)
+        return TradeDecision(signal_id, normalized_symbol, "BUY", "BLOCKED", execution.reason, signal.confidence, plan.entry, plan.stop, plan.target, risk_reward, plan.quantity, plan.capital_required, plan.max_loss, execution.normalized_broker)
 
-    return TradeDecision(signal_id, normalized_symbol, "BUY", "PAPER_READY", "PAPER_ORDER_AUTHORIZED", signal.confidence, plan.entry, plan.stop, plan.target, plan.risk_reward, plan.quantity, plan.capital_required, plan.max_loss, execution.normalized_broker)
+    return TradeDecision(signal_id, normalized_symbol, "BUY", "PAPER_READY", "PAPER_ORDER_AUTHORIZED", signal.confidence, plan.entry, plan.stop, plan.target, risk_reward, plan.quantity, plan.capital_required, plan.max_loss, execution.normalized_broker)
