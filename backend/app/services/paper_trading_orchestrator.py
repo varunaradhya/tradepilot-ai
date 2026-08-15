@@ -30,18 +30,24 @@ class PaperTradingOrchestrator:
         ))
         self.session_trades = 0
         self.last_signal: dict[str, Any] | None = None
+        self._session: str | None = None
+
+    def _sync_session(self, session: str) -> None:
+        if self._session != session:
+            self.session_trades = 0
+            self._session = session
+        self.engine.new_session(session)
 
     def on_bar(self, session: str, high: float, low: float, close: float) -> dict[str, Any]:
+        self._sync_session(session)
         before = self.engine.position
         trade = self.engine.on_bar(session, high, low, close)
-        if self.engine.day != session:
-            self.session_trades = 0
         snapshot = self.engine.snapshot()
         snapshot["last_event"] = "EXIT" if trade else ("POSITION_OPEN" if before is not None and self.engine.position is not None else "MARK")
         return snapshot
 
     def on_signal(self, session: str, signal: dict[str, Any]) -> dict[str, Any]:
-        self.engine.new_session(session)
+        self._sync_session(session)
         self.last_signal = dict(signal)
         if signal.get("action") != "BUY":
             return {"accepted": False, "reason": "SIGNAL_NOT_BUY", **self.engine.snapshot()}
