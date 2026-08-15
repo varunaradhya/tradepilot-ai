@@ -30,7 +30,22 @@ class BaseBrokerAdapter:
     def capabilities(self):
         return get_broker_capabilities(self.name)
 
+    def validate_order(self, order: CanonicalOrder) -> None:
+        symbol = order.symbol.strip()
+        side = order.side.strip().upper()
+        if not symbol:
+            raise ValueError("INVALID_SYMBOL")
+        if side not in {"BUY", "SELL"}:
+            raise ValueError("INVALID_SIDE")
+        if order.quantity <= 0:
+            raise ValueError("INVALID_QUANTITY")
+        if order.order_type.strip().upper() not in {"MARKET", "LIMIT"}:
+            raise ValueError("INVALID_ORDER_TYPE")
+        if order.order_type.strip().upper() == "LIMIT" and (order.price is None or order.price <= 0):
+            raise ValueError("INVALID_LIMIT_PRICE")
+
     def place_order(self, order: CanonicalOrder):
+        self.validate_order(order)
         raise RuntimeError("LIVE_ORDER_EXECUTION_DISABLED")
 
 
