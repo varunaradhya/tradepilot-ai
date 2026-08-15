@@ -40,7 +40,7 @@ def market_quote(symbol: str):
         quote = get_quote(symbol)
     except MarketDataProviderError as exc:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(exc),
         ) from exc
 
@@ -54,6 +54,7 @@ def market_quote(symbol: str):
         change=quote.change,
         change_percent=quote.change_percent,
         market_time=quote.market_time,
+        data_status=quote.data_status,
     )
 
 
@@ -77,7 +78,7 @@ def market_history(
     try:
         history = get_history(symbol=symbol, range_=range_, interval=interval)
     except MarketDataProviderError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
 
     return HistoryResponse(
         symbol=history.symbol,
@@ -85,4 +86,5 @@ def market_history(
         interval=history.interval,
         range=history.range,
         data=history.data,
+        data_status=history.data_status,
     )
