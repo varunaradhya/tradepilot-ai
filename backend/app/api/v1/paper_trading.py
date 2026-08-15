@@ -11,6 +11,7 @@ from app.services.paper_trading_service import close_paper_trade, list_paper_tra
 from app.models.paper_trade import PaperTrade
 from app.services.paper_trading_orchestrator import PaperOrchestratorConfig, PaperTradingOrchestrator
 from app.services.paper_market_service import PaperMarketCoordinator
+from app.services.paper_dhan_service import run_dhan_paper_session
 
 router = APIRouter(prefix="/paper-trading", tags=["Paper Trading"])
 _sessions: dict[int, PaperTradingOrchestrator] = {}
@@ -63,6 +64,12 @@ class MarketBarRequest(BaseModel):
     volume: float = Field(ge=0)
     opening_high: float | None = Field(default=None, gt=0)
     opening_low: float | None = Field(default=None, gt=0)
+
+
+class DhanPaperRequest(BaseModel):
+    symbol: str = Field(min_length=1, max_length=30)
+    session: str = Field(min_length=10, max_length=10)
+    interval: str = Field(default="5", pattern="^(1|5|15|25|60)$")
 
 
 def _owned(db: Session, user_id: int, trade_id: int) -> PaperTrade:
@@ -148,6 +155,19 @@ def paper_market_bar(payload: MarketBarRequest, current_user: User = Depends(get
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+
+
+@router.post("/session/dhan")
+def paper_dhan_session(payload: DhanPaperRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict[str, Any]:
+    try:
+        return run_dhan_paper_session(
+            db, current_user.id, payload.symbol, payload.session, payload.interval,
+            coordinator=_market_coordinator(current_user.id),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
 
 @router.post("/session/market-reset")
