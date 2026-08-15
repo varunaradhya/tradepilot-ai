@@ -19,3 +19,8 @@ def test_dhan_paper_session_requires_auth():
         json={"symbol":"TCS","session":"2026-08-14","interval":"5"},
     )
     assert response.status_code in {401, 403}
+
+
+def test_readiness_requires_auth():
+    response = client.get("/api/v1/paper-trading/readiness")
+    assert response.status_code in {401, 403}
