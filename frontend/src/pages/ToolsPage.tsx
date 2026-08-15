@@ -1,0 +1,63 @@
+import { useEffect, useMemo, useState } from "react";
+import StockSearch, { type StockInstrument } from "../components/StockSearch";
+import { getPortfolioAnalytics, type PortfolioAnalytics } from "../services/analytics";
+import { getQuote, type Quote } from "../services/market";
+
+type JournalEntry = { id: number; symbol: string; thesis: string; target: string; stop: string; createdAt: string };
+
+function money(value: number) { return value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+export default function ToolsPage({ onBack }: { onBack: () => void }) {
+  const [symbol, setSymbol] = useState("");
+  const [quote, setQuote] = useState<Quote | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [analytics, setAnalytics] = useState<PortfolioAnalytics | null>(null);
+  const [entry, setEntry] = useState<JournalEntry>({ id: 0, symbol: "", thesis: "", target: "", stop: "", createdAt: "" });
+  const [journal, setJournal] = useState<JournalEntry[]>(() => JSON.parse(localStorage.getItem("tradepilot_journal") ?? "[]"));
+  const [riskEntry, setRiskEntry] = useState("100");
+  const [riskStop, setRiskStop] = useState("95");
+  const [riskTarget, setRiskTarget] = useState("115");
+
+  useEffect(() => { getPortfolioAnalytics().then(setAnalytics).catch(() => undefined); }, []);
+  useEffect(() => { localStorage.setItem("tradepilot_journal", JSON.stringify(journal)); }, [journal]);
+
+  async function analyze(instrument?: StockInstrument) {
+    const selected = instrument?.symbol ?? symbol.trim().toUpperCase();
+    if (!selected) return;
+    setSymbol(selected); setQuoteLoading(true); setQuote(null);
+    try { setQuote(await getQuote(selected)); } catch { setQuote(null); }
+    finally { setQuoteLoading(false); }
+  }
+
+  const risk = Math.max(0, Number(riskEntry) - Number(riskStop));
+  const reward = Math.max(0, Number(riskTarget) - Number(riskEntry));
+  const rr = risk > 0 ? reward / risk : 0;
+  const allocation = useMemo(() => {
+    const total = analytics?.current_value ?? 0;
+    return (analytics?.stocks ?? []).map((stock) => ({ ...stock, weight: total > 0 ? (stock.current_value / total) * 100 : 0 })).sort((a, b) => b.weight - a.weight);
+  }, [analytics]);
+
+  function saveJournal() {
+    if (!entry.symbol || !entry.thesis) return;
+    setJournal((items) => [{ ...entry, id: Date.now(), createdAt: new Date().toISOString() }, ...items]);
+    setEntry({ id: 0, symbol: "", thesis: "", target: "", stop: "", createdAt: "" });
+  }
+
+  return (
+    <main className="min-h-screen bg-slate-50 p-6 text-slate-900">
+      <div className="mx-auto max-w-7xl">
+        <div className="flex flex-wrap items-center justify-between gap-4"><div><h1 className="text-3xl font-bold">Investor Tools</h1><p className="mt-2 text-slate-600">Research, risk planning and trade journaling in one workspace.</p></div><button onClick={onBack} className="rounded-lg border bg-white px-4 py-2 font-medium">Back to Dashboard</button></div>
+
+        <section className="mt-8 rounded-2xl border bg-white p-6 shadow-sm"><div className="flex flex-wrap items-end gap-3"><div className="min-w-[280px] flex-1"><label className="text-sm font-semibold text-slate-700">Universal stock search</label><StockSearch value={symbol} onChange={setSymbol} onSelect={analyze} placeholder="Search TCS, INFY, AAPL..." /></div><button onClick={() => void analyze()} className="rounded-lg bg-slate-950 px-5 py-2.5 font-semibold text-white">Analyze</button></div>{quoteLoading && <p className="mt-4 text-sm text-slate-500">Loading market quote...</p>}{quote && <div className="mt-5 grid gap-4 md:grid-cols-4"><div><p className="text-sm text-slate-500">{quote.symbol}</p><p className="text-2xl font-bold">₹{money(quote.price)}</p></div><div><p className="text-sm text-slate-500">Change</p><p className={`text-xl font-bold ${(quote.change ?? 0) >= 0 ? "text-emerald-700" : "text-red-700"}`}>{(quote.change ?? 0) >= 0 ? "+" : ""}{money(quote.change ?? 0)} ({(quote.change_percent ?? 0).toFixed(2)}%)</p></div><div><p className="text-sm text-slate-500">Exchange</p><p className="text-xl font-semibold">{quote.exchange ?? "-"}</p></div><div><p className="text-sm text-slate-500">Market time</p><p className="text-sm font-semibold">{quote.market_time ? new Date(quote.market_time).toLocaleString("en-IN") : "Unavailable"}</p></div></div>}</section>
+
+        <div className="mt-6 grid gap-6 lg:grid-cols-2">
+          <section className="rounded-2xl border bg-white p-6 shadow-sm"><h2 className="text-xl font-semibold">Risk / Reward Calculator</h2><p className="mt-1 text-sm text-slate-500">Plan the trade before entering it.</p><div className="mt-5 grid gap-4 sm:grid-cols-3"><label className="text-sm">Entry<input type="number" value={riskEntry} onChange={(e) => setRiskEntry(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2" /></label><label className="text-sm">Stop loss<input type="number" value={riskStop} onChange={(e) => setRiskStop(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2" /></label><label className="text-sm">Target<input type="number" value={riskTarget} onChange={(e) => setRiskTarget(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2" /></label></div><div className="mt-5 grid grid-cols-3 gap-3"><div className="rounded-xl bg-slate-50 p-4"><p className="text-xs text-slate-500">Risk</p><p className="text-xl font-bold">₹{money(risk)}</p></div><div className="rounded-xl bg-slate-50 p-4"><p className="text-xs text-slate-500">Reward</p><p className="text-xl font-bold">₹{money(reward)}</p></div><div className="rounded-xl bg-emerald-50 p-4"><p className="text-xs text-emerald-700">R:R</p><p className="text-xl font-bold text-emerald-800">1 : {rr.toFixed(2)}</p></div></div></section>
+
+          <section className="rounded-2xl border bg-white p-6 shadow-sm"><h2 className="text-xl font-semibold">Portfolio Concentration</h2><p className="mt-1 text-sm text-slate-500">See where your capital is concentrated.</p>{allocation.length === 0 ? <p className="mt-6 text-slate-500">Add holdings to see allocation.</p> : <div className="mt-5 space-y-4">{allocation.slice(0, 6).map((stock) => <div key={stock.symbol}><div className="flex justify-between text-sm font-semibold"><span>{stock.symbol}</span><span>{stock.weight.toFixed(1)}%</span></div><div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-slate-900" style={{ width: `${Math.min(stock.weight, 100)}%` }} /></div></div>)}</div>}</section>
+        </div>
+
+        <section className="mt-6 rounded-2xl border bg-white p-6 shadow-sm"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-semibold">Trade Journal</h2><p className="mt-1 text-sm text-slate-500">Record why you entered a trade so TradePilot can learn your habits later.</p></div><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold">Saved locally</span></div><div className="mt-5 grid gap-4 md:grid-cols-2"><div><label className="text-sm font-medium">Stock</label><StockSearch value={entry.symbol} onChange={(value) => setEntry({ ...entry, symbol: value })} placeholder="Search stock..." /></div><label className="text-sm font-medium">Target<input value={entry.target} onChange={(e) => setEntry({ ...entry, target: e.target.value })} className="mt-1 w-full rounded-lg border px-3 py-2" placeholder="3500" /></label><label className="text-sm font-medium">Stop loss<input value={entry.stop} onChange={(e) => setEntry({ ...entry, stop: e.target.value })} className="mt-1 w-full rounded-lg border px-3 py-2" placeholder="3050" /></label><label className="text-sm font-medium md:col-span-2">Trade thesis<textarea value={entry.thesis} onChange={(e) => setEntry({ ...entry, thesis: e.target.value })} className="mt-1 min-h-24 w-full rounded-lg border px-3 py-2" placeholder="Why am I taking this trade? What invalidates it?" /></label></div><button onClick={saveJournal} className="mt-4 rounded-lg bg-slate-950 px-5 py-2.5 font-semibold text-white">Save journal entry</button>{journal.length > 0 && <div className="mt-6 space-y-3">{journal.slice(0, 8).map((item) => <article key={item.id} className="rounded-xl border border-slate-200 p-4"><div className="flex justify-between gap-4"><span className="font-bold">{item.symbol}</span><span className="text-xs text-slate-500">{new Date(item.createdAt).toLocaleString("en-IN")}</span></div><p className="mt-2 text-sm text-slate-700">{item.thesis}</p><p className="mt-2 text-xs text-slate-500">Target: {item.target || "-"} · Stop: {item.stop || "-"}</p></article>)}</div>}</section>
+      </div>
+    </main>
+  );
+}
