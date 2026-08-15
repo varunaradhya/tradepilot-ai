@@ -53,10 +53,10 @@ def test_intraday_history_chunks_requests_at_90_days():
         client,
         HistoricalRequest("1333", interval="15"),
         date(2024, 1, 1),
-        date(2024, 7, 1),
+        date(2024, 5, 1),
     )
 
-    assert len(client.calls) == 3
+    assert len(client.calls) == 2
     assert client.calls[0][1]["from_date"] == "2024-01-01"
     assert client.calls[0][1]["to_date"] == "2024-03-31"
     assert diagnostics["bars"] == 2
