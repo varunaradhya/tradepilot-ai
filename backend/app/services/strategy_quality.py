@@ -35,7 +35,10 @@ def score_long_setup(
 
     lookback = min(5, len(closes) - 1)
     prior = closes[-1 - lookback] if lookback > 0 else closes[-1]
-    slope_pct = ((slow_ema / prior) - 1.0) * 100 if prior else 0.0
+    # Regime slope must describe the observed price trend. Comparing the
+    # current slow EMA to an older raw close mixes two different quantities and
+    # can incorrectly label a clearly rising/falling series as sideways.
+    slope_pct = ((closes[-1] / prior) - 1.0) * 100 if prior else 0.0
 
     trend = 45 if fast_ema > slow_ema else 0
     trend += _clamp(slope_pct * 500, 0, 35)
