@@ -1,24 +1,13 @@
-﻿from datetime import datetime
+from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator
 
 
 class TransactionCreate(BaseModel):
-    symbol: str = Field(
-        min_length=1,
-        max_length=20,
-    )
-
+    symbol: str = Field(min_length=1, max_length=20)
     transaction_type: str
-
-    quantity: float = Field(
-        gt=0,
-    )
-
-    price: float = Field(
-        gt=0,
-    )
-
+    quantity: float = Field(gt=0)
+    price: float = Field(gt=0)
     transaction_date: datetime | None = None
 
     @field_validator("symbol")
@@ -29,14 +18,9 @@ class TransactionCreate(BaseModel):
     @field_validator("transaction_type")
     @classmethod
     def validate_transaction_type(cls, value: str) -> str:
-
         value = value.strip().upper()
-
         if value not in {"BUY", "SELL"}:
-            raise ValueError(
-                "transaction_type must be BUY or SELL"
-            )
-
+            raise ValueError("transaction_type must be BUY or SELL")
         return value
 
 
@@ -48,9 +32,7 @@ class TransactionResponse(BaseModel):
     price: float
     transaction_date: datetime
 
-    model_config = {
-        "from_attributes": True,
-    }
+    model_config = {"from_attributes": True}
 
 
 class TransactionSummary(BaseModel):
@@ -63,3 +45,7 @@ class TransactionSummary(BaseModel):
 class TransactionListResponse(BaseModel):
     transactions: list[TransactionResponse]
     summary: TransactionSummary
+
+
+class TransactionUpdate(TransactionCreate):
+    pass
