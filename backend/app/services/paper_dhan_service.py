@@ -4,6 +4,7 @@ from datetime import date, timedelta
 from typing import Any
 
 from app.brokers.dhan import DhanClient
+from app.models.paper_trade import PaperTrade
 from app.services.broker_service import get_access_token, get_user_broker
 from app.services.dhan_historical_service import HistoricalRequest, fetch_intraday_history
 from app.services.instrument_master_service import InstrumentMaster, instrument_master
@@ -48,8 +49,23 @@ def run_dhan_paper_session(
         trading_day,
         trading_day + timedelta(days=1),
     )
+    if not bars:
+        return {
+            "mode": "SIMULATION_ONLY",
+            "symbol": instrument.symbol,
+            "interval": interval,
+            "processed_bars": 0,
+            "buy_entries": 0,
+            "persisted_trades": 0,
+            "dataset_valid": diagnostics["valid"],
+            "diagnostics": diagnostics,
+            "last": None,
+        }
 
     runner = coordinator or PaperMarketCoordinator()
+    # A Dhan session is a self-contained historical simulation. Resetting here
+    # prevents repeated button presses from appending to a previous run.
+    runner.reset()
     processed = 0
     buys = 0
     last_result: dict[str, Any] | None = None
@@ -67,13 +83,47 @@ def run_dhan_paper_session(
         if last_result.get("execution", {}).get("accepted"):
             buys += 1
 
+    # Intraday positions must not remain open after the historical session.
+    last_close = float(bars[-1].close)
+    runner.close_session(session, instrument.symbol, last_close)
+
+    marker = f"DHAN:{session}:{interval}"
+    existing = db.query(PaperTrade).filter(
+        PaperTrade.user_id == user_id,
+        PaperTrade.symbol == instrument.symbol,
+        PaperTrade.reason == marker,
+    ).count()
+    persisted = 0
+    if existing == 0:
+        for trade in runner.orchestrator.trades():
+            record = PaperTrade(
+                user_id=user_id,
+                symbol=instrument.symbol,
+                side="BUY",
+                status="CLOSED",
+                quantity=int(trade["quantity"]),
+                entry_price=float(trade["entry"]),
+                stop_price=float(trade["stop"]),
+                target_price=float(trade["target"]),
+                exit_price=float(trade["exit"]),
+                pnl=float(trade["pnl"]),
+                reason=marker,
+                strategy_version="V1",
+            )
+            db.add(record)
+            persisted += 1
+        if persisted:
+            db.commit()
+
     return {
         "mode": "SIMULATION_ONLY",
         "symbol": instrument.symbol,
         "interval": interval,
         "processed_bars": processed,
         "buy_entries": buys,
+        "persisted_trades": persisted,
         "dataset_valid": diagnostics["valid"],
         "diagnostics": diagnostics,
         "last": last_result,
+        "paper": runner.orchestrator.summary(),
     }
