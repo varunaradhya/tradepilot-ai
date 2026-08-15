@@ -119,7 +119,7 @@ def qualify_strategy_for_paper(symbol: str = Query(min_length=1, max_length=30),
     return {"symbol": symbol.strip().upper(), "interval": interval, "dataset": dataset, "qualification": qualification, "backtest": {k: v for k, v in backtest.items() if k != "trades_detail"}, "robustness": robustness["summary"], "walk_forward": {"windows": walk_forward["windows"], "v2_summary": walk_forward["v2"]["summary"]}}
 
 @router.post("/readiness")
-def strategy_readiness(symbol: str = Query(min_length=1, max_length=30), symbols: str = Query(default="", max_length=2000), interval: str = Query(default="5", pattern="^(1|5|15|25|60)$"), train_size: int = Query(default=60, ge=10, le=5000), validation_size: int = Query(default=20, ge=5, le=2000), step: int | None = Query(default=None, ge=1, le=2000), request: StrategyBuildRequest = ..., current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def strategy_readiness(symbol: str = Query(min_length=1, max_length=30), symbols: str = Query(default="", max_length=2000), strategy_version: str = Query(default="V1", pattern="^(V1|V2)$"), interval: str = Query(default="5", pattern="^(1|5|15|25|60)$"), train_size: int = Query(default=60, ge=10, le=5000), validation_size: int = Query(default=20, ge=5, le=2000), step: int | None = Query(default=None, ge=1, le=2000), request: StrategyBuildRequest = ..., current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     dataset, rows = _rows(symbol, interval)
     if not rows: raise HTTPException(status_code=404, detail=f"Intraday dataset not found: {dataset}")
     _, _, backtest, robustness, walk_forward, qualification = _qualification(request, rows, train_size, validation_size, step)
@@ -131,6 +131,6 @@ def strategy_readiness(symbol: str = Query(min_length=1, max_length=30), symbols
         else: missing.append(item)
     scorecard = build_intraday_scorecard(datasets, ScorecardConfig(minimum_trades=request.min_trades, slippage_rate=request.slippage_rate))
     evidence = aggregate_scorecards(scorecard.get("ranked", []), interval=interval, requested_symbols=requested, missing_symbols=missing)
-    paper_trades = db.query(PaperTrade).filter(PaperTrade.user_id == current_user.id).all()
+    paper_trades = db.query(PaperTrade).filter(PaperTrade.user_id == current_user.id, PaperTrade.strategy_version == strategy_version).all()
     readiness = build_strategy_readiness(qualification, evidence, paper_trades, ReadinessPolicy())
-    return {"symbol": symbol.strip().upper(), "interval": interval, "dataset": dataset, "qualification": qualification, "backtest": {k: v for k, v in backtest.items() if k != "trades_detail"}, "robustness": robustness["summary"], "walk_forward": {"windows": walk_forward["windows"], "v1_summary": walk_forward["v1"]["summary"], "v2_summary": walk_forward["v2"]["summary"]}, "cross_stock": evidence, "readiness": readiness}
+    return {"symbol": symbol.strip().upper(), "interval": interval, "strategy_version": strategy_version, "dataset": dataset, "qualification": qualification, "backtest": {k: v for k, v in backtest.items() if k != "trades_detail"}, "robustness": robustness["summary"], "walk_forward": {"windows": walk_forward["windows"], "v1_summary": walk_forward["v1"]["summary"], "v2_summary": walk_forward["v2"]["summary"]}, "cross_stock": evidence, "readiness": readiness}
