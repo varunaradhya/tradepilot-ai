@@ -1,6 +1,6 @@
-﻿from datetime import datetime
+from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class QuoteResponse(BaseModel):
@@ -30,3 +30,9 @@ class HistoryResponse(BaseModel):
     interval: str
     range: str
     data: list[HistoricalPrice]
+
+
+class SearchInstrumentResponse(BaseModel):
+    symbol: str
+    name: str
+    exchange: str
