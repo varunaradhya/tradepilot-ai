@@ -52,7 +52,10 @@ def generate_regime_momentum_signal(
     price = float(closes[-1])
     fast = ema(closes, config.fast_ema)
     slow = ema(closes, config.slow_ema)
-    current_rsi = rsi(closes)
+    # Evaluate momentum on the bar immediately before the breakout. This avoids
+    # rejecting an otherwise valid breakout simply because the breakout candle
+    # itself pushed RSI temporarily above the upper bound.
+    momentum_rsi = rsi(closes[:-1]) if len(closes) > 1 else None
     current_atr = atr(highs, lows, closes, config.atr_period)
     prior_high = max(float(x) for x in highs[-config.breakout_period - 1:-1])
     volume_ok = True
@@ -62,7 +65,7 @@ def generate_regime_momentum_signal(
         average_volume = sma(volumes[:-1], config.volume_period)
         volume_ok = average_volume is not None and float(volumes[-1]) >= average_volume * config.volume_multiplier
 
-    if fast is None or slow is None or current_rsi is None or current_atr is None or current_atr <= 0:
+    if fast is None or slow is None or momentum_rsi is None or current_atr is None or current_atr <= 0:
         return Signal("NEUTRAL", 0.0, None, None, None, ("INSUFFICIENT_INDICATOR_DATA",))
 
     reasons: list[str] = []
@@ -73,7 +76,7 @@ def generate_regime_momentum_signal(
     else:
         return Signal("NEUTRAL", score, None, None, None, ("TREND_FILTER_FAILED",))
 
-    if config.rsi_min <= current_rsi <= config.rsi_max:
+    if config.rsi_min <= momentum_rsi <= config.rsi_max:
         score += 20
         reasons.append("MOMENTUM_HEALTHY")
     else:
