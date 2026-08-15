@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -6,14 +6,14 @@ from decimal import Decimal
 from typing import Any
 
 
-@dataclass
+@dataclass(frozen=True)
 class BrokerHolding:
     symbol: str
     quantity: Decimal
     average_price: Decimal
 
 
-@dataclass
+@dataclass(frozen=True)
 class BrokerTransaction:
     symbol: str
     side: str
@@ -26,6 +26,12 @@ class BrokerAdapter(ABC):
     """Common interface implemented by all broker integrations."""
 
     name: str = "unknown"
+
+    @property
+    @abstractmethod
+    def capabilities(self) -> frozenset[str]:
+        """Capabilities exposed by the adapter, never implying live permission."""
+        raise NotImplementedError
 
     @abstractmethod
     def get_profile(self) -> dict[str, Any]:
