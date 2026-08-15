@@ -1,11 +1,13 @@
 from app.services.walk_forward_service import build_walk_forward_windows, run_walk_forward, summarize_walk_forward
 
 
-def test_walk_forward_windows_are_chronological_and_non_overlapping():
+def test_walk_forward_windows_are_chronological_with_non_overlapping_validation_periods():
     windows = build_walk_forward_windows(20, train_size=8, validation_size=4)
     assert len(windows) == 3
     assert windows[0].train_end == windows[0].validation_start
-    assert windows[0].validation_end == windows[1].train_start
+    assert windows[0].validation_end == windows[1].validation_start
+    assert windows[1].validation_end == windows[2].validation_start
+    assert windows[0].train_start < windows[1].train_start < windows[2].train_start
 
 
 def test_walk_forward_never_leaks_validation_into_train():
