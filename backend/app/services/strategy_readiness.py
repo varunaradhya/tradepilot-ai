@@ -37,16 +37,22 @@ def _paper_metrics(trades: Iterable[PaperTrade]) -> dict:
     consecutive_losses = 0
 
     for trade, pnl in zip(closed, pnls):
-        risk_per_trade = abs(float(trade.entry_price) - float(trade.stop_price)) * abs(int(trade.quantity))
-        if risk_per_trade > 0:
-            r_values.append(pnl / risk_per_trade)
+        entry = getattr(trade, "entry_price", None)
+        stop = getattr(trade, "stop_price", None)
+        quantity = getattr(trade, "quantity", None)
+        if entry is not None and stop is not None and quantity is not None:
+            risk_per_trade = abs(float(entry) - float(stop)) * abs(int(quantity))
+            if risk_per_trade > 0:
+                r_values.append(pnl / risk_per_trade)
 
-        if trade.closed_at is not None and trade.created_at is not None:
-            seconds = (trade.closed_at - trade.created_at).total_seconds()
+        created_at = getattr(trade, "created_at", None)
+        closed_at = getattr(trade, "closed_at", None)
+        if created_at is not None and closed_at is not None:
+            seconds = (closed_at - created_at).total_seconds()
             if seconds >= 0:
                 hold_minutes.append(seconds / 60.0)
 
-        reason = str(trade.reason or "UNKNOWN").upper()
+        reason = str(getattr(trade, "reason", None) or "UNKNOWN").upper()
         exit_reasons[reason] = exit_reasons.get(reason, 0) + 1
 
         if pnl < 0:
