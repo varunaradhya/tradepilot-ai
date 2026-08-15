@@ -13,6 +13,7 @@ from app.services.research_service import download_daily_dataset
 from app.services.research_store import research_store
 from app.services.intraday_experiment import run_intraday_experiment
 from app.services.intraday_batch_research import run_multi_stock_research
+from app.services.intraday_regime_report import build_intraday_regime_report
 
 router = APIRouter(prefix="/research", tags=["Research"])
 
@@ -69,10 +70,18 @@ def experiment_research_intraday(symbol: str=Query(min_length=1,max_length=30), 
 @router.get("/intraday/batch")
 def batch_research_intraday(symbols: str=Query(min_length=1, max_length=1000), interval: str=Query(default="5",pattern="^(1|5|15|25|60)$"), current_user: User=Depends(get_current_user)):
     del current_user
-    try:
-        return run_multi_stock_research([item for item in symbols.split(",")], interval=interval)
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    try: return run_multi_stock_research([item for item in symbols.split(",")], interval=interval)
+    except ValueError as exc: raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+@router.get("/intraday/regime-report")
+def regime_report_intraday(symbol: str=Query(min_length=1,max_length=30), interval: str=Query(default="5",pattern="^(1|5|15|25|60)$"), current_user: User=Depends(get_current_user)):
+    del current_user
+    symbol=symbol.strip().upper()
+    dataset=f"nse/{symbol}_intraday_{interval}m"
+    bars=research_store.load(dataset)
+    if not bars: raise HTTPException(status_code=404,detail=f"Intraday dataset not found: {dataset}")
+    rows=[dict(bar.as_row(), session=bar.as_row()["timestamp"].date().isoformat()) for bar in bars]
+    return {"symbol":symbol,"interval":interval,"dataset":dataset,**build_intraday_regime_report(rows)}
 
 @router.get("/analyze")
 def analyze_research_dataset(symbol: str=Query(min_length=1,max_length=30), current_user: User=Depends(get_current_user)):
