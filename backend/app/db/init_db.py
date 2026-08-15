@@ -5,6 +5,7 @@ from app.models.broker_connection import BrokerConnection
 from app.models.holding import Holding
 from app.models.ai_analysis_history import AIAnalysisHistory
 from app.models.alert import Alert
+from app.models.paper_trade import PaperTrade
 
 from app.db.database import Base, engine
 from app.core.config import TRADEPILOT_AUTO_CREATE_SCHEMA
