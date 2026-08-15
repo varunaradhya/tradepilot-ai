@@ -10,9 +10,11 @@ from app.models.user import User
 from app.services.paper_trading_service import close_paper_trade, list_paper_trades, open_paper_trade, paper_summary, update_paper_trade
 from app.models.paper_trade import PaperTrade
 from app.services.paper_trading_orchestrator import PaperOrchestratorConfig, PaperTradingOrchestrator
+from app.services.paper_market_service import PaperMarketCoordinator
 
 router = APIRouter(prefix="/paper-trading", tags=["Paper Trading"])
 _sessions: dict[int, PaperTradingOrchestrator] = {}
+_market: dict[int, PaperMarketCoordinator] = {}
 
 
 class PaperTradeCreate(BaseModel):
@@ -51,6 +53,18 @@ class PaperBarRequest(BaseModel):
     close: float = Field(gt=0)
 
 
+class MarketBarRequest(BaseModel):
+    session: str = Field(min_length=1, max_length=40)
+    symbol: str = Field(min_length=1, max_length=30)
+    open: float = Field(gt=0)
+    high: float = Field(gt=0)
+    low: float = Field(gt=0)
+    close: float = Field(gt=0)
+    volume: float = Field(ge=0)
+    opening_high: float | None = Field(default=None, gt=0)
+    opening_low: float | None = Field(default=None, gt=0)
+
+
 def _owned(db: Session, user_id: int, trade_id: int) -> PaperTrade:
     trade = db.query(PaperTrade).filter(PaperTrade.id == trade_id, PaperTrade.user_id == user_id).first()
     if trade is None:
@@ -60,6 +74,10 @@ def _owned(db: Session, user_id: int, trade_id: int) -> PaperTrade:
 
 def _orchestrator(user_id: int) -> PaperTradingOrchestrator:
     return _sessions.setdefault(user_id, PaperTradingOrchestrator(PaperOrchestratorConfig(trade_direction="LONG_ONLY")))
+
+
+def _market_coordinator(user_id: int) -> PaperMarketCoordinator:
+    return _market.setdefault(user_id, PaperMarketCoordinator())
 
 
 @router.post("/trades", status_code=status.HTTP_201_CREATED)
@@ -116,4 +134,23 @@ def paper_session_bar(payload: PaperBarRequest, current_user: User = Depends(get
 @router.post("/session/reset")
 def paper_session_reset(current_user: User = Depends(get_current_user)) -> dict[str, Any]:
     _sessions[current_user.id] = PaperTradingOrchestrator(PaperOrchestratorConfig(trade_direction="LONG_ONLY"))
+    return {"mode": "SIMULATION_ONLY", "reset": True}
+
+
+@router.post("/session/market-bar")
+def paper_market_bar(payload: MarketBarRequest, current_user: User = Depends(get_current_user)) -> dict[str, Any]:
+    if payload.low > payload.high:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="low cannot exceed high")
+    try:
+        return _market_coordinator(current_user.id).on_bar(
+            payload.session, payload.symbol, payload.open, payload.high, payload.low,
+            payload.close, payload.volume, payload.opening_high, payload.opening_low,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+
+
+@router.post("/session/market-reset")
+def paper_market_reset(current_user: User = Depends(get_current_user)) -> dict[str, Any]:
+    _market[current_user.id] = PaperMarketCoordinator()
     return {"mode": "SIMULATION_ONLY", "reset": True}
