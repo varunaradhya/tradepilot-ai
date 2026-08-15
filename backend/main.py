@@ -20,60 +20,18 @@ from app.db.init_db import init_db
 from app.db.database import engine
 from app.core.config import TRADEPILOT_CORS_ORIGINS
 
-
-app = FastAPI(
-    title="TradePilot AI",
-    description="AI-powered stock portfolio tracking and analysis platform",
-    version="0.1.0",
-)
-
+app = FastAPI(title="TradePilot AI", description="AI-powered stock portfolio tracking and analysis platform", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=TRADEPILOT_CORS_ORIGINS,
     allow_credentials=False,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
-
-app.include_router(
-    users_router,
-    prefix="/api/v1",
-)
-
-app.include_router(
-    auth_router,
-    prefix="/api/v1",
-)
-app.include_router(
-    portfolio_router,
-    prefix="/api/v1",
-)
-app.include_router(
-    valuation_router,
-    prefix="/api/v1",
-)
-app.include_router(
-    transactions_router,
-    prefix="/api/v1",
-)
-app.include_router(
-    analytics_router,
-    prefix="/api/v1",
-)
-app.include_router(
-    watchlist_router,
-    prefix="/api/v1",
-)
-app.include_router(
-    brokers_router,
-    prefix="/api/v1",
-)
-app.include_router(
-    market_router,
-    prefix="/api/v1",
-)
+for router in [users_router, auth_router, portfolio_router, valuation_router, transactions_router, analytics_router, watchlist_router, brokers_router, market_router]:
+    app.include_router(router, prefix="/api/v1")
 app.include_router(reconciliation_router, prefix="/api/v1")
 app.include_router(advanced_analytics_router, prefix="/api/v1")
 app.include_router(signals_router, prefix="/api/v1")
@@ -84,21 +42,13 @@ app.include_router(alerts_router, prefix="/api/v1")
 def startup_event():
     init_db()
 
-
 @app.get("/")
 def root():
-    return {
-        "message": "TradePilot AI API is running",
-        "version": "0.1.0",
-    }
-
+    return {"message": "TradePilot AI API is running", "version": "0.1.0"}
 
 @app.get("/health")
 def health_check():
-    return {
-        "status": "healthy",
-    }
-
+    return {"status": "healthy"}
 
 @app.get("/ready", tags=["Operations"], summary="Check critical dependency readiness")
 def readiness_check():
