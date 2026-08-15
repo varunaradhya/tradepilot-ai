@@ -5,10 +5,10 @@ class StockPerformance(BaseModel):
     symbol: str
     quantity: float
     invested_amount: float
-    current_price: float | None = None
-    current_value: float | None = None
-    unrealized_profit_loss: float | None = None
-    unrealized_profit_loss_percent: float | None = None
+    current_price: float
+    current_value: float
+    unrealized_profit_loss: float
+    unrealized_profit_loss_percent: float
     market_data_available: bool = False
 
 
