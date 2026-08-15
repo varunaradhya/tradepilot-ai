@@ -20,6 +20,7 @@ class QuoteData:
     change: float | None
     change_percent: float | None
     market_time: datetime | None
+    data_status: str = "LIVE"
 
 
 @dataclass
@@ -29,6 +30,7 @@ class HistoricalData:
     interval: str
     range: str
     data: list[dict]
+    data_status: str = "LIVE"
 
 
 class YahooFinanceProvider:
@@ -37,6 +39,8 @@ class YahooFinanceProvider:
     Plain symbols are tried on NSE first and then BSE. Explicit .NS/.BO
     symbols are respected. A short TTL cache reduces repeated browser refreshes
     and the second Yahoo host provides a rate-limit fallback.
+
+    The provider never invents a price when the upstream service fails.
     """
 
     BASE_URLS = (
@@ -53,15 +57,6 @@ class YahooFinanceProvider:
         self.timeout = timeout
 
     @classmethod
-    def _provider_symbol(cls, symbol: str) -> str:
-        normalized = symbol.strip().upper()
-        if not normalized:
-            raise MarketDataProviderError("Symbol is required")
-        if "." in normalized:
-            return normalized
-        return f"{normalized}{cls.NSE_SUFFIX}"
-
-    @classmethod
     def _candidate_provider_symbols(cls, symbol: str) -> list[str]:
         normalized = symbol.strip().upper()
         if not normalized:
@@ -69,6 +64,10 @@ class YahooFinanceProvider:
         if "." in normalized:
             return [normalized]
         return [f"{normalized}{cls.NSE_SUFFIX}", f"{normalized}{cls.BSE_SUFFIX}"]
+
+    @classmethod
+    def _provider_symbol(cls, symbol: str) -> str:
+        return cls._candidate_provider_symbols(symbol)[0]
 
     @classmethod
     def _cached(cls, key: tuple[str, str, str]) -> dict | None:
@@ -87,14 +86,14 @@ class YahooFinanceProvider:
         cls._cache[key] = (time.monotonic(), payload)
         return payload
 
-    def _get_chart(self, symbol: str, range_: str, interval: str) -> dict:
+    def _get_chart(self, symbol: str, range_: str, interval: str) -> tuple[dict, str]:
         last_error: Exception | None = None
 
         for provider_symbol in self._candidate_provider_symbols(symbol):
             key = (provider_symbol, range_, interval)
             cached = self._cached(key)
             if cached is not None:
-                return cached
+                return cached, "CACHED"
 
             for base_url in self.BASE_URLS:
                 url = f"{base_url}/{provider_symbol}"
@@ -133,7 +132,7 @@ class YahooFinanceProvider:
                             f"No market data found for symbol {symbol.strip().upper()}"
                         )
                         continue
-                    return self._store_cache(key, results[0])
+                    return self._store_cache(key, results[0]), "LIVE"
                 except (httpx.HTTPError, ValueError) as exc:
                     last_error = exc
                     continue
@@ -150,7 +149,7 @@ class YahooFinanceProvider:
 
     def get_quote(self, symbol: str) -> QuoteData:
         requested_symbol = symbol.strip().upper()
-        result = self._get_chart(requested_symbol, "1d", "1d")
+        result, data_status = self._get_chart(requested_symbol, "1d", "1d")
         meta = result.get("meta", {})
         price = meta.get("regularMarketPrice")
         if price is None:
@@ -178,11 +177,12 @@ class YahooFinanceProvider:
             change=change,
             change_percent=change_percent,
             market_time=market_time,
+            data_status=data_status,
         )
 
     def get_history(self, symbol: str, range_: str = "1mo", interval: str = "1d") -> HistoricalData:
         requested_symbol = symbol.strip().upper()
-        result = self._get_chart(requested_symbol, range_, interval)
+        result, data_status = self._get_chart(requested_symbol, range_, interval)
         meta = result.get("meta", {})
         timestamps = result.get("timestamp") or []
         indicators = result.get("indicators", {})
@@ -213,4 +213,5 @@ class YahooFinanceProvider:
             interval=interval,
             range=range_,
             data=data,
+            data_status=data_status,
         )
