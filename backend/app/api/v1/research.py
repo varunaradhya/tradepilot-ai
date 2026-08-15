@@ -9,6 +9,7 @@ from app.dependencies.auth import get_current_user
 from app.models.user import User
 from app.services.broker_service import get_access_token, get_user_broker
 from app.services.instrument_master_service import InstrumentMasterError, instrument_master
+from app.services.research_lab import analyze_dataset
 from app.services.research_service import download_daily_dataset
 
 router = APIRouter(prefix="/research", tags=["Research"])
@@ -72,3 +73,15 @@ def download_research_daily(
         "end": result.end,
         "valid": result.valid,
     }
+
+
+@router.get("/analyze")
+def analyze_research_dataset(
+    symbol: str = Query(min_length=1, max_length=30),
+    current_user: User = Depends(get_current_user),
+):
+    del current_user
+    try:
+        return analyze_dataset(symbol)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
