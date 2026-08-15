@@ -152,7 +152,7 @@ def test_edit_transaction_rebuilds_fifo_holdings():
 def test_edit_transaction_that_creates_invalid_sell_rolls_back():
     create_user()
     headers = auth_headers()
-    buy = post_trade(headers, "INFY", "BUY", 5, 100).json()
+    post_trade(headers, "INFY", "BUY", 5, 100)
     sell = post_trade(headers, "INFY", "SELL", 2, 120).json()
     response = client.put(
         f"/api/v1/transactions/{sell['id']}",
@@ -191,8 +191,14 @@ def test_edit_and_delete_require_ownership():
     finally:
         db.close()
     other_login = client.post("/api/v1/auth/login", json={"email": "transaction-other@example.com", "password": PASSWORD})
+    assert other_login.status_code == 200
     other_headers = {"Authorization": f"Bearer {other_login.json()['access_token']}"}
-    assert client.put(f"/api/v1/transactions/{trade['id']}", json={"quantity": 20}, headers=other_headers).status_code == 404
+    edit_response = client.put(
+        f"/api/v1/transactions/{trade['id']}",
+        json={"symbol": "TCS", "transaction_type": "BUY", "quantity": 20, "price": 3000, "transaction_date": trade["transaction_date"]},
+        headers=other_headers,
+    )
+    assert edit_response.status_code == 404
     assert client.delete(f"/api/v1/transactions/{trade['id']}", headers=other_headers).status_code == 404
 
 
