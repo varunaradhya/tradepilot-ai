@@ -3,11 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Sequence
 
+from app.services.strategy_quality import score_long_setup
+
 
 @dataclass(frozen=True)
 class IntradayConfig:
-    # The initial production/paper strategy is intentionally long-only.
-    # Short-selling can be added later as a separately qualified strategy.
     trade_direction: str = "LONG_ONLY"
     opening_bars: int = 3
     fast_period: int = 9
@@ -20,11 +20,15 @@ class IntradayConfig:
     atr_period: int = 14
     atr_stop_multiple: float = 1.5
     reward_multiple: float = 2.0
+    min_quality_score: int = 55
+    require_trending_regime: bool = True
 
 
 def _validate_direction(config: IntradayConfig) -> None:
     if config.trade_direction not in {"LONG_ONLY", "LONG_SHORT"}:
         raise ValueError("trade_direction must be LONG_ONLY or LONG_SHORT")
+    if not 0 <= config.min_quality_score <= 100:
+        raise ValueError("min_quality_score must be between 0 and 100")
 
 
 def _sma(values: Sequence[float], period: int) -> float | None:
@@ -79,12 +83,27 @@ def generate_intraday_signal(
         return {"action": "NEUTRAL", "reason": "EXTREME_GAP", "gap_percent": round(gap, 2), "trade_direction": config.trade_direction}
     if close <= opening_high or fast <= slow or volume_ratio < config.min_volume_ratio:
         return {"action": "NEUTRAL", "reason": "FILTERS_BLOCKED", "volume_ratio": round(volume_ratio, 2), "trade_direction": config.trade_direction}
+
+    quality = score_long_setup(closes, fast, slow, volume_ratio, atr)
+    if config.require_trending_regime and quality.regime != "TRENDING_UP":
+        return {"action": "NEUTRAL", "reason": "REGIME_BLOCKED", "regime": quality.regime, "quality_score": quality.score, "trade_direction": config.trade_direction}
+    if quality.score < config.min_quality_score:
+        return {"action": "NEUTRAL", "reason": "QUALITY_SCORE_BLOCKED", "quality_score": quality.score, "regime": quality.regime, "trade_direction": config.trade_direction}
+
     entry = close
     stop = entry - config.atr_stop_multiple * atr
     target = entry + config.reward_multiple * (entry - stop)
     return {
-        "action": "BUY", "trade_direction": "LONG_ONLY" if config.trade_direction == "LONG_ONLY" else config.trade_direction,
-        "reason": "OPENING_RANGE_BREAKOUT", "entry": round(entry, 4),
-        "stop": round(stop, 4), "target": round(target, 4), "volume_ratio": round(volume_ratio, 2),
-        "atr": round(atr, 4), "risk_reward": config.reward_multiple,
+        "action": "BUY",
+        "trade_direction": "LONG_ONLY" if config.trade_direction == "LONG_ONLY" else config.trade_direction,
+        "reason": "OPENING_RANGE_BREAKOUT",
+        "entry": round(entry, 4),
+        "stop": round(stop, 4),
+        "target": round(target, 4),
+        "volume_ratio": round(volume_ratio, 2),
+        "atr": round(atr, 4),
+        "risk_reward": config.reward_multiple,
+        "quality_score": quality.score,
+        "regime": quality.regime,
+        "quality_components": {"trend": quality.trend_score, "momentum": quality.momentum_score, "volume": quality.volume_score, "volatility": quality.volatility_score},
     }
