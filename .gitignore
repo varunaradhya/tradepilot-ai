@@ -39,3 +39,6 @@ backend/.test-tmp/
 
 # Package manager cache
 .pnpm-store/
+
+# Local research datasets
+backend/data/research/
