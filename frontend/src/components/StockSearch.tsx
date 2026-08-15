@@ -3,10 +3,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 export type StockInstrument = {
   symbol: string;
   name: string;
-  exchange: "NSE" | "BSE" | "NASDAQ" | "NYSE";
+  exchange: "NSE" | "BSE";
 };
 
-const INSTRUMENTS: StockInstrument[] = [
+// Indian-market universe used by the autocomplete. Keep this focused on
+// NSE/BSE symbols for the current India-first product scope.
+const INSTRUMENT_ROWS: Array<[string, string, "NSE" | "BSE"]> = [
   ["TCS", "Tata Consultancy Services", "NSE"],
   ["INFY", "Infosys", "NSE"],
   ["RELIANCE", "Reliance Industries", "NSE"],
@@ -28,6 +30,7 @@ const INSTRUMENTS: StockInstrument[] = [
   ["ADANIPORTS", "Adani Ports & SEZ", "NSE"],
   ["ASIANPAINT", "Asian Paints", "NSE"],
   ["BAJFINANCE", "Bajaj Finance", "NSE"],
+  ["BAJAJFINSV", "Bajaj Finserv", "NSE"],
   ["BEL", "Bharat Electronics", "NSE"],
   ["COALINDIA", "Coal India", "NSE"],
   ["HCLTECH", "HCL Technologies", "NSE"],
@@ -40,14 +43,41 @@ const INSTRUMENTS: StockInstrument[] = [
   ["TITAN", "Titan Company", "NSE"],
   ["ULTRACEMCO", "UltraTech Cement", "NSE"],
   ["ZOMATO", "Eternal (Zomato)", "NSE"],
-  ["AAPL", "Apple", "NASDAQ"],
-  ["MSFT", "Microsoft", "NASDAQ"],
-  ["NVDA", "NVIDIA", "NASDAQ"],
-  ["AMZN", "Amazon", "NASDAQ"],
-  ["GOOGL", "Alphabet", "NASDAQ"],
-  ["META", "Meta Platforms", "NASDAQ"],
-  ["TSLA", "Tesla", "NASDAQ"],
-].map(([symbol, name, exchange]) => ({ symbol, name, exchange } as StockInstrument));
+  ["TRENT", "Trent", "NSE"],
+  ["TECHM", "Tech Mahindra", "NSE"],
+  ["DRREDDY", "Dr. Reddy's Laboratories", "NSE"],
+  ["CIPLA", "Cipla", "NSE"],
+  ["EICHERMOT", "Eicher Motors", "NSE"],
+  ["HEROMOTOCO", "Hero MotoCorp", "NSE"],
+  ["BAJAJ-AUTO", "Bajaj Auto", "NSE"],
+  ["GRASIM", "Grasim Industries", "NSE"],
+  ["APOLLOHOSP", "Apollo Hospitals Enterprise", "NSE"],
+  ["BPCL", "Bharat Petroleum", "NSE"],
+  ["IOC", "Indian Oil Corporation", "NSE"],
+  ["INDUSINDBK", "IndusInd Bank", "NSE"],
+  ["DIVISLAB", "Divi's Laboratories", "NSE"],
+  ["HDFCLIFE", "HDFC Life Insurance", "NSE"],
+  ["SBILIFE", "SBI Life Insurance", "NSE"],
+  ["NESTLEIND", "Nestle India", "NSE"],
+  ["DABUR", "Dabur India", "NSE"],
+  ["PIDILITIND", "Pidilite Industries", "NSE"],
+  ["DMART", "Avenue Supermarts", "NSE"],
+  ["IRCTC", "Indian Railway Catering & Tourism", "NSE"],
+  ["HAL", "Hindustan Aeronautics", "NSE"],
+  ["INDIGO", "InterGlobe Aviation", "NSE"],
+  ["VEDL", "Vedanta", "NSE"],
+  ["TATAPOWER", "Tata Power", "NSE"],
+  ["JINDALSTEL", "Jindal Steel & Power", "NSE"],
+  ["CANBK", "Canara Bank", "NSE"],
+  ["PNB", "Punjab National Bank", "NSE"],
+  ["BANKBARODA", "Bank of Baroda", "NSE"],
+];
+
+const INSTRUMENTS: StockInstrument[] = INSTRUMENT_ROWS.map(([symbol, name, exchange]) => ({
+  symbol,
+  name,
+  exchange,
+}));
 
 type StockSearchProps = {
   value: string;
@@ -57,7 +87,7 @@ type StockSearchProps = {
   className?: string;
 };
 
-export default function StockSearch({ value, onChange, onSelect, placeholder = "Search stocks...", className = "" }: StockSearchProps) {
+export default function StockSearch({ value, onChange, onSelect, placeholder = "Search Indian stocks...", className = "" }: StockSearchProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const query = value.trim().toLowerCase();
@@ -85,6 +115,7 @@ export default function StockSearch({ value, onChange, onSelect, placeholder = "
         onFocus={() => setOpen(true)}
         placeholder={placeholder}
         autoComplete="off"
+        aria-label="Search Indian stocks"
         className={className || "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"}
       />
       {open && matches.length > 0 && (
