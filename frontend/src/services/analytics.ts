@@ -4,10 +4,10 @@ export interface StockPerformance {
   symbol: string;
   quantity: number;
   invested_amount: number;
-  current_price: number | null;
-  current_value: number | null;
-  unrealized_profit_loss: number | null;
-  unrealized_profit_loss_percent: number | null;
+  current_price: number;
+  current_value: number;
+  unrealized_profit_loss: number;
+  unrealized_profit_loss_percent: number;
   market_data_available: boolean;
 }
 
@@ -28,6 +28,4 @@ export interface PortfolioAnalytics {
   stocks: StockPerformance[];
 }
 
-export async function getPortfolioAnalytics() {
-  return api.get<PortfolioAnalytics>("/analytics/portfolio");
-}
+export async function getPortfolioAnalytics() { return api.get<PortfolioAnalytics>("/analytics/portfolio"); }
