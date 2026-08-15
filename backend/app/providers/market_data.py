@@ -1,4 +1,4 @@
-﻿from dataclasses import dataclass
+from dataclasses import dataclass
 from datetime import datetime
 
 import httpx
@@ -31,24 +31,31 @@ class HistoricalData:
 
 
 class YahooFinanceProvider:
-    """Yahoo Finance chart-data provider.
+    """Yahoo Finance chart-data provider for NSE-listed Indian stocks.
 
-    The provider is isolated behind this class so it can be replaced
-    later by Dhan or another production market-data provider.
+    User-facing symbols such as TCS are translated to Yahoo's TCS.NS
+    ticker format. Symbols that already contain an exchange suffix are
+    passed through unchanged.
     """
 
     BASE_URL = "https://query1.finance.yahoo.com/v8/finance/chart"
+    NSE_SUFFIX = ".NS"
 
     def __init__(self, timeout: float = 10.0):
         self.timeout = timeout
 
-    def _get_chart(self, symbol: str, range_: str, interval: str) -> dict:
-        symbol = symbol.strip().upper()
-
-        if not symbol:
+    @classmethod
+    def _provider_symbol(cls, symbol: str) -> str:
+        normalized = symbol.strip().upper()
+        if not normalized:
             raise MarketDataProviderError("Symbol is required")
+        if "." in normalized:
+            return normalized
+        return f"{normalized}{cls.NSE_SUFFIX}"
 
-        url = f"{self.BASE_URL}/{symbol}"
+    def _get_chart(self, symbol: str, range_: str, interval: str) -> dict:
+        provider_symbol = self._provider_symbol(symbol)
+        url = f"{self.BASE_URL}/{provider_symbol}"
 
         try:
             response = httpx.get(
@@ -86,51 +93,44 @@ class YahooFinanceProvider:
 
         if not results:
             raise MarketDataProviderError(
-                f"No market data found for symbol {symbol}"
+                f"No market data found for symbol {symbol.strip().upper()}"
             )
 
         return results[0]
 
     def get_quote(self, symbol: str) -> QuoteData:
-        result = self._get_chart(symbol, "1d", "1d")
+        requested_symbol = symbol.strip().upper()
+        result = self._get_chart(requested_symbol, "1d", "1d")
 
         meta = result.get("meta", {})
-
         price = meta.get("regularMarketPrice")
 
         if price is None:
             raise MarketDataProviderError(
-                f"Current price unavailable for {symbol.upper()}"
+                f"Current price unavailable for {requested_symbol}"
             )
 
         previous_close = meta.get("previousClose")
-
         change = None
         change_percent = None
 
         if previous_close is not None:
             change = price - previous_close
-
             if previous_close != 0:
                 change_percent = (change / previous_close) * 100
 
         market_time = None
-
         if meta.get("regularMarketTime"):
-            market_time = datetime.fromtimestamp(
-                meta["regularMarketTime"]
-            )
+            market_time = datetime.fromtimestamp(meta["regularMarketTime"])
 
         return QuoteData(
-            symbol=meta.get("symbol") or symbol.upper(),
+            symbol=requested_symbol,
             name=meta.get("shortName") or meta.get("longName"),
             currency=meta.get("currency"),
             exchange=meta.get("exchangeName"),
             price=float(price),
             previous_close=(
-                float(previous_close)
-                if previous_close is not None
-                else None
+                float(previous_close) if previous_close is not None else None
             ),
             change=change,
             change_percent=change_percent,
@@ -143,12 +143,11 @@ class YahooFinanceProvider:
         range_: str = "1mo",
         interval: str = "1d",
     ) -> HistoricalData:
-
-        result = self._get_chart(symbol, range_, interval)
+        requested_symbol = symbol.strip().upper()
+        result = self._get_chart(requested_symbol, range_, interval)
 
         meta = result.get("meta", {})
         timestamps = result.get("timestamp") or []
-
         indicators = result.get("indicators", {})
         quotes = indicators.get("quote") or [{}]
         quote = quotes[0]
@@ -158,11 +157,9 @@ class YahooFinanceProvider:
         lows = quote.get("low") or []
         closes = quote.get("close") or []
         volumes = quote.get("volume") or []
-
         data = []
 
         for index, timestamp in enumerate(timestamps):
-
             def value(values):
                 if index >= len(values):
                     return None
@@ -180,7 +177,7 @@ class YahooFinanceProvider:
             )
 
         return HistoricalData(
-            symbol=meta.get("symbol") or symbol.upper(),
+            symbol=requested_symbol,
             currency=meta.get("currency"),
             interval=interval,
             range=range_,
