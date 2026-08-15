@@ -12,13 +12,13 @@ def test_v1_paper_workflow_signal_position_exit_is_simulation_only():
     )
     assert opened["accepted"] is True
     assert opened["reason"] == "PAPER_ORDER_OPENED"
-    assert opened["position"] is not None
+    assert opened["open_position"] is not None
     assert opened["mode"] == "SIMULATION_ONLY"
 
     exited = orchestrator.on_bar("2026-08-17", high=111.0, low=99.0, close=110.0)
     assert exited["last_event"] == "EXIT"
     assert exited["trade"]["reason"] == "TARGET"
-    assert exited["position"] is None
+    assert exited["open_position"] is None
 
 
 def test_v1_paper_workflow_rejects_neutral_before_position_creation():
@@ -29,7 +29,7 @@ def test_v1_paper_workflow_rejects_neutral_before_position_creation():
     )
     assert result["accepted"] is False
     assert result["reason"] == "SIGNAL_NOT_BUY"
-    assert result["position"] is None
+    assert result["open_position"] is None
 
 
 def test_v1_paper_workflow_enforces_long_only_contract():
