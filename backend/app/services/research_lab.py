@@ -26,14 +26,10 @@ def analyze_dataset(symbol: str, dataset: str | None = None, store: ResearchStor
         buy_value = float(trade["entry"]) * int(trade["quantity"])
         sell_value = float(trade["exit"]) * int(trade["quantity"])
         estimated_costs.append(cost_model.estimate_round_trip(buy_value, sell_value))
-    cost_total = round(sum(item["total"] for item in estimated_costs), 2)
     result["symbol"] = normalized
     result["dataset"] = dataset_name
     result["regime"] = asdict(regime)
     result["equity_metrics"] = summarize_equity_curve(equity)
     result["trade_metrics"] = summarize_trades(trades)
-    result["estimated_indian_costs"] = cost_total
-    result["return_after_estimated_costs_percent"] = round(
-        ((result["ending_capital"] - cost_total) / result["initial_capital"] - 1) * 100, 2
-    )
+    result["reference_indian_cost_estimate"] = round(sum(item["total"] for item in estimated_costs), 2)
     return result
