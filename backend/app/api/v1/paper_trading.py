@@ -12,6 +12,7 @@ from app.models.paper_trade import PaperTrade
 from app.services.paper_trading_orchestrator import PaperOrchestratorConfig, PaperTradingOrchestrator
 from app.services.paper_market_service import PaperMarketCoordinator
 from app.services.paper_dhan_service import run_dhan_paper_session
+from app.services.intraday_evidence_aggregation import aggregate_paper_performance
 
 router = APIRouter(prefix="/paper-trading", tags=["Paper Trading"])
 _sessions: dict[int, PaperTradingOrchestrator] = {}
@@ -99,6 +100,12 @@ def create_paper_trade(payload: PaperTradeCreate, current_user: User = Depends(g
 def get_paper_trades(status_filter: str | None = Query(default=None, alias="status", pattern="^(OPEN|CLOSED)$"), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     trades = list_paper_trades(db, current_user.id, status_filter)
     return {"trades": trades, "summary": paper_summary(trades), "mode": "SIMULATION_ONLY"}
+
+
+@router.get("/performance")
+def get_paper_performance(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    trades = list_paper_trades(db, current_user.id)
+    return aggregate_paper_performance(trades)
 
 
 @router.post("/trades/{trade_id}/mark")
