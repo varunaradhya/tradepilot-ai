@@ -45,9 +45,14 @@ def _metrics(initial_capital: float, ending_capital: float, trades: list[dict]) 
 
 
 def run_intraday_backtest(rows: Sequence[dict], config: IntradayBacktestConfig = IntradayBacktestConfig()) -> dict:
-    """Conservative single-position intraday research backtest with session isolation and risk caps."""
+    """Conservative single-position intraday research backtest; initial mode is long-only."""
+    if config.strategy.trade_direction not in {"LONG_ONLY", "LONG_SHORT"}:
+        raise ValueError("trade_direction must be LONG_ONLY or LONG_SHORT")
     if not rows:
-        return _metrics(config.initial_capital, config.initial_capital, []) | {"trades_detail": [], "strategy_version": config.strategy_version}
+        return _metrics(config.initial_capital, config.initial_capital, []) | {
+            "trades_detail": [], "strategy_version": config.strategy_version,
+            "trade_direction": config.strategy.trade_direction,
+        }
     if config.strategy_version not in {"V1", "V2"}:
         raise ValueError("strategy_version must be V1 or V2")
 
@@ -71,7 +76,7 @@ def run_intraday_backtest(rows: Sequence[dict], config: IntradayBacktestConfig =
         costs = gross * config.brokerage_rate
         cash += gross - costs
         pnl = qty * (exit_price - position["entry"]) - costs - position["entry_cost"]
-        trade = {"entry": position["entry"], "exit": exit_price, "quantity": qty, "pnl": pnl, "reason": reason}
+        trade = {"entry": position["entry"], "exit": exit_price, "quantity": qty, "pnl": pnl, "reason": reason, "direction": "LONG"}
         if position.get("entry_time") is not None:
             trade["entry_time"] = position["entry_time"]
         if exit_time is not None:
@@ -148,4 +153,7 @@ def run_intraday_backtest(rows: Sequence[dict], config: IntradayBacktestConfig =
 
     if position is not None:
         close_position(float(rows[-1]["close"]), "END_OF_TEST", rows[-1].get("timestamp", rows[-1].get("time")))
-    return _metrics(config.initial_capital, cash, trades) | {"trades_detail": trades, "strategy_version": config.strategy_version}
+    return _metrics(config.initial_capital, cash, trades) | {
+        "trades_detail": trades, "strategy_version": config.strategy_version,
+        "trade_direction": config.strategy.trade_direction,
+    }
