@@ -14,7 +14,7 @@ class DhanClient:
         self.client_id = client_id
         self.access_token = access_token
 
-    def _request(self, method: str, path: str) -> Any:
+    def _request(self, method: str, path: str, json: dict[str, Any] | None = None) -> Any:
         url = f"{self.BASE_URL}{path}"
         headers = {
             "Accept": "application/json",
@@ -23,7 +23,7 @@ class DhanClient:
             "client-id": self.client_id,
         }
         try:
-            response = httpx.request(method, url, headers=headers, timeout=20.0)
+            response = httpx.request(method, url, headers=headers, json=json, timeout=20.0)
         except httpx.HTTPError as exc:
             raise DhanAPIError(f"Dhan connection failed: {exc}") from exc
 
@@ -57,3 +57,50 @@ class DhanClient:
     def trades(self):
         result = self._request("GET", "/trades")
         return result or []
+
+    def historical_daily(
+        self,
+        security_id: str,
+        exchange_segment: str,
+        instrument: str,
+        from_date: str,
+        to_date: str,
+        oi: bool = False,
+    ):
+        return self._request(
+            "POST",
+            "/charts/historical",
+            {
+                "securityId": security_id,
+                "exchangeSegment": exchange_segment,
+                "instrument": instrument,
+                "expiryCode": 0,
+                "oi": oi,
+                "fromDate": from_date,
+                "toDate": to_date,
+            },
+        )
+
+    def historical_intraday(
+        self,
+        security_id: str,
+        exchange_segment: str,
+        instrument: str,
+        interval: str,
+        from_date: str,
+        to_date: str,
+        oi: bool = False,
+    ):
+        return self._request(
+            "POST",
+            "/charts/intraday",
+            {
+                "securityId": security_id,
+                "exchangeSegment": exchange_segment,
+                "instrument": instrument,
+                "interval": interval,
+                "oi": oi,
+                "fromDate": from_date,
+                "toDate": to_date,
+            },
+        )
