@@ -5,6 +5,7 @@ from typing import Sequence
 
 from app.services.intraday_strategy import IntradayConfig, generate_intraday_signal
 from app.services.intraday_strategy_v2 import IntradayV2Config, generate_intraday_v2_signal
+from app.services.strategy_identity import strategy_fingerprint
 
 
 @dataclass(frozen=True)
@@ -48,10 +49,21 @@ def run_intraday_backtest(rows: Sequence[dict], config: IntradayBacktestConfig =
     """Conservative single-position intraday research backtest; initial mode is long-only."""
     if config.strategy.trade_direction not in {"LONG_ONLY", "LONG_SHORT"}:
         raise ValueError("trade_direction must be LONG_ONLY or LONG_SHORT")
+    identity = strategy_fingerprint(
+        config.strategy,
+        strategy_version=config.strategy_version,
+        execution={
+            "initial_capital": config.initial_capital,
+            "brokerage_rate": config.brokerage_rate,
+            "slippage_rate": config.slippage_rate,
+            "max_daily_loss_percent": config.max_daily_loss_percent,
+            "max_trades_per_session": config.max_trades_per_session,
+        },
+    )
     if not rows:
         return _metrics(config.initial_capital, config.initial_capital, []) | {
             "trades_detail": [], "strategy_version": config.strategy_version,
-            "trade_direction": config.strategy.trade_direction,
+            "trade_direction": config.strategy.trade_direction, "strategy_fingerprint": identity,
         }
     if config.strategy_version not in {"V1", "V2"}:
         raise ValueError("strategy_version must be V1 or V2")
@@ -155,5 +167,5 @@ def run_intraday_backtest(rows: Sequence[dict], config: IntradayBacktestConfig =
         close_position(float(rows[-1]["close"]), "END_OF_TEST", rows[-1].get("timestamp", rows[-1].get("time")))
     return _metrics(config.initial_capital, cash, trades) | {
         "trades_detail": trades, "strategy_version": config.strategy_version,
-        "trade_direction": config.strategy.trade_direction,
+        "trade_direction": config.strategy.trade_direction, "strategy_fingerprint": identity,
     }
