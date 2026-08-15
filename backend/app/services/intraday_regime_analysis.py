@@ -12,15 +12,28 @@ def _returns(values: Sequence[float]) -> float:
     return (values[-1] / values[0] - 1.0) * 100.0
 
 
+def _sort_key(row: dict):
+    """Return a comparable chronological key for common timestamp fields."""
+    value = row.get("timestamp") or row.get("datetime") or row.get("date")
+    return value.isoformat() if hasattr(value, "isoformat") else str(value)
+
+
 def build_benchmark_regime_analysis(benchmark_rows: Sequence[dict], lookback: int = 50, step: int = 25) -> dict:
-    """Describe a benchmark's chronological regimes without fitting anything."""
+    """Describe a benchmark's chronological regimes without fitting anything.
+
+    Historical rows are normalized into chronological order before rolling
+    windows are built. This prevents an unsorted provider response from
+    corrupting the temporal sequence while preserving look-ahead protection:
+    each observation still uses only rows at or before its own timestamp.
+    """
     if lookback < 20 or step < 1:
         raise ValueError("lookback must be >= 20 and step must be >= 1")
-    if len(benchmark_rows) < lookback:
+    rows = sorted(benchmark_rows, key=_sort_key)
+    if len(rows) < lookback:
         return {"status": "INSUFFICIENT_DATA", "observations": [], "distribution": {}}
     observations: list[dict] = []
-    for end in range(lookback, len(benchmark_rows) + 1, step):
-        window = benchmark_rows[end - lookback:end]
+    for end in range(lookback, len(rows) + 1, step):
+        window = rows[end - lookback:end]
         closes = [float(row["close"]) for row in window]
         regime = classify_market_regime(closes, lookback=lookback)
         observations.append({
