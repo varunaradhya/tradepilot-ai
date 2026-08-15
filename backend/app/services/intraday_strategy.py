@@ -20,7 +20,7 @@ class IntradayConfig:
     atr_period: int = 14
     atr_stop_multiple: float = 1.5
     reward_multiple: float = 2.0
-    min_quality_score: int = 55
+    min_quality_score: int = 30
     require_trending_regime: bool = True
 
 
