@@ -7,6 +7,7 @@ from app.services.intraday_strategy import IntradayConfig
 from app.services.intraday_strategy_comparison import compare_intraday_strategies
 from app.services.intraday_walk_forward import run_fixed_parameter_walk_forward
 from app.services.intraday_robustness import run_robustness_analysis
+from app.services.strategy_qualification import QualificationPolicy, qualify_strategy
 from app.services.research_store import research_store
 
 router = APIRouter(prefix="/strategy-builder", tags=["Strategy Builder"])
@@ -28,6 +29,12 @@ class StrategyBuildRequest(BaseModel):
     atr_period: int = Field(default=14, ge=2, le=100)
     atr_stop_multiple: float = Field(default=1.5, gt=0.1, le=10)
     reward_multiple: float = Field(default=2.0, gt=0.1, le=20)
+    min_trades: int = Field(default=30, ge=1, le=100000)
+    min_profit_factor: float = Field(default=1.10, ge=0, le=10)
+    min_positive_sensitivity_percent: float = Field(default=60.0, ge=0, le=100)
+    min_stable_profit_factor_percent: float = Field(default=60.0, ge=0, le=100)
+    max_drawdown_percent: float = Field(default=15.0, ge=0, le=100)
+    min_walk_forward_success_percent: float = Field(default=55.0, ge=0, le=100)
 
 def _rows(symbol: str, interval: str):
     dataset = f"nse/{symbol.strip().upper()}_intraday_{interval}m"
@@ -46,6 +53,9 @@ def _strategy(request: StrategyBuildRequest) -> IntradayConfig:
 
 def _backtest_config(request: StrategyBuildRequest, strategy: IntradayConfig, version: str = "V1") -> IntradayBacktestConfig:
     return IntradayBacktestConfig(initial_capital=request.initial_capital, brokerage_rate=request.brokerage_rate, slippage_rate=request.slippage_rate, max_daily_loss_percent=request.max_daily_loss_percent, max_trades_per_session=request.max_trades_per_session, strategy=strategy, strategy_version=version)
+
+def _policy(request: StrategyBuildRequest) -> QualificationPolicy:
+    return QualificationPolicy(min_trades=request.min_trades, min_profit_factor=request.min_profit_factor, min_positive_return_percent=request.min_positive_sensitivity_percent, min_pf_above_one_percent=request.min_stable_profit_factor_percent, max_drawdown_percent=request.max_drawdown_percent, min_walk_forward_success_percent=request.min_walk_forward_success_percent)
 
 @router.post("/backtest")
 def build_and_backtest(symbol: str = Query(min_length=1, max_length=30), interval: str = Query(default="5", pattern="^(1|5|15|25|60)$"), request: StrategyBuildRequest = ..., current_user: User = Depends(get_current_user)):
@@ -88,3 +98,19 @@ def robustness_validation(symbol: str = Query(min_length=1, max_length=30), inte
     strategy = _strategy(request)
     result = run_robustness_analysis(rows, _backtest_config(request, strategy), stress_costs=stress_costs)
     return {"symbol": symbol.strip().upper(), "interval": interval, "dataset": dataset, **result}
+
+@router.post("/qualify")
+def qualify_strategy_for_paper(symbol: str = Query(min_length=1, max_length=30), interval: str = Query(default="5", pattern="^(1|5|15|25|60)$"), train_size: int = Query(default=60, ge=10, le=5000), validation_size: int = Query(default=20, ge=5, le=2000), step: int | None = Query(default=None, ge=1, le=2000), request: StrategyBuildRequest = ..., current_user: User = Depends(get_current_user)):
+    del current_user
+    dataset, rows = _rows(symbol, interval)
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"Intraday dataset not found: {dataset}")
+    if train_size + validation_size > len(rows):
+        raise HTTPException(status_code=422, detail="Not enough bars for the requested train and validation windows")
+    strategy = _strategy(request)
+    config = _backtest_config(request, strategy)
+    backtest = run_intraday_backtest(rows, config)
+    robustness = run_robustness_analysis(rows, config, stress_costs=True)
+    walk_forward = run_fixed_parameter_walk_forward(rows, train_size, validation_size, step, config)
+    qualification = qualify_strategy(backtest, robustness, walk_forward, _policy(request))
+    return {"symbol": symbol.strip().upper(), "interval": interval, "dataset": dataset, "qualification": qualification, "backtest": {k: v for k, v in backtest.items() if k != "trades_detail"}, "robustness": robustness["summary"], "walk_forward": {"windows": walk_forward["windows"], "v2_summary": walk_forward["v2"]["summary"]}}
