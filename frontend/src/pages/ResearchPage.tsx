@@ -1,5 +1,6 @@
 import { useState } from "react";
 import StockSearch from "../components/StockSearch";
+import IntradayEvidencePanel from "../components/IntradayEvidencePanel";
 import { getStockIntelligence, type IntelligenceResponse } from "../services/intelligence";
 
 function number(value: unknown, digits = 2) { return typeof value === "number" && Number.isFinite(value) ? value.toFixed(digits) : "—"; }
@@ -31,6 +32,8 @@ export default function ResearchPage() {
     <main className="min-h-screen bg-slate-50 p-6 text-slate-900">
       <div className="mx-auto max-w-7xl">
         <header><p className="text-sm font-semibold uppercase tracking-wide text-slate-500">Research</p><h1 className="mt-1 text-3xl font-bold">Stock Intelligence</h1><p className="mt-2 max-w-3xl text-slate-600">A structured decision-support workspace for short-term research. It does not execute trades, predict guaranteed returns, or replace your own risk management.</p></header>
+
+        <IntradayEvidencePanel />
 
         <section className="mt-6 rounded-2xl border bg-white p-5 shadow-sm"><div className="flex flex-col gap-3 md:flex-row"><div className="min-w-0 flex-1"><StockSearch value={symbol} onChange={setSymbol} onSelect={(item) => void analyse(item.symbol)} placeholder="Search TCS, Reliance, Infosys..." /></div><button type="button" onClick={() => void analyse()} disabled={loading || !symbol.trim()} className="rounded-lg bg-slate-950 px-5 py-2.5 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">{loading ? "Analysing…" : "Analyse stock"}</button></div>{error && <div className="mt-4 rounded-lg bg-red-50 p-3 text-sm font-medium text-red-700">{error}</div>}</section>
 
