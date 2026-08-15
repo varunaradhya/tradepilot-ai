@@ -75,6 +75,18 @@ def _qualification(request: StrategyBuildRequest, rows: list[dict], train_size: 
     qualification = qualify_strategy(backtest, robustness, walk_forward, _policy(request))
     return strategy, config, backtest, robustness, walk_forward, qualification
 
+def _basket(symbols: str, interval: str):
+    requested = list(dict.fromkeys(item.strip().upper() for item in symbols.split(",") if item.strip()))
+    datasets: dict[str, list[dict]] = {}
+    missing: list[str] = []
+    for item in requested:
+        _, item_rows = _rows(item, interval)
+        if item_rows:
+            datasets[item] = item_rows
+        else:
+            missing.append(item)
+    return requested, datasets, missing
+
 @router.post("/backtest")
 def build_and_backtest(symbol: str = Query(min_length=1, max_length=30), interval: str = Query(default="5", pattern="^(1|5|15|25|60)$"), request: StrategyBuildRequest = ..., current_user: User = Depends(get_current_user)):
     del current_user
@@ -122,32 +134,30 @@ def qualify_strategy_for_paper(symbol: str = Query(min_length=1, max_length=30),
 @router.post("/historical-validation")
 def historical_validation(symbols: str = Query(default="", max_length=2000), interval: str = Query(default="5", pattern="^(1|5|15|25|60)$"), train_fraction: float = Query(default=0.70, ge=0.5, lt=1.0), min_train_bars: int = Query(default=40, ge=10, le=50000), min_test_bars: int = Query(default=20, ge=5, le=50000), request: StrategyBuildRequest = ..., current_user: User = Depends(get_current_user)):
     del current_user
-    requested = list(dict.fromkeys(item.strip().upper() for item in symbols.split(",") if item.strip()))
-    if not requested:
-        raise HTTPException(status_code=422, detail="At least one symbol is required")
-    datasets: dict[str, list[dict]] = {}
-    missing: list[str] = []
-    for item in requested:
-        _, item_rows = _rows(item, interval)
-        if item_rows:
-            datasets[item] = item_rows
-        else:
-            missing.append(item)
+    requested, datasets, missing = _basket(symbols, interval)
+    if not requested: raise HTTPException(status_code=422, detail="At least one symbol is required")
     strategy = _strategy(request)
     result = validate_historical_datasets(datasets, _backtest_config(request, strategy), HistoricalValidationConfig(train_fraction=train_fraction, min_train_bars=min_train_bars, min_test_bars=min_test_bars))
     return {"interval": interval, "requested_symbols": requested, "missing_symbols": missing, **result}
+
+@router.post("/evidence")
+def evidence_report(symbols: str = Query(default="", max_length=2000), interval: str = Query(default="5", pattern="^(1|5|15|25|60)$"), train_fraction: float = Query(default=0.70, ge=0.5, lt=1.0), min_train_bars: int = Query(default=40, ge=10, le=50000), min_test_bars: int = Query(default=20, ge=5, le=50000), request: StrategyBuildRequest = ..., current_user: User = Depends(get_current_user)):
+    del current_user
+    requested, datasets, missing = _basket(symbols, interval)
+    if not requested: raise HTTPException(status_code=422, detail="At least one symbol is required")
+    strategy = _strategy(request)
+    backtest_config = _backtest_config(request, strategy)
+    scorecard = build_intraday_scorecard(datasets, ScorecardConfig(initial_capital=request.initial_capital, minimum_trades=request.min_trades, slippage_rate=request.slippage_rate))
+    evidence = aggregate_scorecards(scorecard.get("ranked", []), interval=interval, requested_symbols=requested, missing_symbols=missing)
+    historical = validate_historical_datasets(datasets, backtest_config, HistoricalValidationConfig(train_fraction=train_fraction, min_train_bars=min_train_bars, min_test_bars=min_test_bars))
+    return {"interval": interval, "requested_symbols": requested, "missing_symbols": missing, "cross_stock": evidence, "historical_out_of_sample": historical, "research_policy": {"parameter_selection": False, "cross_stock_optimization": False, "fixed_parameters": True}}
 
 @router.post("/readiness")
 def strategy_readiness(symbol: str = Query(min_length=1, max_length=30), symbols: str = Query(default="", max_length=2000), strategy_version: str = Query(default="V1", pattern="^(V1|V2)$"), interval: str = Query(default="5", pattern="^(1|5|15|25|60)$"), train_size: int = Query(default=60, ge=10, le=5000), validation_size: int = Query(default=20, ge=5, le=2000), step: int | None = Query(default=None, ge=1, le=2000), request: StrategyBuildRequest = ..., current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     dataset, rows = _rows(symbol, interval)
     if not rows: raise HTTPException(status_code=404, detail=f"Intraday dataset not found: {dataset}")
     _, _, backtest, robustness, walk_forward, qualification = _qualification(request, rows, train_size, validation_size, step)
-    requested = list(dict.fromkeys([item.strip().upper() for item in (symbols or symbol).split(",") if item.strip()]))
-    datasets = {}; missing = []
-    for item in requested:
-        _, item_rows = _rows(item, interval)
-        if item_rows: datasets[item] = item_rows
-        else: missing.append(item)
+    requested, datasets, missing = _basket(symbols or symbol, interval)
     scorecard = build_intraday_scorecard(datasets, ScorecardConfig(minimum_trades=request.min_trades, slippage_rate=request.slippage_rate))
     evidence = aggregate_scorecards(scorecard.get("ranked", []), interval=interval, requested_symbols=requested, missing_symbols=missing)
     paper_trades = db.query(PaperTrade).filter(PaperTrade.user_id == current_user.id, PaperTrade.strategy_version == strategy_version).all()
