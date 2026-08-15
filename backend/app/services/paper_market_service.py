@@ -55,9 +55,11 @@ class PaperMarketCoordinator:
             raise ValueError("session and symbol are required")
         key = (session, symbol.upper())
         state = self._states.setdefault(key, PaperMarketState())
-        had_position = self.orchestrator.summary().get("position") is not None
         state.append(open_price, high, low, close, volume)
 
+        # Position state belongs to the orchestrator. Use its actual open_position
+        # field rather than the legacy/nonexistent `position` key.
+        had_position = self.orchestrator.summary().get("open_position") is not None
         signal = generate_intraday_signal(
             state.opens,
             state.highs,
@@ -89,5 +91,11 @@ class PaperMarketCoordinator:
             "paper": self.orchestrator.summary(),
         }
 
+    def close_session(self, session: str, symbol: str, close: float) -> dict[str, Any]:
+        return self.orchestrator.close_session(session, close)
+
     def reset(self) -> None:
         self._states.clear()
+        self.orchestrator = PaperTradingOrchestrator(
+            self.orchestrator.config
+        )
