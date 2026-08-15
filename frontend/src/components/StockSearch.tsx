@@ -8,18 +8,18 @@ export type StockInstrument = {
 };
 
 const POPULAR_INDIAN_STOCKS: StockInstrument[] = [
-  ["TCS", "Tata Consultancy Services", "NSE"],
-  ["RELIANCE", "Reliance Industries", "NSE"],
-  ["INFY", "Infosys", "NSE"],
-  ["HDFCBANK", "HDFC Bank", "NSE"],
-  ["ICICIBANK", "ICICI Bank", "NSE"],
-  ["SBIN", "State Bank of India", "NSE"],
-  ["BHARTIARTL", "Bharti Airtel", "NSE"],
-  ["ITC", "ITC", "NSE"],
-  ["LT", "Larsen & Toubro", "NSE"],
-  ["TATAMOTORS", "Tata Motors", "NSE"],
-  ["HAL", "Hindustan Aeronautics", "NSE"],
-  ["IRFC", "Indian Railway Finance Corporation", "NSE"],
+  { symbol: "TCS", name: "Tata Consultancy Services", exchange: "NSE" },
+  { symbol: "RELIANCE", name: "Reliance Industries", exchange: "NSE" },
+  { symbol: "INFY", name: "Infosys", exchange: "NSE" },
+  { symbol: "HDFCBANK", name: "HDFC Bank", exchange: "NSE" },
+  { symbol: "ICICIBANK", name: "ICICI Bank", exchange: "NSE" },
+  { symbol: "SBIN", name: "State Bank of India", exchange: "NSE" },
+  { symbol: "BHARTIARTL", name: "Bharti Airtel", exchange: "NSE" },
+  { symbol: "ITC", name: "ITC", exchange: "NSE" },
+  { symbol: "LT", name: "Larsen & Toubro", exchange: "NSE" },
+  { symbol: "TATAMOTORS", name: "Tata Motors", exchange: "NSE" },
+  { symbol: "HAL", name: "Hindustan Aeronautics", exchange: "NSE" },
+  { symbol: "IRFC", name: "Indian Railway Finance Corporation", exchange: "NSE" },
 ];
 
 type StockSearchProps = {
@@ -30,13 +30,7 @@ type StockSearchProps = {
   className?: string;
 };
 
-export default function StockSearch({
-  value,
-  onChange,
-  onSelect,
-  placeholder = "Search Indian stocks...",
-  className = "",
-}: StockSearchProps) {
+export default function StockSearch({ value, onChange, onSelect, placeholder = "Search Indian stocks...", className = "" }: StockSearchProps) {
   const [open, setOpen] = useState(false);
   const [matches, setMatches] = useState<StockInstrument[]>(POPULAR_INDIAN_STOCKS.slice(0, 8));
   const [loading, setLoading] = useState(false);
@@ -47,9 +41,7 @@ export default function StockSearch({
 
   useEffect(() => {
     if (query.length < 2) {
-      setMatches(query ? POPULAR_INDIAN_STOCKS.filter((item) =>
-        item.symbol.toLowerCase().includes(query.toLowerCase()) || item.name.toLowerCase().includes(query.toLowerCase()),
-      ).slice(0, 8) : POPULAR_INDIAN_STOCKS.slice(0, 8));
+      setMatches(query ? POPULAR_INDIAN_STOCKS.filter((item) => item.symbol.toLowerCase().includes(query.toLowerCase()) || item.name.toLowerCase().includes(query.toLowerCase())).slice(0, 8) : POPULAR_INDIAN_STOCKS.slice(0, 8));
       setLoading(false);
       setSearchError("");
       return;
@@ -64,10 +56,7 @@ export default function StockSearch({
         if (currentRequest === requestId.current) setMatches(result);
       } catch (error) {
         if (currentRequest !== requestId.current) return;
-        const localMatches = POPULAR_INDIAN_STOCKS.filter((item) =>
-          item.symbol.toLowerCase().includes(query.toLowerCase()) || item.name.toLowerCase().includes(query.toLowerCase()),
-        ).slice(0, 8);
-        setMatches(localMatches);
+        setMatches(POPULAR_INDIAN_STOCKS.filter((item) => item.symbol.toLowerCase().includes(query.toLowerCase()) || item.name.toLowerCase().includes(query.toLowerCase())).slice(0, 8));
         setSearchError(error instanceof Error ? error.message : "Search is temporarily unavailable.");
       } finally {
         if (currentRequest === requestId.current) setLoading(false);
@@ -93,38 +82,13 @@ export default function StockSearch({
 
   return (
     <div ref={rootRef} className="relative">
-      <input
-        value={value}
-        onChange={(event) => { onChange(event.target.value); setOpen(true); }}
-        onFocus={() => setOpen(true)}
-        placeholder={placeholder}
-        autoComplete="off"
-        aria-label="Search Indian stocks"
-        aria-expanded={open}
-        className={className || "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"}
-      />
-      {open && (
-        <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
-          {loading && <div className="px-4 py-3 text-sm text-slate-500">Searching Indian stocks…</div>}
-          {!loading && matches.length === 0 && <div className="px-4 py-3 text-sm text-slate-500">No Indian stock found for “{query}”.</div>}
-          {!loading && matches.map((item) => (
-            <button
-              type="button"
-              key={`${item.exchange}:${item.symbol}`}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => select(item)}
-              className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-slate-50"
-            >
-              <span className="min-w-0">
-                <span className="block font-semibold text-slate-900">{item.symbol}</span>
-                <span className="block truncate text-xs text-slate-500">{item.name}</span>
-              </span>
-              <span className="shrink-0 rounded bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">{item.exchange}</span>
-            </button>
-          ))}
-          {searchError && <div className="border-t px-4 py-2 text-xs text-amber-700">Live search unavailable; showing local matches.</div>}
-        </div>
-      )}
+      <input value={value} onChange={(event) => { onChange(event.target.value); setOpen(true); }} onFocus={() => setOpen(true)} placeholder={placeholder} autoComplete="off" aria-label="Search Indian stocks" aria-expanded={open} className={className || "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"} />
+      {open && <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+        {loading && <div className="px-4 py-3 text-sm text-slate-500">Searching Indian stocks…</div>}
+        {!loading && matches.length === 0 && <div className="px-4 py-3 text-sm text-slate-500">No Indian stock found for “{query}”.</div>}
+        {!loading && matches.map((item) => <button type="button" key={`${item.exchange}:${item.symbol}`} onMouseDown={(event) => event.preventDefault()} onClick={() => select(item)} className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-slate-50"><span className="min-w-0"><span className="block font-semibold text-slate-900">{item.symbol}</span><span className="block truncate text-xs text-slate-500">{item.name}</span></span><span className="shrink-0 rounded bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">{item.exchange}</span></button>)}
+        {searchError && <div className="border-t px-4 py-2 text-xs text-amber-700">Live search unavailable; showing local matches.</div>}
+      </div>}
     </div>
   );
 }
