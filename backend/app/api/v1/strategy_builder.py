@@ -13,6 +13,7 @@ from app.services.research_store import research_store
 router = APIRouter(prefix="/strategy-builder", tags=["Strategy Builder"])
 
 class StrategyBuildRequest(BaseModel):
+    trade_direction: str = Field(default="LONG_ONLY", pattern="^(LONG_ONLY|LONG_SHORT)$")
     initial_capital: float = Field(default=100000, gt=0, le=100000000)
     brokerage_rate: float = Field(default=0.0003, ge=0, le=0.01)
     slippage_rate: float = Field(default=0.0005, ge=0, le=0.01)
@@ -49,7 +50,7 @@ def _rows(symbol: str, interval: str):
 def _strategy(request: StrategyBuildRequest) -> IntradayConfig:
     if request.fast_period >= request.slow_period:
         raise HTTPException(status_code=422, detail="Fast EMA period must be smaller than slow EMA period")
-    return IntradayConfig(opening_bars=request.opening_bars, fast_period=request.fast_period, slow_period=request.slow_period, volume_period=request.volume_period, min_volume_ratio=request.min_volume_ratio, max_gap_percent=request.max_gap_percent, risk_per_trade=request.risk_per_trade, max_position_percent=request.max_position_percent, atr_period=request.atr_period, atr_stop_multiple=request.atr_stop_multiple, reward_multiple=request.reward_multiple)
+    return IntradayConfig(trade_direction=request.trade_direction, opening_bars=request.opening_bars, fast_period=request.fast_period, slow_period=request.slow_period, volume_period=request.volume_period, min_volume_ratio=request.min_volume_ratio, max_gap_percent=request.max_gap_percent, risk_per_trade=request.risk_per_trade, max_position_percent=request.max_position_percent, atr_period=request.atr_period, atr_stop_multiple=request.atr_stop_multiple, reward_multiple=request.reward_multiple)
 
 def _backtest_config(request: StrategyBuildRequest, strategy: IntradayConfig, version: str = "V1") -> IntradayBacktestConfig:
     return IntradayBacktestConfig(initial_capital=request.initial_capital, brokerage_rate=request.brokerage_rate, slippage_rate=request.slippage_rate, max_daily_loss_percent=request.max_daily_loss_percent, max_trades_per_session=request.max_trades_per_session, strategy=strategy, strategy_version=version)
@@ -61,8 +62,7 @@ def _policy(request: StrategyBuildRequest) -> QualificationPolicy:
 def build_and_backtest(symbol: str = Query(min_length=1, max_length=30), interval: str = Query(default="5", pattern="^(1|5|15|25|60)$"), request: StrategyBuildRequest = ..., current_user: User = Depends(get_current_user)):
     del current_user
     dataset, rows = _rows(symbol, interval)
-    if not rows:
-        raise HTTPException(status_code=404, detail=f"Intraday dataset not found: {dataset}")
+    if not rows: raise HTTPException(status_code=404, detail=f"Intraday dataset not found: {dataset}")
     strategy = _strategy(request)
     result = run_intraday_backtest(rows, _backtest_config(request, strategy))
     return {"symbol": symbol.strip().upper(), "interval": interval, "dataset": dataset, "strategy": strategy.__dict__, "execution": {"brokerage_rate": request.brokerage_rate, "slippage_rate": request.slippage_rate, "max_daily_loss_percent": request.max_daily_loss_percent, "max_trades_per_session": request.max_trades_per_session}, **result}
@@ -71,20 +71,16 @@ def build_and_backtest(symbol: str = Query(min_length=1, max_length=30), interva
 def compare_versions(symbol: str = Query(min_length=1, max_length=30), interval: str = Query(default="5", pattern="^(1|5|15|25|60)$"), request: StrategyBuildRequest = ..., current_user: User = Depends(get_current_user)):
     del current_user
     dataset, rows = _rows(symbol, interval)
-    if not rows:
-        raise HTTPException(status_code=404, detail=f"Intraday dataset not found: {dataset}")
+    if not rows: raise HTTPException(status_code=404, detail=f"Intraday dataset not found: {dataset}")
     strategy = _strategy(request)
-    comparison = compare_intraday_strategies(rows, _backtest_config(request, strategy))
-    return {"symbol": symbol.strip().upper(), "interval": interval, "dataset": dataset, **comparison}
+    return {"symbol": symbol.strip().upper(), "interval": interval, "dataset": dataset, **compare_intraday_strategies(rows, _backtest_config(request, strategy))}
 
 @router.post("/walk-forward")
 def walk_forward_validation(symbol: str = Query(min_length=1, max_length=30), interval: str = Query(default="5", pattern="^(1|5|15|25|60)$"), train_size: int = Query(default=60, ge=10, le=5000), validation_size: int = Query(default=20, ge=5, le=2000), step: int | None = Query(default=None, ge=1, le=2000), request: StrategyBuildRequest = ..., current_user: User = Depends(get_current_user)):
     del current_user
     dataset, rows = _rows(symbol, interval)
-    if not rows:
-        raise HTTPException(status_code=404, detail=f"Intraday dataset not found: {dataset}")
-    if train_size + validation_size > len(rows):
-        raise HTTPException(status_code=422, detail="Not enough bars for the requested train and validation windows")
+    if not rows: raise HTTPException(status_code=404, detail=f"Intraday dataset not found: {dataset}")
+    if train_size + validation_size > len(rows): raise HTTPException(status_code=422, detail="Not enough bars for the requested train and validation windows")
     strategy = _strategy(request)
     result = run_fixed_parameter_walk_forward(rows, train_size, validation_size, step, _backtest_config(request, strategy))
     return {"symbol": symbol.strip().upper(), "interval": interval, "dataset": dataset, **result}
@@ -93,8 +89,7 @@ def walk_forward_validation(symbol: str = Query(min_length=1, max_length=30), in
 def robustness_validation(symbol: str = Query(min_length=1, max_length=30), interval: str = Query(default="5", pattern="^(1|5|15|25|60)$"), stress_costs: bool = Query(default=True), request: StrategyBuildRequest = ..., current_user: User = Depends(get_current_user)):
     del current_user
     dataset, rows = _rows(symbol, interval)
-    if not rows:
-        raise HTTPException(status_code=404, detail=f"Intraday dataset not found: {dataset}")
+    if not rows: raise HTTPException(status_code=404, detail=f"Intraday dataset not found: {dataset}")
     strategy = _strategy(request)
     result = run_robustness_analysis(rows, _backtest_config(request, strategy), stress_costs=stress_costs)
     return {"symbol": symbol.strip().upper(), "interval": interval, "dataset": dataset, **result}
@@ -103,14 +98,9 @@ def robustness_validation(symbol: str = Query(min_length=1, max_length=30), inte
 def qualify_strategy_for_paper(symbol: str = Query(min_length=1, max_length=30), interval: str = Query(default="5", pattern="^(1|5|15|25|60)$"), train_size: int = Query(default=60, ge=10, le=5000), validation_size: int = Query(default=20, ge=5, le=2000), step: int | None = Query(default=None, ge=1, le=2000), request: StrategyBuildRequest = ..., current_user: User = Depends(get_current_user)):
     del current_user
     dataset, rows = _rows(symbol, interval)
-    if not rows:
-        raise HTTPException(status_code=404, detail=f"Intraday dataset not found: {dataset}")
-    if train_size + validation_size > len(rows):
-        raise HTTPException(status_code=422, detail="Not enough bars for the requested train and validation windows")
-    strategy = _strategy(request)
-    config = _backtest_config(request, strategy)
-    backtest = run_intraday_backtest(rows, config)
-    robustness = run_robustness_analysis(rows, config, stress_costs=True)
-    walk_forward = run_fixed_parameter_walk_forward(rows, train_size, validation_size, step, config)
+    if not rows: raise HTTPException(status_code=404, detail=f"Intraday dataset not found: {dataset}")
+    if train_size + validation_size > len(rows): raise HTTPException(status_code=422, detail="Not enough bars for the requested train and validation windows")
+    strategy = _strategy(request); config = _backtest_config(request, strategy)
+    backtest = run_intraday_backtest(rows, config); robustness = run_robustness_analysis(rows, config, stress_costs=True); walk_forward = run_fixed_parameter_walk_forward(rows, train_size, validation_size, step, config)
     qualification = qualify_strategy(backtest, robustness, walk_forward, _policy(request))
     return {"symbol": symbol.strip().upper(), "interval": interval, "dataset": dataset, "qualification": qualification, "backtest": {k: v for k, v in backtest.items() if k != "trades_detail"}, "robustness": robustness["summary"], "walk_forward": {"windows": walk_forward["windows"], "v2_summary": walk_forward["v2"]["summary"]}}
