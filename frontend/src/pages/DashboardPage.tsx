@@ -91,6 +91,7 @@ export default function DashboardPage({ onLogout, onTransactions }: DashboardPag
   }
 
   const profitPositive = analytics.total_profit_loss >= 0;
+  const unrealizedPositive = analytics.unrealized_profit_loss >= 0;
 
   return (
     <main className="min-h-screen bg-slate-50 p-6">
@@ -103,34 +104,46 @@ export default function DashboardPage({ onLogout, onTransactions }: DashboardPag
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={onTransactions} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-slate-700">Transactions</button>
             <button type="button" onClick={() => void loadDashboard()} className="rounded-lg bg-slate-900 px-4 py-2 text-white">Refresh</button>
-            <button type="button" onClick={onLogout} className="rounded-lg border border-slate-300 px-4 py-2 text-slate-700">Logout</button>
+            <button type="button" onClick={onLogout} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-slate-700">Logout</button>
           </div>
         </div>
 
         {error && <div className="mt-5 rounded-lg bg-red-50 p-4 text-red-700">{error}</div>}
 
         <section className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-xl border bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Invested</p><p className="mt-2 text-2xl font-bold">₹{money(analytics.total_invested)}</p></div>
-          <div className="rounded-xl border bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Current Value</p><p className="mt-2 text-2xl font-bold">₹{money(analytics.current_value)}</p></div>
-          <div className="rounded-xl border bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Total P/L</p><p className="mt-2 text-2xl font-bold">{profitPositive ? "+" : ""}₹{money(analytics.total_profit_loss)}</p></div>
-          <div className="rounded-xl border bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Return</p><p className="mt-2 text-2xl font-bold">{profitPositive ? "+" : ""}{analytics.total_return_percent.toFixed(2)}%</p></div>
+          <div className="rounded-xl border bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Invested</p><p className="mt-2 text-2xl font-bold text-slate-900">₹{money(analytics.total_invested)}</p></div>
+          <div className="rounded-xl border bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Current Value</p><p className="mt-2 text-2xl font-bold text-slate-900">₹{money(analytics.current_value)}</p></div>
+          <div className="rounded-xl border bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Total P/L</p><p className={`mt-2 text-2xl font-bold ${profitPositive ? "text-emerald-700" : "text-red-700"}`}>{profitPositive ? "+" : ""}₹{money(analytics.total_profit_loss)}</p></div>
+          <div className="rounded-xl border bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Return</p><p className={`mt-2 text-2xl font-bold ${profitPositive ? "text-emerald-700" : "text-red-700"}`}>{profitPositive ? "+" : ""}{analytics.total_return_percent.toFixed(2)}%</p></div>
         </section>
 
         <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-xl border bg-white p-5"><p className="text-sm text-slate-500">Realized P/L</p><p className="mt-2 text-xl font-semibold">₹{money(analytics.realized_profit_loss)}</p></div>
-          <div className="rounded-xl border bg-white p-5"><p className="text-sm text-slate-500">Unrealized P/L</p><p className="mt-2 text-xl font-semibold">₹{money(analytics.unrealized_profit_loss)}</p></div>
-          <div className="rounded-xl border bg-white p-5"><p className="text-sm text-slate-500">Best Performer</p><p className="mt-2 text-xl font-semibold">{analytics.best_performer ?? "-"}</p></div>
-          <div className="rounded-xl border bg-white p-5"><p className="text-sm text-slate-500">Worst Performer</p><p className="mt-2 text-xl font-semibold">{analytics.worst_performer ?? "-"}</p></div>
+          <div className="rounded-xl border bg-white p-5"><p className="text-sm text-slate-500">Realized P/L</p><p className="mt-2 text-xl font-semibold text-slate-900">₹{money(analytics.realized_profit_loss)}</p></div>
+          <div className="rounded-xl border bg-white p-5"><p className="text-sm text-slate-500">Unrealized P/L</p><p className={`mt-2 text-xl font-semibold ${unrealizedPositive ? "text-emerald-700" : "text-red-700"}`}>{unrealizedPositive ? "+" : ""}₹{money(analytics.unrealized_profit_loss)}</p></div>
+          <div className="rounded-xl border bg-white p-5"><p className="text-sm text-slate-500">Best Performer</p><p className="mt-2 text-xl font-semibold text-slate-900">{analytics.best_performer ?? "-"}</p></div>
+          <div className="rounded-xl border bg-white p-5"><p className="text-sm text-slate-500">Worst Performer</p><p className="mt-2 text-xl font-semibold text-slate-900">{analytics.worst_performer ?? "-"}</p></div>
         </section>
 
         <section className="mt-8 rounded-xl border bg-white shadow-sm">
-          <div className="border-b p-5"><h2 className="text-xl font-semibold">Holdings Performance</h2></div>
+          <div className="border-b p-5"><h2 className="text-xl font-semibold text-slate-900">Holdings Performance</h2><p className="mt-1 text-sm text-slate-500">Live market price is used to calculate current value and unrealized P/L.</p></div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-500"><tr><th className="px-5 py-3">Symbol</th><th className="px-5 py-3">Quantity</th><th className="px-5 py-3">Invested</th><th className="px-5 py-3">Current</th><th className="px-5 py-3">P/L</th><th className="px-5 py-3">Return</th></tr></thead>
+              <thead className="bg-slate-50 text-slate-600"><tr><th className="px-5 py-3">Symbol</th><th className="px-5 py-3">Quantity</th><th className="px-5 py-3">Avg. Buy</th><th className="px-5 py-3">Current Price</th><th className="px-5 py-3">Current Value</th><th className="px-5 py-3">P/L</th><th className="px-5 py-3">Return</th></tr></thead>
               <tbody>
-                {analytics.stocks.length === 0 && <tr className="border-t"><td className="px-5 py-6 text-center text-slate-500" colSpan={6}>No holdings yet.</td></tr>}
-                {analytics.stocks.map((stock) => <tr key={stock.symbol} className="border-t"><td className="px-5 py-4 font-semibold">{stock.symbol}</td><td className="px-5 py-4">{stock.quantity}</td><td className="px-5 py-4">₹{money(stock.invested_amount)}</td><td className="px-5 py-4">₹{money(stock.current_value)}</td><td className="px-5 py-4">₹{money(stock.unrealized_profit_loss)}</td><td className="px-5 py-4">{stock.unrealized_profit_loss_percent.toFixed(2)}%</td></tr>)}
+                {analytics.stocks.length === 0 && <tr className="border-t"><td className="px-5 py-6 text-center text-slate-500" colSpan={7}>No holdings yet.</td></tr>}
+                {analytics.stocks.map((stock) => {
+                  const currentPrice = stock.quantity > 0 ? stock.current_value / stock.quantity : 0;
+                  const stockProfitPositive = stock.unrealized_profit_loss >= 0;
+                  return <tr key={stock.symbol} className="border-t border-slate-200 text-slate-800">
+                    <td className="px-5 py-4 font-semibold text-slate-900">{stock.symbol}</td>
+                    <td className="px-5 py-4">{stock.quantity}</td>
+                    <td className="px-5 py-4">₹{money(stock.invested_amount / stock.quantity)}</td>
+                    <td className="px-5 py-4 font-semibold text-slate-900">₹{money(currentPrice)}</td>
+                    <td className="px-5 py-4">₹{money(stock.current_value)}</td>
+                    <td className={`px-5 py-4 font-semibold ${stockProfitPositive ? "text-emerald-700" : "text-red-700"}`}>{stockProfitPositive ? "+" : ""}₹{money(stock.unrealized_profit_loss)}</td>
+                    <td className={`px-5 py-4 font-semibold ${stockProfitPositive ? "text-emerald-700" : "text-red-700"}`}>{stockProfitPositive ? "+" : ""}{stock.unrealized_profit_loss_percent.toFixed(2)}%</td>
+                  </tr>;
+                })}
               </tbody>
             </table>
           </div>
@@ -138,10 +151,10 @@ export default function DashboardPage({ onLogout, onTransactions }: DashboardPag
 
         <section className="mt-8 rounded-xl border bg-white shadow-sm">
           <div className="flex flex-col gap-4 border-b p-5 md:flex-row md:items-center md:justify-between">
-            <div><h2 className="text-xl font-semibold">Watchlist</h2><p className="text-sm text-slate-500">Track stocks before you buy.</p></div>
-            <div className="flex gap-2"><input value={newSymbol} onChange={(event) => setNewSymbol(event.target.value)} placeholder="TCS" className="rounded-lg border px-3 py-2" /><button type="button" onClick={() => void addSymbol()} className="rounded-lg bg-slate-900 px-4 py-2 text-white">Add</button></div>
+            <div><h2 className="text-xl font-semibold text-slate-900">Watchlist</h2><p className="text-sm text-slate-500">Track stocks before you buy.</p></div>
+            <div className="flex gap-2"><input value={newSymbol} onChange={(event) => setNewSymbol(event.target.value)} placeholder="TCS" className="rounded-lg border border-slate-300 px-3 py-2 text-slate-900" /><button type="button" onClick={() => void addSymbol()} className="rounded-lg bg-slate-900 px-4 py-2 text-white">Add</button></div>
           </div>
-          {watchlist.length === 0 ? <div className="p-8 text-center text-slate-500">Your watchlist is empty.</div> : <div className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-4">{watchlist.map((item) => <div key={item.id} className="rounded-lg border p-4"><div className="flex items-center justify-between"><span className="font-semibold">{item.symbol}</span><button type="button" onClick={() => void removeSymbol(item.id)} className="text-xs text-red-600">Remove</button></div><p className="mt-3 text-xl font-bold">₹{money(item.price)}</p><p className="mt-1 text-sm">{item.change >= 0 ? "+" : ""}{money(item.change)} ({item.change_percent >= 0 ? "+" : ""}{item.change_percent.toFixed(2)}%)</p></div>)}</div>}
+          {watchlist.length === 0 ? <div className="p-8 text-center text-slate-500">Your watchlist is empty.</div> : <div className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-4">{watchlist.map((item) => <div key={item.id} className="rounded-lg border border-slate-200 p-4 text-slate-800"><div className="flex items-center justify-between"><span className="font-semibold text-slate-900">{item.symbol}</span><button type="button" onClick={() => void removeSymbol(item.id)} className="text-xs text-red-600">Remove</button></div><p className="mt-3 text-xl font-bold text-slate-900">₹{money(item.price)}</p><p className={`mt-1 text-sm font-medium ${item.change >= 0 ? "text-emerald-700" : "text-red-700"}`}>{item.change >= 0 ? "+" : ""}{money(item.change)} ({item.change_percent >= 0 ? "+" : ""}{item.change_percent.toFixed(2)}%)</p></div>)}</div>}
         </section>
 
         <IntelligencePanel />
