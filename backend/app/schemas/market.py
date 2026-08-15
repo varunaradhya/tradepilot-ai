@@ -13,6 +13,7 @@ class QuoteResponse(BaseModel):
     change: float | None = None
     change_percent: float | None = None
     market_time: datetime | None = None
+    data_status: str = "LIVE"
 
 
 class HistoricalPrice(BaseModel):
@@ -30,6 +31,7 @@ class HistoryResponse(BaseModel):
     interval: str
     range: str
     data: list[HistoricalPrice]
+    data_status: str = "LIVE"
 
 
 class SearchInstrumentResponse(BaseModel):
