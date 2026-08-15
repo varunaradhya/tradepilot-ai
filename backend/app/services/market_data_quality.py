@@ -43,16 +43,19 @@ def validate_intraday_candles(rows, expected_minutes: int = 5, stale_after_minut
         age = (now - timestamps[-1]).total_seconds() / 60
         stale = age > stale_after_minutes
 
+    # Structural quality takes precedence over wall-clock freshness when both
+    # are present. This makes the diagnostic actionable: a replayed historical
+    # dataset with gaps should report its gaps rather than being labelled stale.
     reason = None
-    if stale:
-        reason = "STALE_DATA"
-    elif missing:
+    if missing:
         reason = "MISSING_INTERVALS"
+    elif stale:
+        reason = "STALE_DATA"
     elif outside_session:
         reason = "OUTSIDE_MARKET_SESSION"
 
     return CandleQuality(
-        valid=not stale and not out_of_order and not duplicate,
+        valid=not stale and not out_of_order and not duplicate and not missing,
         stale=stale,
         missing_intervals=missing,
         outside_session=outside_session,
