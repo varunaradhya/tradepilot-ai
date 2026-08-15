@@ -23,20 +23,17 @@ class ExecutionDecision:
 
 
 def authorize_order(context: ExecutionContext, order: CanonicalOrder) -> ExecutionDecision:
-    """Central safety gate before any broker-order path.
-
-    PAPER is allowed only after structural validation and all safety gates.
-    LIVE is always denied until a separately reviewed live-execution release.
-    """
+    """Central safety gate before any broker-order path."""
     broker = normalize_broker_name(context.broker)
     mode = context.mode.strip().upper()
-    adapter = get_broker_adapter(broker)
-
+    try:
+        adapter = get_broker_adapter(broker)
+    except ValueError:
+        return ExecutionDecision(False, "BROKER_UNSUPPORTED", broker, mode)
     try:
         adapter.validate_order(order)
     except ValueError as exc:
         return ExecutionDecision(False, str(exc), broker, mode)
-
     if context.long_only and order.side.strip().upper() != "BUY":
         return ExecutionDecision(False, "LONG_ONLY_POLICY", broker, mode)
     if not context.market_data_healthy:
@@ -49,11 +46,9 @@ def authorize_order(context: ExecutionContext, order: CanonicalOrder) -> Executi
         return ExecutionDecision(False, "STRATEGY_NOT_READY", broker, mode)
     if not context.risk_approved:
         return ExecutionDecision(False, "RISK_NOT_APPROVED", broker, mode)
-
     capabilities = get_broker_capabilities(broker)
     if capabilities.integration_status == "UNSUPPORTED":
         return ExecutionDecision(False, "BROKER_UNSUPPORTED", broker, mode)
     if not capabilities.paper_orders:
         return ExecutionDecision(False, "PAPER_ORDERS_UNSUPPORTED", broker, mode)
-
     return ExecutionDecision(True, "PAPER_ORDER_AUTHORIZED", broker, mode)
