@@ -1,4 +1,6 @@
-﻿export interface Holding {
+import { api } from "./api";
+
+export interface Holding {
   id: number;
   user_id: number;
   symbol: string;
@@ -14,48 +16,18 @@ export interface HoldingCreate {
   average_buy_price: number;
 }
 
-const API_URL =
-  import.meta.env.VITE_API_URL ??
-  "http://localhost:8000/api/v1";
-
-export async function getHoldings(
-  token: string
-): Promise<Holding[]> {
-  const response = await fetch(
-    `${API_URL}/portfolio/holdings`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error("Failed to load holdings");
-  }
-
-  return response.json();
+export async function getHoldings(): Promise<Holding[]> {
+  return api.get<Holding[]>("/portfolio/holdings");
 }
 
-export async function createHolding(
-  token: string,
-  holding: HoldingCreate
-): Promise<Holding> {
-  const response = await fetch(
-    `${API_URL}/portfolio/holdings`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(holding),
-    }
-  );
+export async function createHolding(holding: HoldingCreate): Promise<Holding> {
+  return api.post<Holding>("/portfolio/holdings", holding);
+}
 
-  if (!response.ok) {
-    throw new Error("Failed to create holding");
-  }
+export async function updateHolding(id: number, holding: Partial<HoldingCreate>): Promise<Holding> {
+  return api.put<Holding>(`/portfolio/holdings/${id}`, holding);
+}
 
-  return response.json();
+export async function deleteHolding(id: number): Promise<void> {
+  return api.delete<void>(`/portfolio/holdings/${id}`);
 }
