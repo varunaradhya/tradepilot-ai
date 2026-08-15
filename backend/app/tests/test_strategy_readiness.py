@@ -89,3 +89,35 @@ def test_readiness_tracks_consecutive_losses_and_stop_distribution():
     )
     assert result["paper"]["max_consecutive_losses"] == 2
     assert result["paper"]["exit_reasons"] == {"STOP": 3}
+
+
+def test_readiness_rejects_excessive_consecutive_losses():
+    class Trade:
+        status = "CLOSED"
+        pnl = -10.0
+        entry_price = 100.0
+        stop_price = 95.0
+        quantity = 1
+        reason = "STOP"
+        created_at = None
+        closed_at = None
+
+    result = build_strategy_readiness(
+        {"status": "PAPER_CANDIDATE"},
+        {"summary": {"symbols_tested": 5, "robust_percent": 80}},
+        [Trade() for _ in range(30)],
+    )
+    assert result["checks"]["paper_risk_quality"] is False
+    assert "PAPER_RISK_QUALITY_FAILED" in result["reasons"]
+    assert result["status"] == "PAPER_VALIDATION"
+
+
+def test_readiness_exposes_risk_quality_policy():
+    result = build_strategy_readiness(
+        {"status": "NOT_QUALIFIED"},
+        {"summary": {"symbols_tested": 0, "robust_percent": 0}},
+        [],
+    )
+    assert result["policy"]["max_consecutive_losses"] == 5
+    assert result["policy"]["min_average_r"] == 0.0
+    assert result["checks"]["paper_risk_quality"] is True
