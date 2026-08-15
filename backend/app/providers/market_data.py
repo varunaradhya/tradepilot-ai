@@ -32,11 +32,11 @@ class HistoricalData:
 
 
 class YahooFinanceProvider:
-    """Yahoo Finance chart-data provider for NSE-listed Indian stocks.
+    """Yahoo Finance chart-data provider for Indian listed equities.
 
-    Plain user-facing symbols such as TCS are translated to TCS.NS. The
-    provider uses a small in-process TTL cache and a second Yahoo chart host
-    as a fallback so browser refreshes do not immediately turn into 429s.
+    Plain symbols are tried on NSE first and then BSE. Explicit .NS/.BO
+    symbols are respected. A short TTL cache reduces repeated browser refreshes
+    and the second Yahoo host provides a rate-limit fallback.
     """
 
     BASE_URLS = (
@@ -44,6 +44,7 @@ class YahooFinanceProvider:
         "https://query2.finance.yahoo.com/v8/finance/chart",
     )
     NSE_SUFFIX = ".NS"
+    BSE_SUFFIX = ".BO"
     CACHE_TTL_SECONDS = 30
     HISTORY_CACHE_TTL_SECONDS = 180
     _cache: dict[tuple[str, str, str], tuple[float, dict]] = {}
@@ -59,6 +60,15 @@ class YahooFinanceProvider:
         if "." in normalized:
             return normalized
         return f"{normalized}{cls.NSE_SUFFIX}"
+
+    @classmethod
+    def _candidate_provider_symbols(cls, symbol: str) -> list[str]:
+        normalized = symbol.strip().upper()
+        if not normalized:
+            raise MarketDataProviderError("Symbol is required")
+        if "." in normalized:
+            return [normalized]
+        return [f"{normalized}{cls.NSE_SUFFIX}", f"{normalized}{cls.BSE_SUFFIX}"]
 
     @classmethod
     def _cached(cls, key: tuple[str, str, str]) -> dict | None:
@@ -78,62 +88,64 @@ class YahooFinanceProvider:
         return payload
 
     def _get_chart(self, symbol: str, range_: str, interval: str) -> dict:
-        provider_symbol = self._provider_symbol(symbol)
-        key = (provider_symbol, range_, interval)
-        cached = self._cached(key)
-        if cached is not None:
-            return cached
-
         last_error: Exception | None = None
-        for base_url in self.BASE_URLS:
-            url = f"{base_url}/{provider_symbol}"
-            try:
-                response = httpx.get(
-                    url,
-                    params={
-                        "range": range_,
-                        "interval": interval,
-                        "includePrePost": "false",
-                        "events": "div,splits",
-                    },
-                    timeout=self.timeout,
-                    follow_redirects=True,
-                    headers={"User-Agent": "Mozilla/5.0 TradePilotAI/0.1"},
-                )
-                if response.status_code == 429:
-                    last_error = httpx.HTTPStatusError(
-                        "429 Too Many Requests",
-                        request=response.request,
-                        response=response,
-                    )
-                    continue
-                response.raise_for_status()
-                payload = response.json()
-                chart = payload.get("chart", {})
-                error = chart.get("error")
-                if error:
-                    description = error.get("description") or "Unknown provider error"
-                    raise MarketDataProviderError(description)
-                results = chart.get("result") or []
-                if not results:
-                    raise MarketDataProviderError(
-                        f"No market data found for symbol {symbol.strip().upper()}"
-                    )
-                return self._store_cache(key, results[0])
-            except MarketDataProviderError:
-                raise
-            except (httpx.HTTPError, ValueError) as exc:
-                last_error = exc
-                continue
 
+        for provider_symbol in self._candidate_provider_symbols(symbol):
+            key = (provider_symbol, range_, interval)
+            cached = self._cached(key)
+            if cached is not None:
+                return cached
+
+            for base_url in self.BASE_URLS:
+                url = f"{base_url}/{provider_symbol}"
+                try:
+                    response = httpx.get(
+                        url,
+                        params={
+                            "range": range_,
+                            "interval": interval,
+                            "includePrePost": "false",
+                            "events": "div,splits",
+                        },
+                        timeout=self.timeout,
+                        follow_redirects=True,
+                        headers={"User-Agent": "Mozilla/5.0 TradePilotAI/0.1"},
+                    )
+                    if response.status_code == 429:
+                        last_error = httpx.HTTPStatusError(
+                            "429 Too Many Requests",
+                            request=response.request,
+                            response=response,
+                        )
+                        continue
+                    response.raise_for_status()
+                    payload = response.json()
+                    chart = payload.get("chart", {})
+                    error = chart.get("error")
+                    if error:
+                        last_error = MarketDataProviderError(
+                            error.get("description") or "Unknown provider error"
+                        )
+                        continue
+                    results = chart.get("result") or []
+                    if not results:
+                        last_error = MarketDataProviderError(
+                            f"No market data found for symbol {symbol.strip().upper()}"
+                        )
+                        continue
+                    return self._store_cache(key, results[0])
+                except (httpx.HTTPError, ValueError) as exc:
+                    last_error = exc
+                    continue
+
+        if isinstance(last_error, httpx.HTTPStatusError) and last_error.response.status_code == 429:
+            raise MarketDataProviderError(
+                "Market data provider is temporarily rate-limiting requests. Please try again in a few seconds."
+            ) from last_error
+        if isinstance(last_error, ValueError):
+            raise MarketDataProviderError("Market data provider returned invalid JSON") from last_error
         if last_error is not None:
-            if isinstance(last_error, httpx.HTTPStatusError) and last_error.response.status_code == 429:
-                raise MarketDataProviderError(
-                    "Market data provider is temporarily rate-limiting requests. Please try again in a few seconds."
-                ) from last_error
-            if isinstance(last_error, ValueError):
-                raise MarketDataProviderError("Market data provider returned invalid JSON") from last_error
-            raise MarketDataProviderError(f"Market data provider request failed: {last_error}") from last_error
+            raise MarketDataProviderError(str(last_error)) from last_error
         raise MarketDataProviderError("Market data provider request failed")
 
     def get_quote(self, symbol: str) -> QuoteData:
