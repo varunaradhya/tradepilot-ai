@@ -2,56 +2,20 @@ from sqlalchemy.orm import Session
 
 from app.models.holding import Holding
 from app.models.transaction import Transaction
-from app.services.market_service import (
-    MarketDataProviderError,
-    get_quote,
-)
+from app.services.market_service import MarketDataProviderError, get_quote
+from app.services.pnl_service import calculate_fifo_realized_pnl
 
 
 def calculate_realized_profit_loss(
     db: Session,
     user_id: int,
-) -> float:
+) -> tuple[float, float]:
     transactions = (
         db.query(Transaction)
         .filter(Transaction.user_id == user_id)
-        .order_by(
-            Transaction.transaction_date.asc(),
-            Transaction.id.asc(),
-        )
         .all()
     )
-
-    positions = {}
-    realized = 0.0
-
-    for transaction in transactions:
-        symbol = transaction.symbol
-        quantity = float(transaction.quantity)
-        price = float(transaction.price)
-
-        if symbol not in positions:
-            positions[symbol] = {"quantity": 0.0, "average_cost": 0.0}
-
-        position = positions[symbol]
-
-        if transaction.transaction_type == "BUY":
-            old_quantity = position["quantity"]
-            old_average = position["average_cost"]
-            new_quantity = old_quantity + quantity
-
-            if new_quantity > 0:
-                position["average_cost"] = (
-                    (old_quantity * old_average) + (quantity * price)
-                ) / new_quantity
-
-            position["quantity"] = new_quantity
-
-        elif transaction.transaction_type == "SELL" and quantity <= position["quantity"]:
-            realized += quantity * (price - position["average_cost"])
-            position["quantity"] -= quantity
-
-    return round(realized, 2)
+    return calculate_fifo_realized_pnl(transactions)
 
 
 def calculate_analytics(
@@ -112,11 +76,15 @@ def calculate_analytics(
         else 0.0
     )
 
-    realized_profit_loss = calculate_realized_profit_loss(db, user_id)
+    realized_profit_loss, realized_cost_basis = calculate_realized_profit_loss(
+        db, user_id
+    )
     total_profit_loss = realized_profit_loss + unrealized_profit_loss
+
+    total_cost_basis = total_invested + realized_cost_basis
     total_return_percent = (
-        (total_profit_loss / total_invested) * 100
-        if total_invested
+        (total_profit_loss / total_cost_basis) * 100
+        if total_cost_basis
         else 0.0
     )
 
