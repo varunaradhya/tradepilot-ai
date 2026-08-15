@@ -20,6 +20,7 @@ def _paper_metrics(trades: Iterable[PaperTrade]) -> dict:
     wins = [p for p in pnls if p > 0]
     losses = [p for p in pnls if p < 0]
     gross_loss = abs(sum(losses))
+
     equity = 100000.0
     peak = equity
     max_dd = 0.0
@@ -28,6 +29,35 @@ def _paper_metrics(trades: Iterable[PaperTrade]) -> dict:
         peak = max(peak, equity)
         if peak:
             max_dd = max(max_dd, (peak - equity) / peak * 100)
+
+    r_values: list[float] = []
+    hold_minutes: list[float] = []
+    exit_reasons: dict[str, int] = {}
+    max_consecutive_losses = 0
+    consecutive_losses = 0
+
+    for trade, pnl in zip(closed, pnls):
+        risk_per_trade = abs(float(trade.entry_price) - float(trade.stop_price)) * abs(int(trade.quantity))
+        if risk_per_trade > 0:
+            r_values.append(pnl / risk_per_trade)
+
+        if trade.closed_at is not None and trade.created_at is not None:
+            seconds = (trade.closed_at - trade.created_at).total_seconds()
+            if seconds >= 0:
+                hold_minutes.append(seconds / 60.0)
+
+        reason = str(trade.reason or "UNKNOWN").upper()
+        exit_reasons[reason] = exit_reasons.get(reason, 0) + 1
+
+        if pnl < 0:
+            consecutive_losses += 1
+            max_consecutive_losses = max(max_consecutive_losses, consecutive_losses)
+        else:
+            consecutive_losses = 0
+
+    average_r = sum(r_values) / len(r_values) if r_values else None
+    average_hold = sum(hold_minutes) / len(hold_minutes) if hold_minutes else None
+
     return {
         "trades": len(closed),
         "wins": len(wins),
@@ -36,6 +66,10 @@ def _paper_metrics(trades: Iterable[PaperTrade]) -> dict:
         "profit_factor": round(sum(wins) / gross_loss, 4) if gross_loss else None,
         "realized_pnl": round(sum(pnls), 2),
         "max_drawdown_percent": round(max_dd, 2),
+        "average_r": round(average_r, 4) if average_r is not None else None,
+        "average_hold_minutes": round(average_hold, 2) if average_hold is not None else None,
+        "max_consecutive_losses": max_consecutive_losses,
+        "exit_reasons": dict(sorted(exit_reasons.items())),
     }
 
 
