@@ -52,11 +52,11 @@ def download_research_daily(symbol: str = Query(min_length=1, max_length=30), st
 @router.post("/intraday")
 def download_research_intraday(symbol: str = Query(min_length=1, max_length=30), interval: str = Query(default="5", pattern="^(1|5|15|25|60)$"), start: date | None = None, end: date | None = None, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     end_date = end or date.today()
-    start_date = start or (end_date - timedelta(days=90))
+    start_date = start or (end_date - timedelta(days=365 * 5))
     if start_date >= end_date:
         raise HTTPException(status_code=422, detail="start must be before end")
-    if (end_date - start_date).days > 90:
-        raise HTTPException(status_code=422, detail="Intraday history is limited to 90 days per request")
+    if (end_date - start_date).days > 365 * 5:
+        raise HTTPException(status_code=422, detail="Intraday research history is limited to 5 years per request")
     try:
         result = download_intraday_dataset(_dhan_client(db, current_user), symbol, start_date, end_date, interval)
     except (ValueError, InstrumentMasterError) as exc:
