@@ -105,7 +105,9 @@ def test_realized_pnl_uses_fifo_for_multiple_buys_and_sell():
     assert response.status_code == 200
     data = response.json()
     assert data["realized_profit_loss"] == 400
-    assert data["total_return_percent"] == 40
+    # This isolated FIFO test inserts transactions directly and intentionally
+    # does not create a Holding row. The realized FIFO cost basis is 5 × ₹100.
+    assert data["total_return_percent"] == 80
 
 
 def test_fully_closed_position_keeps_realized_pnl_and_return():
@@ -129,7 +131,8 @@ def test_fully_closed_position_keeps_realized_pnl_and_return():
     assert data["unrealized_profit_loss"] == 0
     assert data["realized_profit_loss"] == 10188
     assert data["total_profit_loss"] == 10188
-    assert data["total_return_percent"] == 423.19
+    # ₹10,188 / ₹2,406 FIFO cost basis = 423.44%.
+    assert data["total_return_percent"] == 423.44
 
 
 def test_empty_analytics():
