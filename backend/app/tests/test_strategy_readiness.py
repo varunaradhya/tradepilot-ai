@@ -35,7 +35,14 @@ def test_readiness_requires_realized_paper_performance_before_live_review():
         status = "CLOSED"
         pnl = -100.0
 
-    trades = [Trade() for _ in range(20)] + [Loss() for _ in range(10)]
+    # Keep losses distributed so this fixture represents acceptable loss-sequence
+    # quality; the dedicated risk-quality test covers excessive loss streaks.
+    trades = []
+    for index in range(20):
+        trades.append(Trade())
+        if index < 10:
+            trades.append(Loss())
+
     result = build_strategy_readiness(
         {"status": "PAPER_CANDIDATE"},
         {"summary": {"symbols_tested": 5, "robust_percent": 80}},
