@@ -6,9 +6,9 @@ def _trend_rows(n=100):
     rows = []
     price = 100.0
     for i in range(n):
-        # Positive drift with regular pullbacks keeps RSI in a healthy
-        # momentum zone instead of creating an unrealistic RSI=100 series.
-        price += 0.8 if i % 3 else -0.6
+        # Positive drift with regular pullbacks keeps RSI safely inside the
+        # configured momentum zone instead of creating an overbought fixture.
+        price += 0.8 if i % 3 else -0.7
         rows.append({"close": price, "high": price + 1.0, "low": price - 1.0, "volume": 2000.0})
     # Create a breakout on the final bar with healthy volume.
     rows[-1]["close"] += 8
