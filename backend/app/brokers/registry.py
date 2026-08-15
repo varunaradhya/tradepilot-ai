@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from typing import Type
 
@@ -10,10 +10,10 @@ class BrokerRegistry:
         self._adapters: dict[str, Type[BrokerAdapter]] = {}
 
     def register(self, name: str, adapter: Type[BrokerAdapter]) -> None:
-        self._adapters[name.lower()] = adapter
+        self._adapters[name.strip().lower()] = adapter
 
     def get(self, name: str) -> Type[BrokerAdapter]:
-        key = name.lower()
+        key = name.strip().lower()
         if key not in self._adapters:
             raise KeyError(f"Unsupported broker: {name}")
         return self._adapters[key]
@@ -26,9 +26,12 @@ registry = BrokerRegistry()
 
 
 def _register_builtin_adapters() -> None:
-    from app.brokers.adapters import DhanBrokerAdapter
+    from app.brokers.adapters import AngelOneAdapter, DhanBrokerAdapter, GrowwAdapter
 
     registry.register("dhan", DhanBrokerAdapter)
+    registry.register("groww", GrowwAdapter)
+    registry.register("angelone", AngelOneAdapter)
+    registry.register("angel one", AngelOneAdapter)
 
 
 _register_builtin_adapters()
