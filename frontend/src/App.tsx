@@ -5,14 +5,16 @@ import BrokerPage from "./pages/BrokerPage";
 import DashboardPage from "./pages/DashboardPage";
 import MarketPage from "./pages/MarketPage";
 import PortfolioPage from "./pages/PortfolioPage";
+import ResearchPage from "./pages/ResearchPage";
 import ToolsPage from "./pages/ToolsPage";
 import TransactionsPage from "./pages/TransactionsPage";
 import { isAuthenticated, logout } from "./services/auth";
 
-type Page = "dashboard" | "transactions" | "market" | "portfolio" | "brokers" | "tools";
+type Page = "dashboard" | "research" | "transactions" | "market" | "portfolio" | "brokers" | "tools";
 
 const navItems: Array<{ id: Page; label: string }> = [
   { id: "dashboard", label: "Overview" },
+  { id: "research", label: "Research" },
   { id: "portfolio", label: "Portfolio" },
   { id: "transactions", label: "Transactions" },
   { id: "market", label: "Markets" },
@@ -26,12 +28,7 @@ function Navigation({ page, setPage }: { page: Page; setPage: (page: Page) => vo
       <div className="mx-auto flex max-w-7xl items-center gap-2 overflow-x-auto">
         <div className="mr-3 whitespace-nowrap text-sm font-extrabold text-slate-950">TradePilot</div>
         {navItems.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => setPage(item.id)}
-            className={`whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold ${page === item.id ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"}`}
-          >
+          <button key={item.id} type="button" onClick={() => setPage(item.id)} className={`whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold ${page === item.id ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"}`}>
             {item.label}
           </button>
         ))}
@@ -61,6 +58,7 @@ export default function App() {
     <>
       <Navigation page={page} setPage={setPage} />
       {page === "dashboard" && <DashboardPage onLogout={logout} onTransactions={() => setPage("transactions")} />}
+      {page === "research" && <ResearchPage />}
       {page === "transactions" && <TransactionsPage onBack={() => setPage("dashboard")} />}
       {page === "market" && <MarketPage />}
       {page === "portfolio" && <PortfolioPage />}
