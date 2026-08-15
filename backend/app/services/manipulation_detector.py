@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import isfinite
 from statistics import mean, pstdev
 from typing import Sequence
 
@@ -16,8 +17,17 @@ class ManipulationSignal:
 def _zscore(value: float, values: Sequence[float]) -> float:
     if len(values) < 2:
         return 0.0
-    deviation = pstdev(values)
-    return (value - mean(values)) / deviation if deviation else 0.0
+    baseline = [float(x) for x in values if isfinite(float(x))]
+    if not baseline:
+        return 0.0
+    average = mean(baseline)
+    deviation = pstdev(baseline)
+    if deviation == 0:
+        # A perfectly stable baseline is itself useful information: any
+        # meaningful increase above it is an anomaly even though a classical
+        # z-score is undefined.
+        return float("inf") if value > average else (float("-inf") if value < average else 0.0)
+    return (value - average) / deviation
 
 
 def detect_market_pressure(
