@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import AuthPage from "./pages/AuthPage";
 import BrokerPage from "./pages/BrokerPage";
 import DashboardPage from "./pages/DashboardPage";
+import IntradayEvidencePage from "./pages/IntradayEvidencePage";
 import IntradayScannerPage from "./pages/IntradayScannerPage";
 import MarketPage from "./pages/MarketPage";
 import PaperTradingPage from "./pages/PaperTradingPage";
@@ -13,11 +14,12 @@ import ToolsPage from "./pages/ToolsPage";
 import TransactionsPage from "./pages/TransactionsPage";
 import { isAuthenticated, logout } from "./services/auth";
 
-type Page = "dashboard" | "research" | "scanner" | "strategy" | "paper" | "transactions" | "market" | "portfolio" | "brokers" | "tools";
+type Page = "dashboard" | "research" | "evidence" | "scanner" | "strategy" | "paper" | "transactions" | "market" | "portfolio" | "brokers" | "tools";
 
 const navItems: Array<{ id: Page; label: string }> = [
   { id: "dashboard", label: "Overview" },
   { id: "research", label: "Research" },
+  { id: "evidence", label: "Intraday Evidence" },
   { id: "scanner", label: "Intraday Scanner" },
   { id: "strategy", label: "Strategy Builder" },
   { id: "paper", label: "Paper Trading" },
@@ -38,5 +40,5 @@ export default function App() {
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   useEffect(() => { const syncAuth = () => { setAuthenticated(isAuthenticated()); setPage("dashboard"); }; window.addEventListener("tradepilot:login", syncAuth); window.addEventListener("tradepilot:logout", syncAuth); return () => { window.removeEventListener("tradepilot:login", syncAuth); window.removeEventListener("tradepilot:logout", syncAuth); }; }, []);
   if (!authenticated) return <AuthPage mode={authMode} onModeChange={setAuthMode} onAuthenticated={() => setAuthenticated(true)} />;
-  return <><Navigation page={page} setPage={setPage} />{page === "dashboard" && <DashboardPage onLogout={logout} onTransactions={() => setPage("transactions")} />}{page === "research" && <ResearchPage />}{page === "scanner" && <IntradayScannerPage />}{page === "strategy" && <StrategyBuilderPage />}{page === "paper" && <PaperTradingPage />}{page === "transactions" && <TransactionsPage onBack={() => setPage("dashboard")} />}{page === "market" && <MarketPage />}{page === "portfolio" && <PortfolioPage />}{page === "tools" && <ToolsPage onBack={() => setPage("dashboard")} />}{page === "brokers" && <BrokerPage />}</>;
+  return <><Navigation page={page} setPage={setPage} />{page === "dashboard" && <DashboardPage onLogout={logout} onTransactions={() => setPage("transactions")} />}{page === "research" && <ResearchPage />}{page === "evidence" && <IntradayEvidencePage />}{page === "scanner" && <IntradayScannerPage />}{page === "strategy" && <StrategyBuilderPage />}{page === "paper" && <PaperTradingPage />}{page === "transactions" && <TransactionsPage onBack={() => setPage("dashboard")} />}{page === "market" && <MarketPage />}{page === "portfolio" && <PortfolioPage />}{page === "tools" && <ToolsPage onBack={() => setPage("dashboard")} />}{page === "brokers" && <BrokerPage />}</>;
 }
