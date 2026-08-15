@@ -14,6 +14,7 @@ from app.services.strategy_readiness import ReadinessPolicy, build_strategy_read
 from app.services.research_store import research_store
 from app.services.intraday_scorecard import build_intraday_scorecard, ScorecardConfig
 from app.services.intraday_evidence_aggregation import aggregate_scorecards
+from app.services.intraday_historical_validation import HistoricalValidationConfig, validate_historical_datasets
 from app.models.paper_trade import PaperTrade
 
 router = APIRouter(prefix="/strategy-builder", tags=["Strategy Builder"])
@@ -117,6 +118,24 @@ def qualify_strategy_for_paper(symbol: str = Query(min_length=1, max_length=30),
     if not rows: raise HTTPException(status_code=404, detail=f"Intraday dataset not found: {dataset}")
     _, _, backtest, robustness, walk_forward, qualification = _qualification(request, rows, train_size, validation_size, step)
     return {"symbol": symbol.strip().upper(), "interval": interval, "dataset": dataset, "qualification": qualification, "backtest": {k: v for k, v in backtest.items() if k != "trades_detail"}, "robustness": robustness["summary"], "walk_forward": {"windows": walk_forward["windows"], "v2_summary": walk_forward["v2"]["summary"]}}
+
+@router.post("/historical-validation")
+def historical_validation(symbols: str = Query(default="", max_length=2000), interval: str = Query(default="5", pattern="^(1|5|15|25|60)$"), train_fraction: float = Query(default=0.70, ge=0.5, lt=1.0), min_train_bars: int = Query(default=40, ge=10, le=50000), min_test_bars: int = Query(default=20, ge=5, le=50000), request: StrategyBuildRequest = ..., current_user: User = Depends(get_current_user)):
+    del current_user
+    requested = list(dict.fromkeys(item.strip().upper() for item in symbols.split(",") if item.strip()))
+    if not requested:
+        raise HTTPException(status_code=422, detail="At least one symbol is required")
+    datasets: dict[str, list[dict]] = {}
+    missing: list[str] = []
+    for item in requested:
+        _, item_rows = _rows(item, interval)
+        if item_rows:
+            datasets[item] = item_rows
+        else:
+            missing.append(item)
+    strategy = _strategy(request)
+    result = validate_historical_datasets(datasets, _backtest_config(request, strategy), HistoricalValidationConfig(train_fraction=train_fraction, min_train_bars=min_train_bars, min_test_bars=min_test_bars))
+    return {"interval": interval, "requested_symbols": requested, "missing_symbols": missing, **result}
 
 @router.post("/readiness")
 def strategy_readiness(symbol: str = Query(min_length=1, max_length=30), symbols: str = Query(default="", max_length=2000), strategy_version: str = Query(default="V1", pattern="^(V1|V2)$"), interval: str = Query(default="5", pattern="^(1|5|15|25|60)$"), train_size: int = Query(default=60, ge=10, le=5000), validation_size: int = Query(default=20, ge=5, le=2000), step: int | None = Query(default=None, ge=1, le=2000), request: StrategyBuildRequest = ..., current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
