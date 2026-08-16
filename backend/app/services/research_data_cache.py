@@ -27,6 +27,9 @@ class ResearchDataCache:
             qmarks=','.join('?'*len(strikes)); sql=f'SELECT timestamp,side,strike_key,strike,open,high,low,close,volume,oi,iv,spot FROM option_bars WHERE strike_key IN ({qmarks}) ORDER BY timestamp,side'; args=tuple(strikes)
         else: sql='SELECT timestamp,side,strike_key,strike,open,high,low,close,volume,oi,iv,spot FROM option_bars ORDER BY timestamp,side'; args=()
         cols=('timestamp','side','strike_key','strike','open','high','low','close','volume','oi','iv','spot'); return [dict(zip(cols,r)) for r in self.db.execute(sql,args)]
+    def option_rows(self,strikes=None):
+        """Backward-compatible alias used by research code/tests."""
+        return self.options(strikes)
     def counts(self): return {'spot_bars':self.db.execute('SELECT COUNT(*) FROM spot_bars').fetchone()[0],'option_rows':self.db.execute('SELECT COUNT(*) FROM option_bars').fetchone()[0],'windows':self.db.execute('SELECT COUNT(*) FROM windows').fetchone()[0]}
     def __enter__(self): return self
     def __exit__(self,*args): self.close()
