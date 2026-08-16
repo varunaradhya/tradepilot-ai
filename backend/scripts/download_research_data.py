@@ -10,7 +10,7 @@ from app.services.option_research_pipeline import normalize_rolling, normalize_s
 from app.services.research_data_cache import ResearchDataCache
 
 def main():
-    p=argparse.ArgumentParser(description='Download and persist Dhan research data once for repeated strategy tests.')
+    p=argparse.ArgumentParser(description='Download and persist Dhan research data with contract/expiry identity.')
     p.add_argument('--security-id',default='13'); p.add_argument('--from-date',required=True); p.add_argument('--to-date',required=True)
     p.add_argument('--interval',default='5',choices=['1','5','15','25','60'])
     p.add_argument('--expiry-flag',default='WEEK',choices=['WEEK','MONTH'])
@@ -22,8 +22,8 @@ def main():
     start=date.fromisoformat(a.from_date); end=date.fromisoformat(a.to_date)
     if start>=end: raise SystemExit('from-date must be earlier than to-date')
     strikes=[x.strip().upper() for x in a.strikes.split(',') if x.strip()]
-    dataset_id=f'nifty_options_{a.expiry_flag.lower()}_{a.interval}m_atm10'
-    metadata={'security_id':a.security_id,'expiry_flag':a.expiry_flag,'expiry_code':a.expiry_code,'strikes':strikes,'interval':a.interval,'fields':['OHLC','IV','VOLUME','OI','SPOT'],'source':'Dhan rolling expired options + Dhan historical intraday'}
+    dataset_id=f'nifty_options_contract_v1_{a.expiry_flag.lower()}_{a.interval}m_atm10'
+    metadata={'security_id':a.security_id,'expiry_flag':a.expiry_flag,'expiry_code':a.expiry_code,'strikes':strikes,'interval':a.interval,'fields':['OHLC','IV','VOLUME','OI','SPOT','EXPIRY','CONTRACT_IDENTITY'],'source':'Dhan rolling expired options + Dhan historical intraday','contract_identity_required':True}
     client=DhanClient(cid,token); windows=chunk_date_range(start,end,30)
     with ResearchDataCache(a.db) as cache:
         cache.dataset(dataset_id,'Dhan',a.interval,a.from_date,a.to_date,metadata)
@@ -39,10 +39,13 @@ def main():
                 for typ in ('CALL','PUT'):
                     raw=client.rolling_option(a.security_id,a.expiry_flag,a.expiry_code,strike,typ,w.start.isoformat(),w.end.isoformat(),a.interval)
                     got=normalize_rolling(raw)
-                    for r in got: r['strike_key']=strike
-                    rows.extend(got)
+                    for r in got:
+                        r['strike_key']=strike
+                        if not r.get('expiry') or not r.get('contract_identity'):
+                            continue
+                    rows.extend(r for r in got if r.get('expiry') and r.get('contract_identity'))
             cache.put_options(rows); cache.mark_done(dataset_id,key)
-            print(f'  spot={len(spot_rows)} option_rows={len(rows)} cache={cache.counts()}')
+            print(f'  spot={len(spot_rows)} contract_option_rows={len(rows)} cache={cache.counts()}')
         print('DOWNLOAD COMPLETE')
         print(cache.counts())
 
