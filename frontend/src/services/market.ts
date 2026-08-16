@@ -10,6 +10,7 @@ export interface Quote {
   change: number | null;
   change_percent: number | null;
   market_time: string | null;
+  data_status: string | null;
 }
 
 export interface HistoricalPrice {
@@ -27,6 +28,7 @@ export interface HistoryResponse {
   interval: string;
   range: string;
   data: HistoricalPrice[];
+  data_status: string | null;
 }
 
 export async function getQuote(symbol: string): Promise<Quote> {
