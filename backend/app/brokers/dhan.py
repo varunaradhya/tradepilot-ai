@@ -6,7 +6,7 @@ class DhanClient:
  def __init__(self,client_id:str,access_token:str): self.client_id=client_id; self.access_token=access_token
  def _request(self,method:str,path:str,json:dict[str,Any]|None=None)->Any:
   headers={"Accept":"application/json","Content-Type":"application/json","access-token":self.access_token,"client-id":self.client_id}
-  try:r=httpx.request(method,f"{self.BASE_URL}{path}",headers=headers,json=json,timeout=20.0)
+  try:r=httpx.request(method,f"{self.BASE_URL}{path}",headers=headers,json=json,timeout=30.0)
   except httpx.HTTPError as exc:raise DhanAPIError(f"Dhan connection failed: {exc}") from exc
   if r.status_code>=400:
    try:p=r.json()
@@ -29,5 +29,7 @@ class DhanClient:
  def activate_kill_switch(self):return self._request("POST","/killswitch?killSwitchStatus=ACTIVATE")
  def deactivate_kill_switch(self):return self._request("POST","/killswitch?killSwitchStatus=DEACTIVATE")
  def kill_switch_status(self):return self._request("GET","/killswitch")
- def historical_daily(self,security_id:str,exchange_segment:str,instrument:str,from_date:str,to_date:str,oi:bool=False):return self._request("POST","/charts/historical",{"securityId":security_id,"exchangeSegment":exchange_segment,"instrument":instrument,"expiryCode":0,"oi":oi,"fromDate":from_date,"toDate":to_date})
- def historical_intraday(self,security_id:str,exchange_segment:str,instrument:str,interval:str,from_date:str,to_date:str,oi:bool=False):return self._request("POST","/charts/intraday",{"securityId":security_id,"exchangeSegment":exchange_segment,"instrument":instrument,"interval":interval,"oi":oi,"fromDate":from_date,"toDate":to_date})
+ def historical_daily(self,security_id:str,exchange_segment:str,instrument:str,from_date:str,to_date:str,oi:bool=False,expiry_code:int=0):return self._request("POST","/charts/historical",{"securityId":security_id,"exchangeSegment":exchange_segment,"instrument":instrument,"expiryCode":expiry_code,"oi":oi,"fromDate":from_date,"toDate":to_date})
+ def historical_intraday(self,security_id:str,exchange_segment:str,instrument:str,interval:str,from_date:str,to_date:str,oi:bool=False,expiry_code:int=0):return self._request("POST","/charts/intraday",{"securityId":security_id,"exchangeSegment":exchange_segment,"instrument":instrument,"interval":interval,"expiryCode":expiry_code,"oi":oi,"fromDate":from_date,"toDate":to_date})
+ def rolling_option(self,security_id:str,expiry_flag:str,expiry_code:int,strike:str,option_type:str,from_date:str,to_date:str,interval:str="5"):
+  return self._request("POST","/charts/rollingoption",{"exchangeSegment":"NSE_FNO","interval":interval,"securityId":security_id,"instrument":"OPTIDX","expiryFlag":expiry_flag,"expiryCode":expiry_code,"strike":strike,"drvOptionType":option_type,"requiredData":["open","high","low","close","iv","volume","strike","oi","spot"],"fromDate":from_date,"toDate":to_date})
