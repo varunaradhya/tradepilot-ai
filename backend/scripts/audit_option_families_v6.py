@@ -146,8 +146,7 @@ def main():
     p.add_argument("--cost-bps", type=float, default=5)
     p.add_argument("--slippage-bps", type=float, default=5)
     p.add_argument("--folds", type=int, default=4)
-    a = p.parse_args()
-    started = time.time()
+    a = p.parse_args(); started = time.time()
 
     src = json.loads(Path(a.input).read_text(encoding="utf-8"))
     v5 = [r for r in src.get("results", []) if r.get("eligible_for_contract_gate")]
@@ -183,7 +182,8 @@ def main():
     for fi, family_row in enumerate(v5, 1):
         family = family_row["family"]
         print(f"OPTION FAMILY V6: family {fi}/{len(v5)} {family}", flush=True)
-        candidates = [{"name": n} for n in family_row.get("matched_candidate_names", [])]
+        candidate_names = list(family_row.get("matched_candidate_names", []))
+        candidates = [{"name": n} for n in candidate_names]
         sensitivity = {}
         for total_bps in (10.0, 15.0, 20.0):
             friction = total_bps / 10000.0
@@ -200,7 +200,7 @@ def main():
         if base["worst_expectancy"] <= 0: reasons.append("negative_base_cost_fold")
         if base["worst_profit_factor"] is None or base["worst_profit_factor"] < 1.05: reasons.append("weak_base_cost_worst_pf")
         if stress["positive_fold_rate"] < 0.75 or stress["median_expectancy"] <= 0: reasons.append("cost_stress_failure")
-        result = {"family": family, "eligible_for_next_research_gate": eligible, "rejection_reasons": reasons, "cost_sensitivity": sensitivity}
+        result = {"family": family, "eligible_for_next_research_gate": eligible, "rejection_reasons": reasons, "matched_candidate_names": candidate_names, "cost_sensitivity": sensitivity}
         results.append(result)
         print(f"OPTION FAMILY V6: {family} base10_median={base['median_expectancy']:.6f} worst={base['worst_expectancy']:.6f} worstPF={base['worst_profit_factor']} stress15_median={stress['median_expectancy']:.6f} positive15={stress['positive_fold_rate']:.2f} eligible={eligible} reasons={','.join(reasons) if reasons else 'NONE'}", flush=True)
 
