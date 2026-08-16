@@ -6,14 +6,36 @@ SCHEMA='''
 CREATE TABLE IF NOT EXISTS datasets(dataset_id TEXT PRIMARY KEY, source TEXT, interval TEXT, from_date TEXT, to_date TEXT, metadata_json TEXT, updated_at TEXT DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS windows(dataset_id TEXT, window_key TEXT, PRIMARY KEY(dataset_id,window_key));
 CREATE TABLE IF NOT EXISTS spot_bars(timestamp INTEGER PRIMARY KEY, open REAL, high REAL, low REAL, close REAL, volume REAL);
-CREATE TABLE IF NOT EXISTS option_bars(timestamp INTEGER, side TEXT, strike_key TEXT, strike REAL, open REAL, high REAL, low REAL, close REAL, volume REAL, oi REAL, iv REAL, spot REAL, PRIMARY KEY(timestamp,side,strike_key));
+CREATE TABLE IF NOT EXISTS option_bars(timestamp INTEGER, side TEXT, strike_key TEXT, strike REAL, expiry TEXT, contract_identity TEXT, open REAL, high REAL, low REAL, close REAL, volume REAL, oi REAL, iv REAL, spot REAL, PRIMARY KEY(timestamp,side,strike_key,expiry,contract_identity));
 CREATE TABLE IF NOT EXISTS equity_bars(dataset_id TEXT, symbol TEXT, timestamp INTEGER, open REAL, high REAL, low REAL, close REAL, volume REAL, PRIMARY KEY(dataset_id,symbol,timestamp));
-CREATE INDEX IF NOT EXISTS idx_opt_contract ON option_bars(side,strike_key,timestamp);
+CREATE INDEX IF NOT EXISTS idx_opt_contract ON option_bars(side,strike_key,expiry,contract_identity,timestamp);
 CREATE INDEX IF NOT EXISTS idx_equity_symbol_time ON equity_bars(dataset_id,symbol,timestamp);
 '''
+
 class ResearchDataCache:
     def __init__(self,path='data/research/market_data.sqlite'):
-        self.path=Path(path); self.path.parent.mkdir(parents=True,exist_ok=True); self.db=sqlite3.connect(self.path); self.db.executescript(SCHEMA); self.db.commit()
+        self.path=Path(path); self.path.parent.mkdir(parents=True,exist_ok=True); self.db=sqlite3.connect(self.path)
+        self._migrate_option_schema()
+        self.db.executescript(SCHEMA); self.db.commit()
+
+    def _migrate_option_schema(self):
+        """Migrate the pre-contract-identity table without pretending old rows have identity."""
+        exists=self.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='option_bars'").fetchone()
+        if not exists: return
+        cols=[r[1] for r in self.db.execute('PRAGMA table_info(option_bars)')]
+        if 'expiry' in cols and 'contract_identity' in cols: return
+        self.db.execute('ALTER TABLE option_bars RENAME TO option_bars_legacy')
+        self.db.execute('''CREATE TABLE option_bars(
+            timestamp INTEGER, side TEXT, strike_key TEXT, strike REAL,
+            expiry TEXT, contract_identity TEXT,
+            open REAL, high REAL, low REAL, close REAL, volume REAL, oi REAL, iv REAL, spot REAL,
+            PRIMARY KEY(timestamp,side,strike_key,expiry,contract_identity)
+        )''')
+        self.db.execute('''INSERT INTO option_bars(timestamp,side,strike_key,strike,expiry,contract_identity,open,high,low,close,volume,oi,iv,spot)
+            SELECT timestamp,side,strike_key,strike,NULL,NULL,open,high,low,close,volume,oi,iv,spot FROM option_bars_legacy''')
+        self.db.execute('DROP TABLE option_bars_legacy')
+        self.db.commit()
+
     def close(self): self.db.close()
     def dataset(self,dataset_id,source,interval,from_date,to_date,metadata):
         self.db.execute('INSERT OR REPLACE INTO datasets VALUES(?,?,?,?,?,?,CURRENT_TIMESTAMP)',(dataset_id,source,interval,from_date,to_date,json.dumps(metadata,sort_keys=True))); self.db.commit()
@@ -22,15 +44,16 @@ class ResearchDataCache:
     def put_spot(self,rows):
         self.db.executemany('INSERT OR REPLACE INTO spot_bars VALUES(?,?,?,?,?,?)',[(int(r['timestamp']),float(r['open']),float(r['high']),float(r['low']),float(r['close']),float(r.get('volume') or 0)) for r in rows]); self.db.commit()
     def put_options(self,rows):
-        self.db.executemany('INSERT OR REPLACE INTO option_bars VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',[(int(r['timestamp']),r['side'],str(r.get('strike_key') or r.get('strike')),r.get('strike'),float(r['open']),float(r['high']),float(r['low']),float(r['close']),float(r.get('volume') or 0),r.get('oi'),r.get('iv'),r.get('spot')) for r in rows]); self.db.commit()
+        self.db.executemany('INSERT OR REPLACE INTO option_bars VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[(int(r['timestamp']),r['side'],str(r.get('strike_key') or r.get('strike')),r.get('strike'),str(r.get('expiry')) if r.get('expiry') is not None else None,str(r.get('contract_identity')) if r.get('contract_identity') is not None else None,float(r['open']),float(r['high']),float(r['low']),float(r['close']),float(r.get('volume') or 0),r.get('oi'),r.get('iv'),r.get('spot')) for r in rows]); self.db.commit()
     def put_equity(self,dataset_id,symbol,rows):
         self.db.executemany('INSERT OR REPLACE INTO equity_bars VALUES(?,?,?,?,?,?,?,?)',[(dataset_id,symbol,int(r['timestamp']),float(r['open']),float(r['high']),float(r['low']),float(r['close']),float(r.get('volume') or 0)) for r in rows]); self.db.commit()
     def spot(self): return [dict(zip(('timestamp','open','high','low','close','volume'),r)) for r in self.db.execute('SELECT timestamp,open,high,low,close,volume FROM spot_bars ORDER BY timestamp')]
     def options(self,strikes=None):
+        cols=('timestamp','side','strike_key','strike','expiry','contract_identity','open','high','low','close','volume','oi','iv','spot')
         if strikes:
-            qmarks=','.join('?'*len(strikes)); sql=f'SELECT timestamp,side,strike_key,strike,open,high,low,close,volume,oi,iv,spot FROM option_bars WHERE strike_key IN ({qmarks}) ORDER BY timestamp,side'; args=tuple(strikes)
-        else: sql='SELECT timestamp,side,strike_key,strike,open,high,low,close,volume,oi,iv,spot FROM option_bars ORDER BY timestamp,side'; args=()
-        cols=('timestamp','side','strike_key','strike','open','high','low','close','volume','oi','iv','spot'); return [dict(zip(cols,r)) for r in self.db.execute(sql,args)]
+            qmarks=','.join('?'*len(strikes)); sql=f'SELECT {",".join(cols)} FROM option_bars WHERE strike_key IN ({qmarks}) ORDER BY timestamp,side'; args=tuple(strikes)
+        else: sql=f'SELECT {",".join(cols)} FROM option_bars ORDER BY timestamp,side'; args=()
+        return [dict(zip(cols,r)) for r in self.db.execute(sql,args)]
     def option_rows(self,strikes=None): return self.options(strikes)
     def equity(self,dataset_id,symbol=None):
         if symbol:
@@ -41,8 +64,7 @@ class ResearchDataCache:
     def counts(self):
         return {'spot_bars':self.db.execute('SELECT COUNT(*) FROM spot_bars').fetchone()[0],'option_rows':self.db.execute('SELECT COUNT(*) FROM option_bars').fetchone()[0],'windows':self.db.execute('SELECT COUNT(*) FROM windows').fetchone()[0]}
     def equity_counts(self,dataset_id=None):
-        if dataset_id:
-            return self.db.execute('SELECT COUNT(*) FROM equity_bars WHERE dataset_id=?',(dataset_id,)).fetchone()[0]
+        if dataset_id: return self.db.execute('SELECT COUNT(*) FROM equity_bars WHERE dataset_id=?',(dataset_id,)).fetchone()[0]
         return self.db.execute('SELECT COUNT(*) FROM equity_bars').fetchone()[0]
     def __enter__(self): return self
     def __exit__(self,*args): self.close()
