@@ -18,6 +18,14 @@ def normalize(payload):
         rows.append({"open":keys["open"][i],"high":keys["high"][i],"low":keys["low"][i],"close":keys["close"][i],"volume":keys["volume"][i] if i<len(keys["volume"]) else 0,"timestamp":keys["timestamp"][i]})
     return rows
 
+def dedupe_timestamp(rows):
+    seen=set();out=[]
+    for row in sorted(rows,key=lambda x:x.get("timestamp",0)):
+        ts=row.get("timestamp")
+        if ts in seen:continue
+        seen.add(ts);out.append(row)
+    return out,len(rows)-len(out)
+
 def main():
     p=argparse.ArgumentParser(description="Run frozen F&O V1 research against Dhan historical NIFTY index data.")
     p.add_argument("--security-id",default="13");p.add_argument("--instrument",default="INDEX");p.add_argument("--exchange",default="IDX_I");p.add_argument("--from-date",required=True);p.add_argument("--to-date",required=True);p.add_argument("--expiry-code",type=int,default=0);p.add_argument("--out",default="data/research/fno_v1.json");a=p.parse_args()
@@ -31,9 +39,10 @@ def main():
         print(f"[{n}/{len(windows)}] {w.start} -> {w.end}")
         payload=client.historical_intraday(a.security_id,a.exchange,a.instrument,"5",w.start.isoformat(),w.end.isoformat(),oi=False,expiry_code=a.expiry_code)
         chunk=normalize(payload);rows.extend(chunk);print(f"  received {len(chunk)} bars")
-    rows.sort(key=lambda x:x["timestamp"]);quality=validate_bars(rows)
+    raw_bars=len(rows);rows,removed=dedupe_timestamp(rows);print(f"Chunk overlap cleanup: removed {removed} duplicate boundary bars; usable bars={len(rows)}")
+    quality=validate_bars(rows)
     if not quality["quality_ok"]:raise SystemExit(f"Historical data quality gate failed: {quality}")
-    result=run_v1_backtest(rows,FNOORBConfig());result["data_quality"]=quality;result["data_coverage"]={"from":a.from_date,"to":a.to_date,"bars":len(rows),"instrument":a.instrument,"exchange":a.exchange,"security_id":a.security_id,"source":"Dhan historical API"}
+    result=run_v1_backtest(rows,FNOORBConfig());result["data_quality"]=quality;result["data_coverage"]={"from":a.from_date,"to":a.to_date,"raw_bars":raw_bars,"bars":len(rows),"overlap_duplicates_removed":removed,"instrument":a.instrument,"exchange":a.exchange,"security_id":a.security_id,"source":"Dhan historical API"}
     yearly={}
     for t in result["trades_detail"]:yearly[t["date"][:4]]=yearly.get(t["date"][:4],0)+t["pnl"]
     result["yearly_pnl"]=yearly;result["promotion_screen"]=evaluate_backtest(result,yearly,ValidationGate())
