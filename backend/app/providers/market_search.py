@@ -10,6 +10,10 @@ class MarketSearchProviderError(Exception):
     """Raised when stock symbol search cannot be completed."""
 
 
+class IndianInstrumentNotFoundError(ValueError):
+    """Raised when a requested symbol is not an Indian listed equity."""
+
+
 @dataclass(frozen=True)
 class SearchInstrument:
     symbol: str
@@ -91,14 +95,17 @@ class YahooFinanceSearchProvider:
         instruments = cls._load_nse_master()
         needle = query.casefold()
         matches = [
-            item for item in instruments
+            item
+            for item in instruments
             if needle in item.symbol.casefold() or needle in item.name.casefold()
         ]
-        matches.sort(key=lambda item: (
-            0 if item.symbol.casefold().startswith(needle) else 1,
-            0 if item.name.casefold().startswith(needle) else 1,
-            item.symbol,
-        ))
+        matches.sort(
+            key=lambda item: (
+                0 if item.symbol.casefold().startswith(needle) else 1,
+                0 if item.name.casefold().startswith(needle) else 1,
+                item.symbol,
+            )
+        )
         return matches[:12]
 
     @staticmethod
@@ -178,11 +185,13 @@ class YahooFinanceSearchProvider:
             deduped[(item.symbol, item.exchange)] = item
 
         final = list(deduped.values())
-        final.sort(key=lambda item: (
-            0 if item.symbol.casefold().startswith(normalized) else 1,
-            0 if item.exchange == "NSE" else 1,
-            item.symbol,
-        ))
+        final.sort(
+            key=lambda item: (
+                0 if item.symbol.casefold().startswith(normalized) else 1,
+                0 if item.exchange == "NSE" else 1,
+                item.symbol,
+            )
+        )
         if final:
             return self._store(normalized, final[:12])
         if errors:
@@ -190,3 +199,20 @@ class YahooFinanceSearchProvider:
                 "Indian stock search is temporarily unavailable. You can still enter an exact NSE symbol."
             ) from errors[-1]
         return self._store(normalized, [])
+
+    def resolve_exact(self, symbol: str) -> SearchInstrument:
+        """Resolve an exact Indian listed equity and reject non-Indian symbols."""
+        normalized = symbol.strip().upper()
+        if normalized.endswith(".NS") or normalized.endswith(".BO"):
+            normalized = normalized.rsplit(".", 1)[0]
+        if not normalized or len(normalized) < 1:
+            raise IndianInstrumentNotFoundError("Enter an Indian NSE/BSE equity symbol.")
+
+        results = self.search(normalized)
+        exact = [item for item in results if item.symbol.upper() == normalized]
+        if not exact:
+            raise IndianInstrumentNotFoundError(
+                f"{normalized} is not available in the Indian NSE/BSE equity universe."
+            )
+        exact.sort(key=lambda item: 0 if item.exchange == "NSE" else 1)
+        return exact[0]
