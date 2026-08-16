@@ -29,7 +29,6 @@ class DhanClient:
                 print(f"Dhan connection retry {attempt + 1}/{self.max_retries} in {delay:.1f}s: {exc}", flush=True)
                 time.sleep(delay)
                 continue
-
             if r.status_code in (429, 500, 502, 503, 504):
                 if attempt >= self.max_retries:
                     try: p = r.json()
@@ -42,16 +41,12 @@ class DhanClient:
                 print(f"Dhan HTTP {r.status_code} retry {attempt + 1}/{self.max_retries} in {delay:.1f}s", flush=True)
                 time.sleep(delay)
                 continue
-
             if r.status_code >= 400:
                 try: p = r.json()
                 except Exception: p = r.text
                 raise DhanAPIError(f"Dhan API returned {r.status_code}: {p}")
-            try:
-                return r.json()
-            except Exception as exc:
-                raise DhanAPIError("Dhan returned invalid JSON.") from exc
-
+            try: return r.json()
+            except Exception as exc: raise DhanAPIError("Dhan returned invalid JSON.") from exc
         raise DhanAPIError("Dhan request failed unexpectedly.")
 
     def profile(self): return self._request("GET", "/profile")
@@ -64,7 +59,7 @@ class DhanClient:
     def place_order(self, order: dict[str, Any]): return self._request("POST", "/orders", order)
     def get_order(self, order_id: str): return self._request("GET", f"/orders/{order_id}")
     def cancel_order(self, order_id: str): return self._request("DELETE", f"/orders/{order_id}")
-    def pnl_exit(self, profit_value: float, loss_value: float, product_types: list[str] | None = None, enable_kill_switch: bool = True): return self._request("POST", "/pnlExit", {"profitValue": f"{profit_value:.2f}", "lossValue": product_types or ["INTRADAY"], "productType": product_types or ["INTRADAY"], "enableKillSwitch": enable_kill_switch})
+    def pnl_exit(self, profit_value: float, loss_value: float, product_types: list[str] | None = None, enable_kill_switch: bool = True): return self._request("POST", "/pnlExit", {"profitValue": f"{profit_value:.2f}", "lossValue": f"{loss_value:.2f}", "productType": product_types or ["INTRADAY"], "enableKillSwitch": enable_kill_switch})
     def pnl_exit_status(self): return self._request("GET", "/pnlExit")
     def activate_kill_switch(self): return self._request("POST", "/killswitch?killSwitchStatus=ACTIVATE")
     def deactivate_kill_switch(self): return self._request("POST", "/killswitch?killSwitchStatus=DEACTIVATE")
