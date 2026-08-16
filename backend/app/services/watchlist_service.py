@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 
 from app.models.watchlist import Watchlist
 from app.services.market_service import search_instruments
-from app.providers.market_search import IndianInstrumentNotFoundError, MarketSearchProviderError
+from app.providers.market_search import MarketSearchProviderError
 
 
 class WatchlistSymbolError(ValueError):
