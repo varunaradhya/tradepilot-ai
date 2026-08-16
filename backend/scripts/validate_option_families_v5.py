@@ -16,7 +16,6 @@ def parse_name(name):
 
 
 def family_signature(name):
-    """Return the canonical side + condition signature for either a family label or V3 candidate."""
     parts = name.split(':')
     side = parts[0]
     if len(parts) >= 3:
@@ -119,9 +118,10 @@ def evaluate_family(family, candidates, groups, horizon, cost_bps, slippage_bps,
     exp = [r['final_expectancy'] for r in variant_rows if r['final_expectancy'] is not None]
     med = statistics.median(exp) if exp else 0.0
     pos = sum(x > 0 for x in exp) / len(exp) if exp else 0.0
+    raw_exp = list(exp)
     trimmed = sorted(exp)
     k = int(len(trimmed) * .10)
-    trimmed = trimmed[k:-k] if len(trimmed) > 2 * k else trimmed
+    trimmed = trimmed[k:-k] if k else trimmed
     trimmed_mean = statistics.mean(trimmed) if trimmed else 0.0
 
     reasons = []
@@ -132,6 +132,7 @@ def evaluate_family(family, candidates, groups, horizon, cost_bps, slippage_bps,
     if fpf is not None and fpf < 1.10: reasons.append('weak_family_final_profit_factor')
     if mcres['probability_positive'] < .60: reasons.append('weak_monte_carlo')
 
+    sorted_exp = sorted(raw_exp)
     return {
         'family': family, 'variants': len(variant_rows),
         'matched_candidate_names': [r['name'] for r in variant_rows],
@@ -139,6 +140,20 @@ def evaluate_family(family, candidates, groups, horizon, cost_bps, slippage_bps,
         'strike_keys': sorted({r['strike_key'] for r in variant_rows}, key=str),
         'positive_variant_rate': pos, 'median_variant_final_expectancy': med,
         'trimmed_variant_final_expectancy': trimmed_mean,
+        'expectancy_diagnostics': {
+            'count': len(raw_exp),
+            'positive_count': sum(x > 0 for x in raw_exp),
+            'zero_count': sum(x == 0 for x in raw_exp),
+            'negative_count': sum(x < 0 for x in raw_exp),
+            'min': min(raw_exp) if raw_exp else 0.0,
+            'max': max(raw_exp) if raw_exp else 0.0,
+            'mean': statistics.mean(raw_exp) if raw_exp else 0.0,
+            'median': med,
+            'trim_fraction_each_side': 0.10,
+            'trim_count_each_side': k,
+            'trimmed_source_values': trimmed,
+            'sorted_source_values': sorted_exp,
+        },
         'family_train_trades': tn, 'family_validation_trades': vn, 'family_final_trades': fn,
         'family_train_expectancy': te, 'family_validation_expectancy': ve,
         'family_final_expectancy': fe, 'family_final_profit_factor': fpf,
@@ -197,6 +212,8 @@ def main():
         results.append(r)
         reason = ','.join(r['rejection_reasons']) if r['rejection_reasons'] else 'NONE'
         print(f'OPTION FAMILY V5: {i}/{len(fams)} {fam} variants={r["variants"]} v3_eligible={r["v3_eligible_variants"]} positive={r["positive_variant_rate"]:.2f} median={r["median_variant_final_expectancy"]:.6f} trimmed={r["trimmed_variant_final_expectancy"]:.6f} family_final={r["family_final_expectancy"]:.6f} PF={r["family_final_profit_factor"]} MC={r["monte_carlo"]["probability_positive"]:.3f} eligible={r["eligible_for_contract_gate"]} reasons={reason}', flush=True)
+        for vr in r['variant_results']:
+            print(f'OPTION FAMILY V5 DIAG: {vr["name"]} final_trades={vr["final_trades"]} expectancy={vr["final_expectancy"]:.6f} PF={vr["final_profit_factor"]} win_rate={vr["final_win_rate"]:.3f} return={vr["final_return"]:.6f}', flush=True)
 
     results.sort(key=lambda x: (x['eligible_for_contract_gate'], x['median_variant_final_expectancy']), reverse=True)
     report = {
