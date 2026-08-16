@@ -1,7 +1,10 @@
 from __future__ import annotations
-import argparse,json,os
+import argparse,json,os,sys
 from datetime import date
 from pathlib import Path
+# Allow `python scripts/research_fno_v1.py` when the working directory is backend.
+BACKEND_DIR=Path(__file__).resolve().parents[1]
+if str(BACKEND_DIR) not in sys.path:sys.path.insert(0,str(BACKEND_DIR))
 from app.brokers.dhan import DhanClient
 from app.services.fno_research_pipeline import chunk_date_range,run_v1_backtest,validate_bars
 from app.services.fno_strategy_v1 import FNOORBConfig
