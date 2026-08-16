@@ -25,6 +25,8 @@ The project currently includes:
 - GitHub Actions CI for backend tests and frontend production builds
 - Runtime error boundary and resilient application navigation
 - India/NSE-first market search and market-data presentation
+- Server-side Indian equity validation for watchlist entries
+- Keyboard-accessible stock search with resilient API error handling
 
 ## Safety boundary
 
@@ -79,7 +81,7 @@ The backend exposes `/health` for liveness and `/ready` for database readiness.
 
 ## Verification baseline
 
-The latest local verification checkpoint is **368 backend tests passing** with a successful Vite production build. The latest GitHub Actions run also passed backend tests, frontend build, and Docker Compose validation. Always rerun the local test/build commands after pulling changes.
+The latest GitHub Actions verification checkpoint is **371 backend tests passing**, with a successful Vite production build and successful Docker Compose configuration validation. Always rerun the local test/build commands after pulling changes.
 
 ## Project structure
 
