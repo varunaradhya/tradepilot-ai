@@ -14,15 +14,26 @@ def historical_nifty_lot_size(day:str)->int:
     if day<'2025-10-29': return 75
     return 65
 
+def _series_value(d:dict, keys:tuple[str,...], i:int, default=None):
+    for key in keys:
+        v=d.get(key)
+        if isinstance(v,list) and i < len(v):
+            return v[i]
+    return default
+
 def normalize_rolling(payload:dict)->list[dict]:
+    """Normalize rolling-option payload while preserving contract/expiry identity when supplied by Dhan."""
     data=payload.get('data',payload) if isinstance(payload,dict) else {}; rows=[]
     for side in ('ce','pe'):
         d=data.get(side) if isinstance(data,dict) else None
         if not isinstance(d,dict): continue
-        keys=('timestamp','open','high','low','close','volume','strike','oi','iv','spot'); n=max((len(d.get(k,[])) for k in keys if isinstance(d.get(k,[]),list)),default=0)
+        keys=('timestamp','open','high','low','close','volume','strike','oi','iv','spot','expiry','expiry_date','expiration','expiration_date','contract','contract_symbol','option_symbol','instrument_token')
+        n=max((len(d.get(k,[])) for k in keys if isinstance(d.get(k,[]),list)),default=0)
         for i in range(n):
             if any(i>=len(d.get(k,[])) for k in ('timestamp','open','high','low','close')): continue
-            rows.append({'side':side,'timestamp':d['timestamp'][i],'open':d['open'][i],'high':d['high'][i],'low':d['low'][i],'close':d['close'][i],'volume':d.get('volume',[0]*n)[i],'strike':d.get('strike',[None]*n)[i],'oi':d.get('oi',[None]*n)[i],'iv':d.get('iv',[None]*n)[i],'spot':d.get('spot',[None]*n)[i]})
+            expiry=_series_value(d,('expiry','expiry_date','expiration','expiration_date'),i)
+            contract=_series_value(d,('contract','contract_symbol','option_symbol','instrument_token'),i)
+            rows.append({'side':side,'timestamp':d['timestamp'][i],'open':d['open'][i],'high':d['high'][i],'low':d['low'][i],'close':d['close'][i],'volume':d.get('volume',[0]*n)[i],'strike':d.get('strike',[None]*n)[i],'oi':d.get('oi',[None]*n)[i],'iv':d.get('iv',[None]*n)[i],'spot':d.get('spot',[None]*n)[i],'expiry':expiry,'contract_identity':str(contract) if contract is not None else None})
     return rows
 
 def normalize_spot(payload:dict)->list[dict]:
@@ -79,12 +90,12 @@ def _history_until(index,ts):
     rows=index['rows']; pos=bisect_right(index['timestamps'],ts)
     return rows[:pos]
 
-def _future_for_contract(day_opts,side,strike,entry_ts):
-    return [x for x in day_opts if x['side']==side and x.get('strike')==strike and x['timestamp']>entry_ts]
+def _future_for_contract(day_opts,side,strike,entry_ts,contract_identity=None,expiry=None):
+    return [x for x in day_opts if x['side']==side and x.get('strike')==strike and x['timestamp']>entry_ts and (contract_identity is None or x.get('contract_identity')==contract_identity) and (expiry is None or x.get('expiry')==expiry)]
 
-def _history_for_contract(index,side,strike,entry_ts):
+def _history_for_contract(index,side,strike,entry_ts,contract_identity=None,expiry=None):
     rows=index[side]['rows']; ts=index[side]['timestamps']; pos=bisect_right(ts,entry_ts)
-    return [x for x in rows[:pos] if x.get('strike')==strike]
+    return [x for x in rows[:pos] if x.get('strike')==strike and (contract_identity is None or x.get('contract_identity')==contract_identity) and (expiry is None or x.get('expiry')==expiry)]
 
 def simulate_option_days(spot_rows:list[dict],option_rows:list[dict],config:OptionResearchConfig=OptionResearchConfig(),strategy_config:FNOORBConfig=FNOORBConfig())->list[dict]:
     spots=group_by_day(spot_rows); opts=group_by_day(option_rows); all_spots=sorted(spot_rows,key=lambda x:x['timestamp']); opt_index=_prepare_option_index(option_rows); trades=[]
@@ -102,9 +113,9 @@ def simulate_option_days(spot_rows:list[dict],option_rows:list[dict],config:Opti
                     chosen=signal; break
             if chosen: break
         if not chosen: continue
-        side,entry=chosen; strike=entry.get('strike'); premium=float(entry['close'])
-        if premium<=0 or strike is None: continue
-        future=_future_for_contract(day_opts,side,strike,entry['timestamp']); hist=_history_for_contract(opt_index,side,strike,entry['timestamp'])
+        side,entry=chosen; strike=entry.get('strike'); premium=float(entry['close']); contract_identity=entry.get('contract_identity'); expiry=entry.get('expiry')
+        if premium<=0 or strike is None or not contract_identity or not expiry: continue
+        future=_future_for_contract(day_opts,side,strike,entry['timestamp'],contract_identity,expiry); hist=_history_for_contract(opt_index,side,strike,entry['timestamp'],contract_identity,expiry)
         if len(hist)<15 or not future: continue
         a=_atr([float(x['high']) for x in hist],[float(x['low']) for x in hist],[float(x['close']) for x in hist],14)
         if not a or a<=0: continue
@@ -116,7 +127,7 @@ def simulate_option_days(spot_rows:list[dict],option_rows:list[dict],config:Opti
             if float(bar['low'])<=stop: exit_row=bar; reason='STOP'; break
             if float(bar['high'])>=target: exit_row=bar; reason='TARGET'; break
         exit_price=float(exit_row['close']); gross=(exit_price-premium)*qty; turnover=(premium+exit_price)*qty; costs=turnover*(config.round_trip_cost_bps/10000); slip=turnover*(config.slippage_bps/10000); net=gross-costs-slip
-        trades.append({'date':day,'option_type':'CE' if side=='ce' else 'PE','strike':strike,'lot_size':lot,'entry':premium,'exit':exit_price,'quantity':qty,'gross_pnl':gross,'costs':costs,'slippage':slip,'pnl':net,'exit_reason':reason,'entry_timestamp':entry['timestamp'],'exit_timestamp':exit_row['timestamp'],'contract_lock':'rolling_strike_proxy','signal_reasons':['OPENING_RANGE_BREAKOUT','EMA_TREND','RSI_CONFIRMATION','OPTION_VOLUME_CONFIRMATION']})
+        trades.append({'date':day,'option_type':'CE' if side=='ce' else 'PE','strike':strike,'expiry':expiry,'contract_identity':contract_identity,'lot_size':lot,'entry':premium,'exit':exit_price,'quantity':qty,'gross_pnl':gross,'costs':costs,'slippage':slip,'pnl':net,'exit_reason':reason,'entry_timestamp':entry['timestamp'],'exit_timestamp':exit_row['timestamp'],'contract_lock':'exact_contract_identity','signal_reasons':['OPENING_RANGE_BREAKOUT','EMA_TREND','RSI_CONFIRMATION','OPTION_VOLUME_CONFIRMATION']})
         if day_no%100==0: print(f'  processed {day_no}/{len(spots)} sessions; trades={len(trades)}')
     return trades
 
