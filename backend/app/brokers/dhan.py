@@ -32,4 +32,9 @@ class DhanClient:
  def historical_daily(self,security_id:str,exchange_segment:str,instrument:str,from_date:str,to_date:str,oi:bool=False,expiry_code:int=0):return self._request("POST","/charts/historical",{"securityId":security_id,"exchangeSegment":exchange_segment,"instrument":instrument,"expiryCode":expiry_code,"oi":oi,"fromDate":from_date,"toDate":to_date})
  def historical_intraday(self,security_id:str,exchange_segment:str,instrument:str,interval:str,from_date:str,to_date:str,oi:bool=False,expiry_code:int=0):return self._request("POST","/charts/intraday",{"securityId":security_id,"exchangeSegment":exchange_segment,"instrument":instrument,"interval":interval,"expiryCode":expiry_code,"oi":oi,"fromDate":from_date,"toDate":to_date})
  def rolling_option(self,security_id:str,expiry_flag:str,expiry_code:int,strike:str,option_type:str,from_date:str,to_date:str,interval:str="5"):
-  return self._request("POST","/charts/rollingoption",{"exchangeSegment":"NSE_FNO","interval":interval,"securityId":security_id,"instrument":"OPTIDX","expiryFlag":expiry_flag,"expiryCode":expiry_code,"strike":strike,"drvOptionType":option_type,"requiredData":["open","high","low","close","iv","volume","strike","oi","spot"],"fromDate":from_date,"toDate":to_date})
+  # Dhan's expired-options endpoint currently uses 1/2/3 for near/next/far.
+  # The older annexure documented 0/1/2; normalize legacy caller value 0 to 1
+  # here so existing research commands continue to work.
+  effective_expiry_code=1 if expiry_code==0 else expiry_code
+  if effective_expiry_code not in (1,2,3): raise ValueError("rolling option expiry_code must be 0/1/2/3 (0 is normalized to near expiry)")
+  return self._request("POST","/charts/rollingoption",{"exchangeSegment":"NSE_FNO","interval":interval,"securityId":security_id,"instrument":"OPTIDX","expiryFlag":expiry_flag,"expiryCode":effective_expiry_code,"strike":strike,"drvOptionType":option_type,"requiredData":["open","high","low","close","iv","volume","strike","oi","spot"],"fromDate":from_date,"toDate":to_date})
