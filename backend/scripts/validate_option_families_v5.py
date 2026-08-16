@@ -43,7 +43,9 @@ def family_key(name):
     if len(parts) < 3:
         return name
     side = parts[0]
-    conditions = [c for c in parts[2].split('+') if c not in {'oi_present', 'iv_high', 'iv_low'}]
+    # Preserve every strategy condition. Strike is the robustness dimension;
+    # IV/OI conditions are strategy conditions and must not be collapsed away.
+    conditions = [c for c in parts[2].split('+') if c]
     return f'{side}:{"+".join(sorted(conditions))}'
 
 
@@ -158,9 +160,7 @@ def main():
 
     v3 = json.loads(Path(a.input).with_name('option_oos_v3.json').read_text(encoding='utf-8'))
     # V4 approved families must be evaluated using ALL V3 variants in those families.
-    # V3 eligibility is retained as a diagnostic, not used as a filter, otherwise entire
-    # approved families can disappear from V5 simply because some variants missed V3's
-    # individual gate.
+    # V3 eligibility is retained as a diagnostic, not used as a filter.
     candidates = [r for r in v3.get('results', []) if family_key(r['name']) in approved_core]
     fams = {}
     for c in candidates:
@@ -188,7 +188,7 @@ def main():
 
     results.sort(key=lambda x: (x['eligible_for_contract_gate'], x['median_variant_final_expectancy']), reverse=True)
     report = {
-        'methodology': {'train_ratio': .60, 'validation_ratio': .20, 'final_ratio': .20, 'family_definition': 'V4-approved family mapped to core side+conditions; strike and IV/OI are robustness variants', 'cost_bps': a.cost_bps, 'slippage_bps': a.slippage_bps, 'monte_carlo_trials': a.monte_carlo_trials, 'final_is_not_used_for_selection': True, 'v3_eligibility_is_diagnostic_only': True},
+        'methodology': {'train_ratio': .60, 'validation_ratio': .20, 'final_ratio': .20, 'family_definition': 'V4-approved family mapped to side+all strategy conditions; strike is the robustness variant dimension', 'cost_bps': a.cost_bps, 'slippage_bps': a.slippage_bps, 'monte_carlo_trials': a.monte_carlo_trials, 'final_is_not_used_for_selection': True, 'v3_eligibility_is_diagnostic_only': True},
         'input_families': len(fams), 'contract_gate_count': sum(r['eligible_for_contract_gate'] for r in results), 'results': results,
         'promotion_status': 'RESEARCH_ONLY_NO_PAPER_TRADING', 'critical_limit': 'Rolling option series only. Exact historical contract/expiry, bid-ask spread, fill, lot size and expiry-roll mechanics remain unvalidated.', 'elapsed_seconds': round(time.time() - started, 2)
     }
