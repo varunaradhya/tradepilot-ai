@@ -15,19 +15,13 @@ from app.services.fno_research_pipeline import chunk_date_range
 from app.services.option_research_pipeline import normalize_rolling, normalize_spot
 from app.services.research_data_cache import ResearchDataCache
 
-# Research scope for the current option-family work.
-# Keep the full ATM +/- 10 range so future family discovery does not require another download.
 DEFAULT_STRIKES = ','.join(
-    ['ATM']
-    + [f'ATM-{i}' for i in range(1, 11)]
-    + [f'ATM+{i}' for i in range(1, 11)]
+    ['ATM'] + [f'ATM-{i}' for i in range(1, 11)] + [f'ATM+{i}' for i in range(1, 11)]
 )
 
 
 def main():
-    p = argparse.ArgumentParser(
-        description='Download and persist the complete NIFTY weekly option research dataset.'
-    )
+    p = argparse.ArgumentParser(description='Download and persist the complete NIFTY weekly option research dataset.')
     p.add_argument('--security-id', default='13')
     p.add_argument('--from-date', required=True)
     p.add_argument('--to-date', required=True)
@@ -54,19 +48,20 @@ def main():
     if missing:
         raise SystemExit(f'Incomplete strike scope. Missing: {missing}')
 
-    # v2 deliberately gets a fresh window/checkpoint namespace so an earlier partial
-    # v1 download can never cause the expanded dataset to be skipped.
     dataset_id = f'nifty_options_contract_v2_{a.expiry_flag.lower()}_{a.interval}m_atm10'
+    effective_expiry_code = 1 if a.expiry_code == 0 else a.expiry_code
     metadata = {
         'security_id': a.security_id,
         'expiry_flag': a.expiry_flag,
-        'expiry_code': a.expiry_code,
+        'expiry_code': effective_expiry_code,
         'strikes': strikes,
         'strike_count_per_side': len(strikes),
         'interval': a.interval,
-        'fields': ['OHLC', 'IV', 'VOLUME', 'OI', 'SPOT', 'EXPIRY', 'CONTRACT_IDENTITY'],
+        'fields': ['OHLC', 'IV', 'VOLUME', 'OI', 'SPOT', 'STRIKE'],
         'source': 'Dhan rolling expired options + Dhan historical intraday',
-        'contract_identity_required': True,
+        'identity_mode': 'rolling_series',
+        'contract_identity_exact': False,
+        'note': 'Dhan rollingoption response exposes OHLC/IV/OI/volume/spot/strike/timestamp but not explicit expiry or contract symbol. Synthetic rolling identity is used for research grouping only; it is not an exact tradable contract identity.',
         'research_scope': 'NIFTY weekly CE/PE ATM-10..ATM+10 plus NIFTY spot',
     }
 
@@ -76,10 +71,8 @@ def main():
     with ResearchDataCache(a.db) as cache:
         cache.dataset(dataset_id, 'Dhan', a.interval, a.from_date, a.to_date, metadata)
         total = len(windows)
-        print(
-            f'Dataset: {dataset_id} | {total} windows | '
-            f'{len(strikes)} strikes x 2 sides + NIFTY spot'
-        )
+        print(f'Dataset: {dataset_id} | {total} windows | {len(strikes)} strikes x 2 sides + NIFTY spot')
+        print('Identity mode: rolling_series (NOT exact expiry/contract identity)')
 
         for n, w in enumerate(windows, 1):
             key = f'{w.start}:{w.end}'
@@ -88,43 +81,45 @@ def main():
                 continue
 
             print(f'[{n}/{total}] {w.start} -> {w.end}')
-            spot = client.historical_intraday(
-                a.security_id, 'IDX_I', 'INDEX', a.interval,
-                w.start.isoformat(), w.end.isoformat(), oi=False, expiry_code=0
-            )
-            spot_rows = normalize_spot(spot)
-            cache.put_spot(spot_rows)
-
-            rows = []
-            for strike in strikes:
-                for typ in ('CALL', 'PUT'):
-                    raw = client.rolling_option(
-                        a.security_id, a.expiry_flag, a.expiry_code, strike, typ,
-                        w.start.isoformat(), w.end.isoformat(), a.interval
-                    )
-                    got = normalize_rolling(raw)
-                    for r in got:
-                        r['strike_key'] = strike
-                    rows.extend(
-                        r for r in got
-                        if r.get('expiry') and r.get('contract_identity')
-                    )
-
-            # Never mark an incomplete API window as done. This is important because a
-            # transient Dhan response must be retryable instead of silently becoming a gap.
-            if not spot_rows or not rows:
-                print(
-                    f'  WARNING incomplete window: spot={len(spot_rows)} '
-                    f'contract_option_rows={len(rows)}; NOT marking cached'
+            try:
+                spot = client.historical_intraday(
+                    a.security_id, 'IDX_I', 'INDEX', a.interval,
+                    w.start.isoformat(), w.end.isoformat(), oi=False, expiry_code=0
                 )
-                continue
+                spot_rows = normalize_spot(spot)
 
-            cache.put_options(rows)
-            cache.mark_done(dataset_id, key)
-            print(
-                f'  spot={len(spot_rows)} contract_option_rows={len(rows)} '
-                f'cache={cache.counts()}'
-            )
+                rows = []
+                api_calls = 0
+                for strike in strikes:
+                    for typ in ('CALL', 'PUT'):
+                        api_calls += 1
+                        raw = client.rolling_option(
+                            a.security_id, a.expiry_flag, a.expiry_code, strike, typ,
+                            w.start.isoformat(), w.end.isoformat(), a.interval
+                        )
+                        got = normalize_rolling(raw)
+                        for r in got:
+                            r['strike_key'] = strike
+                            # Dhan's rolling endpoint is explicitly a continuous/rolling
+                            # series and does not return exact expiry/contract identity.
+                            r['expiry'] = r.get('expiry') or f'ROLLING:{a.expiry_flag}:CODE{effective_expiry_code}'
+                            r['contract_identity'] = r.get('contract_identity') or (
+                                f'ROLLING:{a.expiry_flag}:CODE{effective_expiry_code}:'
+                                f'{r["side"].upper()}:{strike}'
+                            )
+                        rows.extend(got)
+
+                if not spot_rows or not rows:
+                    print(f'  WARNING incomplete window: spot={len(spot_rows)} option_rows={len(rows)}; NOT marking cached')
+                    continue
+
+                cache.put_spot(spot_rows)
+                cache.put_options(rows)
+                cache.mark_done(dataset_id, key)
+                print(f'  spot={len(spot_rows)} option_rows={len(rows)} api_option_calls={api_calls} cache={cache.counts()}')
+            except Exception as exc:
+                print(f'  ERROR window {w.start}->{w.end}: {exc}; NOT marking cached; rerun will retry this window', flush=True)
+                continue
 
         print('DOWNLOAD COMPLETE')
         print(cache.counts())
