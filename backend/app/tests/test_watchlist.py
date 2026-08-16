@@ -46,12 +46,12 @@ def create_user():
 def headers():
     response = client.post(
         "/api/v1/auth/login",
-        data={
-            "username": EMAIL,
+        json={
+            "email": EMAIL,
             "password": PASSWORD,
         },
     )
-    assert response.status_code == 200
+    assert response.status_code == 200, response.text
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
 
@@ -104,4 +104,23 @@ def test_duplicate_watchlist_is_safe():
         },
         headers=headers(),
     )
-    assert response.status_code in (201, 422)
+
+    assert response.status_code == 201
+
+    response = client.post(
+        "/api/v1/watchlist",
+        json={
+            "symbol": "reliance",
+        },
+        headers=headers(),
+    )
+
+    assert response.status_code == 201
+
+    response = client.get(
+        "/api/v1/watchlist",
+        headers=headers(),
+    )
+
+    assert response.status_code == 200
+    assert len(response.json()) == 1
