@@ -27,7 +27,7 @@ def main():
     p.add_argument('--to-date', required=True)
     p.add_argument('--interval', default='5', choices=['1', '5', '15', '25', '60'])
     p.add_argument('--expiry-flag', default='WEEK', choices=['WEEK', 'MONTH'])
-    p.add_argument('--expiry-code', type=int, default=0, help='0=near expiry (normalized by DhanClient)')
+    p.add_argument('--expiry-code', type=int, default=0, choices=[0, 1, 2], help='0=current/near expiry, 1=next expiry, 2=far expiry')
     p.add_argument('--strikes', default=DEFAULT_STRIKES)
     p.add_argument('--db', default='data/research/market_data.sqlite')
     a = p.parse_args()
@@ -48,12 +48,12 @@ def main():
     if missing:
         raise SystemExit(f'Incomplete strike scope. Missing: {missing}')
 
-    dataset_id = f'nifty_options_contract_v2_{a.expiry_flag.lower()}_{a.interval}m_atm10'
-    effective_expiry_code = 1 if a.expiry_code == 0 else a.expiry_code
+    dataset_id = f'nifty_options_contract_v3_{a.expiry_flag.lower()}_code{a.expiry_code}_{a.interval}m_atm10'
     metadata = {
         'security_id': a.security_id,
         'expiry_flag': a.expiry_flag,
-        'expiry_code': effective_expiry_code,
+        'expiry_code': a.expiry_code,
+        'expiry_code_meaning': {0: 'current/near expiry', 1: 'next expiry', 2: 'far expiry'}[a.expiry_code],
         'strikes': strikes,
         'strike_count_per_side': len(strikes),
         'interval': a.interval,
@@ -61,7 +61,7 @@ def main():
         'source': 'Dhan rolling expired options + Dhan historical intraday',
         'identity_mode': 'rolling_series',
         'contract_identity_exact': False,
-        'note': 'Dhan rollingoption response exposes OHLC/IV/OI/volume/spot/strike/timestamp but not explicit expiry or contract symbol. Synthetic rolling identity is used for research grouping only; it is not an exact tradable contract identity.',
+        'note': 'Dhan rollingoption returns a continuous rolling series and does not expose exact historical expiry/trading-symbol identity in the response. Synthetic rolling identity is used only to prevent NULL identity fields; it must not be treated as an exact exchange contract.',
         'research_scope': 'NIFTY weekly CE/PE ATM-10..ATM+10 plus NIFTY spot',
     }
 
@@ -72,6 +72,7 @@ def main():
         cache.dataset(dataset_id, 'Dhan', a.interval, a.from_date, a.to_date, metadata)
         total = len(windows)
         print(f'Dataset: {dataset_id} | {total} windows | {len(strikes)} strikes x 2 sides + NIFTY spot')
+        print(f'Expiry: {a.expiry_flag} code={a.expiry_code} ({metadata["expiry_code_meaning"]})')
         print('Identity mode: rolling_series (NOT exact expiry/contract identity)')
 
         for n, w in enumerate(windows, 1):
@@ -100,11 +101,9 @@ def main():
                         got = normalize_rolling(raw)
                         for r in got:
                             r['strike_key'] = strike
-                            # Dhan's rolling endpoint is explicitly a continuous/rolling
-                            # series and does not return exact expiry/contract identity.
-                            r['expiry'] = r.get('expiry') or f'ROLLING:{a.expiry_flag}:CODE{effective_expiry_code}'
+                            r['expiry'] = r.get('expiry') or f'ROLLING:{a.expiry_flag}:CODE{a.expiry_code}'
                             r['contract_identity'] = r.get('contract_identity') or (
-                                f'ROLLING:{a.expiry_flag}:CODE{effective_expiry_code}:'
+                                f'ROLLING:{a.expiry_flag}:CODE{a.expiry_code}:'
                                 f'{r["side"].upper()}:{strike}'
                             )
                         rows.extend(got)
