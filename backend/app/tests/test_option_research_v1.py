@@ -1,8 +1,13 @@
-from app.services.option_research_pipeline import normalize_rolling, summarize
+from app.services.option_research_pipeline import normalize_rolling, summarize, historical_nifty_lot_size
 from app.services.option_strategy_v1 import option_position_size
 
 def test_option_position_size_is_lot_aligned():
     assert option_position_size(100000,100,80,65) % 65 == 0
+
+def test_historical_nifty_lot_schedule():
+    assert historical_nifty_lot_size('2024-10-01')==25
+    assert historical_nifty_lot_size('2025-01-01')==75
+    assert historical_nifty_lot_size('2026-01-01')==65
 
 def test_normalize_rolling_maps_call_rows():
     payload={'data':{'ce':{'timestamp':[1],'open':[100],'high':[110],'low':[90],'close':[105],'volume':[1000],'strike':[25000],'oi':[5000],'iv':[15],'spot':[25010]},'pe':None}}
