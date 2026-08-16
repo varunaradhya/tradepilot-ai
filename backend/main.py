@@ -11,6 +11,7 @@ from app.api.v1.intraday import router as intraday_router
 from app.api.v1.strategy_builder import router as strategy_builder_router
 from app.api.v1.paper_trading import router as paper_trading_router
 from app.api.v1.trade_decision import router as trade_decision_router
+from app.api.v1.fno import router as fno_router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
@@ -26,21 +27,19 @@ from app.api.v1.market import router as market_router
 from app.db.init_db import init_db
 from app.db.database import engine
 from app.core.config import TRADEPILOT_CORS_ORIGINS
-
-app = FastAPI(title="TradePilot AI", description="AI-powered stock portfolio tracking and analysis platform", version="0.1.0")
-app.add_middleware(CORSMiddleware, allow_origins=TRADEPILOT_CORS_ORIGINS, allow_credentials=False, allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], allow_headers=["*"])
-for router in [users_router, auth_router, portfolio_router, valuation_router, transactions_router, analytics_router, watchlist_router, brokers_router, market_router]: app.include_router(router, prefix="/api/v1")
-for router in [reconciliation_router, advanced_analytics_router, signals_router, intelligence_router, alerts_router, trading_general_router, algo_router, market_risk_router, research_router, intraday_router, strategy_builder_router, paper_trading_router, trade_decision_router]: app.include_router(router, prefix="/api/v1")
-
+app=FastAPI(title="TradePilot AI",description="AI-powered Indian market research, F&O and paper-trading platform",version="0.1.0")
+app.add_middleware(CORSMiddleware,allow_origins=TRADEPILOT_CORS_ORIGINS,allow_credentials=False,allow_methods=["GET","POST","PUT","PATCH","DELETE","OPTIONS"],allow_headers=["*"])
+for router in [users_router,auth_router,portfolio_router,valuation_router,transactions_router,analytics_router,watchlist_router,brokers_router,market_router]: app.include_router(router,prefix="/api/v1")
+for router in [reconciliation_router,advanced_analytics_router,signals_router,intelligence_router,alerts_router,trading_general_router,algo_router,market_risk_router,research_router,intraday_router,strategy_builder_router,paper_trading_router,trade_decision_router,fno_router]: app.include_router(router,prefix="/api/v1")
 @app.on_event("startup")
 def startup_event(): init_db()
 @app.get("/")
-def root(): return {"message": "TradePilot AI API is running", "version": "0.1.0"}
+def root(): return {"message":"TradePilot AI API is running","version":"0.1.0"}
 @app.get("/health")
-def health_check(): return {"status": "healthy"}
-@app.get("/ready", tags=["Operations"], summary="Check critical dependency readiness")
+def health_check(): return {"status":"healthy"}
+@app.get("/ready",tags=["Operations"],summary="Check critical dependency readiness")
 def readiness_check():
     try:
         with engine.connect() as connection: connection.execute(text("SELECT 1"))
-    except Exception: return {"status": "not_ready", "database": "unavailable"}
-    return {"status": "ok", "database": "available"}
+    except Exception:return {"status":"not_ready","database":"unavailable"}
+    return {"status":"ok","database":"available"}
