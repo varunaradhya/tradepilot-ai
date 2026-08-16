@@ -1,0 +1,23 @@
+# Discovery universe only; not a final unbiased historical universe.
+# Use these liquid NSE equities to discover candidate intraday edges.
+# Final validation must use historical constituent membership to avoid survivorship bias.
+RELIANCE
+HDFCBANK
+ICICIBANK
+SBIN
+INFY
+TCS
+ITC
+LT
+BHARTIARTL
+AXISBANK
+KOTAKBANK
+M&M
+MARUTI
+SUNPHARMA
+HINDUNILVR
+TITAN
+BAJFINANCE
+NTPC
+ONGC
+TATASTEEL
