@@ -1,4 +1,4 @@
-﻿from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field
 
 from app.schemas.user import UserResponse
 
@@ -12,6 +12,10 @@ class UserCreate(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=1, max_length=128)
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
 
 
 class TokenResponse(BaseModel):
