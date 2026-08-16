@@ -9,6 +9,13 @@ from .option_strategy_v1 import generate_option_signal
 class OptionResearchConfig:
     capital: float=100000.0; lot_size:int=65; expiry_flag:str='WEEK'; expiry_code:int=0; strike:str='ATM'; interval:str='5'; sl_atr:float=1.0; target_atr:float=2.0; slippage_bps:float=5.0; round_trip_cost_bps:float=12.0
 
+def historical_nifty_lot_size(day:str)->int:
+    # NSE lot revisions: 25 for new contracts before 2024-11-20; 75 from
+    # 2024-11-20; revised 65 from the Oct-2025 revision for applicable new contracts.
+    if day<'2024-11-20': return 25
+    if day<'2025-10-29': return 75
+    return 65
+
 def normalize_rolling(payload:dict)->list[dict]:
     data=payload.get('data',payload) if isinstance(payload,dict) else {}; rows=[]
     for side in ('ce','pe'):
@@ -59,15 +66,15 @@ def simulate_option_days(spot_rows:list[dict],option_rows:list[dict],config:Opti
             if len(hist)<15 or not future: continue
             a=_atr([float(x['high']) for x in hist],[float(x['low']) for x in hist],[float(x['close']) for x in hist],14)
             if not a or a<=0: continue
-            stop=max(0.05,premium-a*config.sl_atr); target=premium+a*config.target_atr
-            qty=max(0,int(config.capital*strategy_config.risk_per_trade//(max(premium-stop,0.01)*config.lot_size))*config.lot_size)
+            stop=max(0.05,premium-a*config.sl_atr); target=premium+a*config.target_atr; lot=historical_nifty_lot_size(day)
+            qty=max(0,int(config.capital*strategy_config.risk_per_trade//(max(premium-stop,0.01)*lot))*lot)
             if qty<=0: continue
             exit_row=future[-1]; reason='EOD'
             for bar in future:
                 if float(bar['low'])<=stop: exit_row=bar; reason='STOP'; break
                 if float(bar['high'])>=target: exit_row=bar; reason='TARGET'; break
             exit_price=float(exit_row['close']); gross=(exit_price-premium)*qty; turnover=(premium+exit_price)*qty; costs=turnover*(config.round_trip_cost_bps/10000); slip=turnover*(config.slippage_bps/10000); net=gross-costs-slip
-            trades.append({'date':day,'option_type':'CE' if side=='ce' else 'PE','strike':strike,'entry':premium,'exit':exit_price,'quantity':qty,'gross_pnl':gross,'costs':costs,'slippage':slip,'pnl':net,'exit_reason':reason,'entry_timestamp':entry['timestamp'],'exit_timestamp':exit_row['timestamp'],'contract_lock':'rolling_strike_proxy','signal_reasons':list(signal.reason)})
+            trades.append({'date':day,'option_type':'CE' if side=='ce' else 'PE','strike':strike,'lot_size':lot,'entry':premium,'exit':exit_price,'quantity':qty,'gross_pnl':gross,'costs':costs,'slippage':slip,'pnl':net,'exit_reason':reason,'entry_timestamp':entry['timestamp'],'exit_timestamp':exit_row['timestamp'],'contract_lock':'rolling_strike_proxy','signal_reasons':list(signal.reason)})
             break
     return trades
 
