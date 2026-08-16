@@ -8,6 +8,7 @@ def _csv(value: str) -> list[str]:
 JWT_ALGORITHM = "HS256"
 JWT_SECRET_KEY = os.getenv("TRADEPILOT_JWT_SECRET", "development-only-secret-change-before-production")
 JWT_EXPIRE_MINUTES = int(os.getenv("TRADEPILOT_JWT_EXPIRE_MINUTES", "60"))
+TRADEPILOT_RESET_DEBUG = os.getenv("TRADEPILOT_RESET_DEBUG", "false").lower() == "true"
 TRADEPILOT_AI_PROVIDER = os.getenv("TRADEPILOT_AI_PROVIDER", "mock").strip().lower()
 TRADEPILOT_AI_API_KEY = os.getenv("TRADEPILOT_AI_API_KEY", "")
 TRADEPILOT_AI_MODEL = os.getenv("TRADEPILOT_AI_MODEL", "")
