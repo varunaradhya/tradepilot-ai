@@ -17,30 +17,33 @@ def historical_nifty_lot_size(day:str)->int:
 def _series_value(d:dict, keys:tuple[str,...], i:int, default=None):
     for key in keys:
         v=d.get(key)
-        if isinstance(v,list) and i < len(v):
-            return v[i]
+        if isinstance(v,list) and i < len(v): return v[i]
     return default
 
+def _array_value(d:dict, key:str, i:int, default=None):
+    v=d.get(key)
+    return v[i] if isinstance(v,list) and i < len(v) else default
+
 def normalize_rolling(payload:dict)->list[dict]:
-    """Normalize rolling-option payload while preserving contract/expiry identity when supplied by Dhan."""
+    """Normalize Dhan rolling-option arrays. Dhan does not expose exact expiry/contract identity here."""
     data=payload.get('data',payload) if isinstance(payload,dict) else {}; rows=[]
     for side in ('ce','pe'):
         d=data.get(side) if isinstance(data,dict) else None
         if not isinstance(d,dict): continue
-        keys=('timestamp','open','high','low','close','volume','strike','oi','iv','spot','expiry','expiry_date','expiration','expiration_date','contract','contract_symbol','option_symbol','instrument_token')
-        n=max((len(d.get(k,[])) for k in keys if isinstance(d.get(k,[]),list)),default=0)
+        required=('timestamp','open','high','low','close')
+        n=max((len(d.get(k,[])) for k in required if isinstance(d.get(k,[]),list)),default=0)
         for i in range(n):
-            if any(i>=len(d.get(k,[])) for k in ('timestamp','open','high','low','close')): continue
+            if any(_array_value(d,k,i) is None for k in required): continue
             expiry=_series_value(d,('expiry','expiry_date','expiration','expiration_date'),i)
             contract=_series_value(d,('contract','contract_symbol','option_symbol','instrument_token'),i)
-            rows.append({'side':side,'timestamp':d['timestamp'][i],'open':d['open'][i],'high':d['high'][i],'low':d['low'][i],'close':d['close'][i],'volume':d.get('volume',[0]*n)[i],'strike':d.get('strike',[None]*n)[i],'oi':d.get('oi',[None]*n)[i],'iv':d.get('iv',[None]*n)[i],'spot':d.get('spot',[None]*n)[i],'expiry':expiry,'contract_identity':str(contract) if contract is not None else None})
+            rows.append({'side':side,'timestamp':d['timestamp'][i],'open':d['open'][i],'high':d['high'][i],'low':d['low'][i],'close':d['close'][i],'volume':_array_value(d,'volume',i,0),'strike':_array_value(d,'strike',i),'oi':_array_value(d,'oi',i),'iv':_array_value(d,'iv',i),'spot':_array_value(d,'spot',i),'expiry':expiry,'contract_identity':str(contract) if contract is not None else None})
     return rows
 
 def normalize_spot(payload:dict)->list[dict]:
     data=payload.get('data',payload) if isinstance(payload,dict) else {}
     if not isinstance(data,dict): return []
-    keys=('timestamp','open','high','low','close','volume'); n=max((len(data.get(k,[])) for k in keys if isinstance(data.get(k,[]),list)),default=0)
-    return [{'timestamp':data['timestamp'][i],'open':data['open'][i],'high':data['high'][i],'low':data['low'][i],'close':data['close'][i],'volume':data.get('volume',[0]*n)[i]} for i in range(n) if all(i<len(data.get(k,[])) for k in ('timestamp','open','high','low','close'))]
+    n=max((len(data.get(k,[])) for k in ('timestamp','open','high','low','close') if isinstance(data.get(k,[]),list)),default=0)
+    return [{'timestamp':data['timestamp'][i],'open':data['open'][i],'high':data['high'][i],'low':data['low'][i],'close':data['close'][i],'volume':_array_value(data,'volume',i,0)} for i in range(n) if all(_array_value(data,k,i) is not None for k in ('timestamp','open','high','low','close'))]
 
 def _day(ts)->str:
     return datetime.fromtimestamp(ts).strftime('%Y-%m-%d') if isinstance(ts,(int,float)) else str(ts)[:10]
@@ -56,7 +59,6 @@ def _time(ts)->str:
     s=str(ts); return s[11:16] if len(s)>=16 else s[-5:]
 
 def _direction_signal(context:list[dict], day_bars:list[dict], option_history:list[dict], config:FNOORBConfig):
-    """Evaluate V1 using prior bars only for indicators and today's first 3 bars for ORB."""
     if len(day_bars)<4: return None
     need=max(config.ema_slow,config.rsi_period+1,config.atr_period+1)+2
     if len(context)<need: return None
@@ -76,25 +78,19 @@ def _direction_signal(context:list[dict], day_bars:list[dict], option_history:li
     return side,row
 
 def _prepare_option_index(option_rows:list[dict]):
-    """Build timestamp/side indexes once; avoids repeated O(N) scans during a five-year backtest."""
-    all_opts=sorted(option_rows,key=lambda x:x['timestamp'])
-    by_side={side:[] for side in ('ce','pe')}
+    all_opts=sorted(option_rows,key=lambda x:x['timestamp']); by_side={side:[] for side in ('ce','pe')}
     for row in all_opts:
         if row.get('side') in by_side: by_side[row['side']].append(row)
-    indexes={}
-    for side,rows in by_side.items():
-        indexes[side]={'rows':rows,'timestamps':[r['timestamp'] for r in rows]}
-    return indexes
+    return {side:{'rows':rows,'timestamps':[r['timestamp'] for r in rows]} for side,rows in by_side.items()}
 
 def _history_until(index,ts):
-    rows=index['rows']; pos=bisect_right(index['timestamps'],ts)
-    return rows[:pos]
+    rows=index['rows']; return rows[:bisect_right(index['timestamps'],ts)]
 
 def _future_for_contract(day_opts,side,strike,entry_ts,contract_identity=None,expiry=None):
     return [x for x in day_opts if x['side']==side and x.get('strike')==strike and x['timestamp']>entry_ts and (contract_identity is None or x.get('contract_identity')==contract_identity) and (expiry is None or x.get('expiry')==expiry)]
 
 def _history_for_contract(index,side,strike,entry_ts,contract_identity=None,expiry=None):
-    rows=index[side]['rows']; ts=index[side]['timestamps']; pos=bisect_right(ts,entry_ts)
+    rows=index[side]['rows']; pos=bisect_right(index[side]['timestamps'],entry_ts)
     return [x for x in rows[:pos] if x.get('strike')==strike and (contract_identity is None or x.get('contract_identity')==contract_identity) and (expiry is None or x.get('expiry')==expiry)]
 
 def simulate_option_days(spot_rows:list[dict],option_rows:list[dict],config:OptionResearchConfig=OptionResearchConfig(),strategy_config:FNOORBConfig=FNOORBConfig())->list[dict]:
@@ -102,15 +98,12 @@ def simulate_option_days(spot_rows:list[dict],option_rows:list[dict],config:Opti
     print(f'Backtest engine: {len(spots)} sessions, {len(option_rows)} option rows')
     for day_no,(day,sb) in enumerate(sorted(spots.items()),1):
         if day not in opts or len(sb)<4: continue
-        first_ts=sb[0]['timestamp']; prior=[x for x in all_spots if x['timestamp']<first_ts]
-        context=prior[-80:]; day_opts=opts[day]; chosen=None
+        first_ts=sb[0]['timestamp']; prior=[x for x in all_spots if x['timestamp']<first_ts]; context=prior[-80:]; day_opts=opts[day]; chosen=None
         for i in range(3,len(sb)):
             current_context=context+sb[:i+1]; ts=sb[i]['timestamp']
             for side in ('ce','pe'):
-                history=_history_until(opt_index[side],ts)
-                signal=_direction_signal(current_context,sb,history,strategy_config)
-                if signal and signal[0]==side:
-                    chosen=signal; break
+                history=_history_until(opt_index[side],ts); signal=_direction_signal(current_context,sb,history,strategy_config)
+                if signal and signal[0]==side: chosen=signal; break
             if chosen: break
         if not chosen: continue
         side,entry=chosen; strike=entry.get('strike'); premium=float(entry['close']); contract_identity=entry.get('contract_identity'); expiry=entry.get('expiry')
@@ -119,22 +112,21 @@ def simulate_option_days(spot_rows:list[dict],option_rows:list[dict],config:Opti
         if len(hist)<15 or not future: continue
         a=_atr([float(x['high']) for x in hist],[float(x['low']) for x in hist],[float(x['close']) for x in hist],14)
         if not a or a<=0: continue
-        stop=max(0.05,premium-a*config.sl_atr); target=premium+a*config.target_atr; lot=historical_nifty_lot_size(day)
-        risk_per_unit=max(premium-stop,0.01); lots=int((config.capital*strategy_config.risk_per_trade)//(risk_per_unit*lot)); qty=max(0,lots*lot)
+        stop=max(0.05,premium-a*config.sl_atr); target=premium+a*config.target_atr; lot=historical_nifty_lot_size(day); risk_per_unit=max(premium-stop,0.01); lots=int((config.capital*strategy_config.risk_per_trade)//(risk_per_unit*lot)); qty=max(0,lots*lot)
         if qty<=0: continue
         exit_row=future[-1]; reason='EOD'
         for bar in future:
             if float(bar['low'])<=stop: exit_row=bar; reason='STOP'; break
             if float(bar['high'])>=target: exit_row=bar; reason='TARGET'; break
         exit_price=float(exit_row['close']); gross=(exit_price-premium)*qty; turnover=(premium+exit_price)*qty; costs=turnover*(config.round_trip_cost_bps/10000); slip=turnover*(config.slippage_bps/10000); net=gross-costs-slip
-        trades.append({'date':day,'option_type':'CE' if side=='ce' else 'PE','strike':strike,'expiry':expiry,'contract_identity':contract_identity,'lot_size':lot,'entry':premium,'exit':exit_price,'quantity':qty,'gross_pnl':gross,'costs':costs,'slippage':slip,'pnl':net,'exit_reason':reason,'entry_timestamp':entry['timestamp'],'exit_timestamp':exit_row['timestamp'],'contract_lock':'exact_contract_identity','signal_reasons':['OPENING_RANGE_BREAKOUT','EMA_TREND','RSI_CONFIRMATION','OPTION_VOLUME_CONFIRMATION']})
+        lock_mode='rolling_series_identity' if str(contract_identity).startswith('ROLLING:') else 'exact_contract_identity'
+        trades.append({'date':day,'option_type':'CE' if side=='ce' else 'PE','strike':strike,'expiry':expiry,'contract_identity':contract_identity,'lot_size':lot,'entry':premium,'exit':exit_price,'quantity':qty,'gross_pnl':gross,'costs':costs,'slippage':slip,'pnl':net,'exit_reason':reason,'entry_timestamp':entry['timestamp'],'exit_timestamp':exit_row['timestamp'],'contract_lock':lock_mode,'signal_reasons':['OPENING_RANGE_BREAKOUT','EMA_TREND','RSI_CONFIRMATION','OPTION_VOLUME_CONFIRMATION']})
         if day_no%100==0: print(f'  processed {day_no}/{len(spots)} sessions; trades={len(trades)}')
     return trades
 
 def summarize(trades:list[dict])->dict:
     pnl=[float(t['pnl']) for t in trades]; wins=[x for x in pnl if x>0]; losses=[x for x in pnl if x<0]; equity=peak=maxdd=0.0
     for x in pnl: equity+=x; peak=max(peak,equity); maxdd=max(maxdd,peak-equity)
-    gross_win=sum(wins); gross_loss=abs(sum(losses)); pf=gross_win/gross_loss if gross_loss else None
-    yearly={}
+    gross_win=sum(wins); gross_loss=abs(sum(losses)); pf=gross_win/gross_loss if gross_loss else None; yearly={}
     for t in trades: yearly[t['date'][:4]]=yearly.get(t['date'][:4],0.0)+float(t['pnl'])
     return {'trades':len(pnl),'wins':len(wins),'losses':len(losses),'win_rate_percent':len(wins)/len(pnl)*100 if pnl else 0.0,'net_pnl':sum(pnl),'profit_factor':pf,'expectancy_per_trade':sum(pnl)/len(pnl) if pnl else 0.0,'max_drawdown':maxdd,'positive_years':sum(1 for v in yearly.values() if v>0)}
