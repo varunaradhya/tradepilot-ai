@@ -21,11 +21,29 @@ def load_symbols(path,master):
     with Path(master).open(newline='',encoding='utf-8-sig') as f: records=list(csv.DictReader(f))
     by={}
     for r in records:
-        if r.get('EXCH_ID')=='NSE' and r.get('SEGMENT')=='E' and r.get('INSTRUMENT')=='EQUITY':
-            sym=(r.get('SYMBOL_NAME') or '').strip().upper();sid=(r.get('SECURITY_ID') or '').strip()
-            if sym and sid:by[sym]=sid
+        # Dhan's detailed master has changed some descriptive values over time.
+        # Identify NSE cash-equity rows by the stable exchange/segment pair and
+        # accept either the documented EQUITY instrument value or an equity-like
+        # instrument/type marker. Prefer the exchange trading symbol when present.
+        exch=(r.get('EXCH_ID') or r.get('SEM_EXM_EXCH_ID') or '').strip().upper()
+        seg=(r.get('SEGMENT') or r.get('SEM_SEGMENT') or '').strip().upper()
+        instr=(r.get('INSTRUMENT') or r.get('SEM_INSTRUMENT_NAME') or '').strip().upper()
+        itype=(r.get('INSTRUMENT_TYPE') or r.get('SEM_EXCH_INSTRUMENT_TYPE') or '').strip().upper()
+        if exch!='NSE' or seg!='E':
+            continue
+        if not ('EQUITY' in instr or instr in {'E','EQ'} or 'EQUITY' in itype or itype in {'E','EQ','ES'}):
+            continue
+        candidates=[r.get('SYMBOL_NAME'),r.get('SEM_TRADING_SYMBOL'),r.get('TRADING_SYMBOL')]
+        sid=(r.get('SECURITY_ID') or r.get('SEM_SMST_SECURITY_ID') or '').strip()
+        if not sid: continue
+        for raw in candidates:
+            sym=(raw or '').strip().upper()
+            if sym and sym in wanted:
+                by[sym]=sid
+                break
     missing=[s for s in wanted if s not in by]
-    if missing:raise SystemExit(f'Missing NSE equity symbols in Dhan master: {missing}')
+    if missing:
+        raise SystemExit(f'Missing NSE equity symbols in Dhan master: {missing}. Refresh the master with download_instrument_master.py; accepted columns include SYMBOL_NAME/SEM_TRADING_SYMBOL and NSE segment E.')
     return [(s,by[s]) for s in wanted]
 
 def main():
