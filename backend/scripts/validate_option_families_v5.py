@@ -1,7 +1,6 @@
 from __future__ import annotations
 import argparse, json, random, statistics, sqlite3, sys, time
 from pathlib import Path
-
 BACKEND = Path(__file__).resolve().parents[1]
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
@@ -54,8 +53,7 @@ def candidate_returns(rows, conditions, horizon, cost_bps, slippage_bps):
     out = []
     for i in range(len(enriched) - horizon):
         if signal(enriched[i], conditions):
-            entry = float(enriched[i]['close'])
-            exit_ = float(enriched[i + horizon]['close'])
+            entry = float(enriched[i]['close']); exit_ = float(enriched[i + horizon]['close'])
             if entry > 0:
                 out.append((enriched[i]['timestamp'], exit_ / entry - 1 - friction))
     return out
@@ -94,11 +92,10 @@ def evaluate_family(family, candidates, groups, horizon, cost_bps, slippage_bps,
         for ts, val in fi:
             all_by_ts.setdefault(ts, []).append(val)
         variant_rows.append({
-            'name': c['name'], 'strike_key': strike, 'final_trades': fn,
-            'train_expectancy': te, 'validation_expectancy': ve,
-            'final_expectancy': fe, 'final_profit_factor': fpf,
-            'final_win_rate': fw, 'final_return': fr,
-            'final_drawdown': _drawdown([x[1] for x in fi]),
+            'name': c['name'], 'strike_key': strike, 'v3_eligible': bool(c.get('eligible')),
+            'final_trades': fn, 'train_expectancy': te, 'validation_expectancy': ve,
+            'final_expectancy': fe, 'final_profit_factor': fpf, 'final_win_rate': fw,
+            'final_return': fr, 'final_drawdown': _drawdown([x[1] for x in fi]),
         })
 
     family_returns = [(ts, statistics.median(vals)) for ts, vals in sorted(all_by_ts.items())]
@@ -109,7 +106,7 @@ def evaluate_family(family, candidates, groups, horizon, cost_bps, slippage_bps,
     fn, fe, fw, fpf, fr = _stats(fiv)
     mcres = mc(fiv, mc_trials, seed)
 
-    exp = [r['final_expectancy'] for r in variant_rows]
+    exp = [r['final_expectancy'] for r in variant_rows if r['final_expectancy'] is not None]
     med = statistics.median(exp) if exp else 0.0
     pos = sum(x > 0 for x in exp) / len(exp) if exp else 0.0
     trimmed = sorted(exp)
@@ -127,9 +124,9 @@ def evaluate_family(family, candidates, groups, horizon, cost_bps, slippage_bps,
 
     return {
         'family': family, 'variants': len(variant_rows),
+        'v3_eligible_variants': sum(r['v3_eligible'] for r in variant_rows),
         'strike_keys': sorted({r['strike_key'] for r in variant_rows}, key=str),
-        'positive_variant_rate': pos,
-        'median_variant_final_expectancy': med,
+        'positive_variant_rate': pos, 'median_variant_final_expectancy': med,
         'trimmed_variant_final_expectancy': trimmed_mean,
         'family_train_trades': tn, 'family_validation_trades': vn, 'family_final_trades': fn,
         'family_train_expectancy': te, 'family_validation_expectancy': ve,
@@ -160,7 +157,11 @@ def main():
     print(f'OPTION FAMILY V5: V4 approved={len(approved)} core families={len(approved_core)} {sorted(approved_core)}', flush=True)
 
     v3 = json.loads(Path(a.input).with_name('option_oos_v3.json').read_text(encoding='utf-8'))
-    candidates = [r for r in v3.get('results', []) if r.get('eligible') and family_key(r['name']) in approved_core]
+    # V4 approved families must be evaluated using ALL V3 variants in those families.
+    # V3 eligibility is retained as a diagnostic, not used as a filter, otherwise entire
+    # approved families can disappear from V5 simply because some variants missed V3's
+    # individual gate.
+    candidates = [r for r in v3.get('results', []) if family_key(r['name']) in approved_core]
     fams = {}
     for c in candidates:
         fams.setdefault(family_key(c['name']), []).append(c)
@@ -183,27 +184,17 @@ def main():
         r = evaluate_family(fam, rows, groups, a.horizon, a.cost_bps, a.slippage_bps, a.monte_carlo_trials, a.seed + i)
         results.append(r)
         reason = ','.join(r['rejection_reasons']) if r['rejection_reasons'] else 'NONE'
-        print(f'OPTION FAMILY V5: {i}/{len(fams)} {fam} variants={r["variants"]} positive={r["positive_variant_rate"]:.2f} median={r["median_variant_final_expectancy"]:.6f} family_final={r["family_final_expectancy"]:.6f} PF={r["family_final_profit_factor"]} MC={r["monte_carlo"]["probability_positive"]:.3f} eligible={r["eligible_for_contract_gate"]} reasons={reason}', flush=True)
+        print(f'OPTION FAMILY V5: {i}/{len(fams)} {fam} variants={r["variants"]} v3_eligible={r["v3_eligible_variants"]} positive={r["positive_variant_rate"]:.2f} median={r["median_variant_final_expectancy"]:.6f} trimmed={r["trimmed_variant_final_expectancy"]:.6f} family_final={r["family_final_expectancy"]:.6f} PF={r["family_final_profit_factor"]} MC={r["monte_carlo"]["probability_positive"]:.3f} eligible={r["eligible_for_contract_gate"]} reasons={reason}', flush=True)
 
     results.sort(key=lambda x: (x['eligible_for_contract_gate'], x['median_variant_final_expectancy']), reverse=True)
     report = {
-        'methodology': {
-            'train_ratio': .60, 'validation_ratio': .20, 'final_ratio': .20,
-            'family_definition': 'V4-approved family mapped to core side+conditions; strike and IV/OI are robustness variants',
-            'cost_bps': a.cost_bps, 'slippage_bps': a.slippage_bps,
-            'monte_carlo_trials': a.monte_carlo_trials, 'final_is_not_used_for_selection': True,
-        },
-        'input_families': len(fams),
-        'contract_gate_count': sum(r['eligible_for_contract_gate'] for r in results),
-        'results': results,
-        'promotion_status': 'RESEARCH_ONLY_NO_PAPER_TRADING',
-        'critical_limit': 'Rolling option series only. Exact historical contract/expiry, bid-ask spread, fill, lot size and expiry-roll mechanics remain unvalidated.',
-        'elapsed_seconds': round(time.time() - started, 2),
+        'methodology': {'train_ratio': .60, 'validation_ratio': .20, 'final_ratio': .20, 'family_definition': 'V4-approved family mapped to core side+conditions; strike and IV/OI are robustness variants', 'cost_bps': a.cost_bps, 'slippage_bps': a.slippage_bps, 'monte_carlo_trials': a.monte_carlo_trials, 'final_is_not_used_for_selection': True, 'v3_eligibility_is_diagnostic_only': True},
+        'input_families': len(fams), 'contract_gate_count': sum(r['eligible_for_contract_gate'] for r in results), 'results': results,
+        'promotion_status': 'RESEARCH_ONLY_NO_PAPER_TRADING', 'critical_limit': 'Rolling option series only. Exact historical contract/expiry, bid-ask spread, fill, lot size and expiry-roll mechanics remain unvalidated.', 'elapsed_seconds': round(time.time() - started, 2)
     }
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     Path(a.out).write_text(json.dumps(report, indent=2), encoding='utf-8')
     print(json.dumps({'families': len(results), 'contract_gate': report['contract_gate_count'], 'elapsed_seconds': report['elapsed_seconds'], 'out': a.out}, indent=2), flush=True)
-
 
 if __name__ == '__main__':
     main()
