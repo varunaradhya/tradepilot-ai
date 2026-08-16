@@ -83,14 +83,7 @@ def returns_for(rows, conditions, horizon, friction):
 def metric(values):
     vals = [x[1] for x in values]
     n, expectancy, win_rate, pf, total_return = _stats(vals)
-    return {
-        "trades": n,
-        "expectancy": expectancy,
-        "win_rate": win_rate,
-        "profit_factor": pf,
-        "return": total_return,
-        "drawdown": _drawdown(vals),
-    }
+    return {"trades": n, "expectancy": expectancy, "win_rate": win_rate, "profit_factor": pf, "return": total_return, "drawdown": _drawdown(vals)}
 
 
 def family_fold_metrics(family, candidates, groups, timestamps, horizon, friction):
@@ -102,8 +95,8 @@ def family_fold_metrics(family, candidates, groups, timestamps, horizon, frictio
             continue
         rr = returns_for(groups.get((cside, strike), []), conditions, horizon, friction)
         for ts, value in rr:
-            for idx, (start, end) in enumerate(timestamps):
-                if start <= ts < end:
+            for idx, (start, end, is_last) in enumerate(timestamps):
+                if start <= ts < end or (is_last and ts == end):
                     fold_returns[idx].append((ts, value))
                     break
     result = []
@@ -125,10 +118,7 @@ def make_folds(all_timestamps, count=4):
     n = len(unique)
     for i in range(count):
         lo = unique[(i * n) // count]
-        if i < count - 1:
-            hi = unique[((i + 1) * n) // count]
-        else:
-            hi = unique[-1]
+        hi = unique[((i + 1) * n) // count] if i < count - 1 else unique[-1]
         folds.append((lo, hi, i == count - 1))
     return folds
 
@@ -187,23 +177,10 @@ def main():
             exps = [m["expectancy"] for m in fm if m["trades"]]
             pfs = [m["profit_factor"] for m in fm if m["profit_factor"] is not None]
             positive_folds = sum(x > 0 for x in exps)
-            sensitivity[str(int(total_bps))] = {
-                "friction_bps": total_bps,
-                "folds": fm,
-                "positive_fold_rate": positive_folds / len(exps) if exps else 0.0,
-                "median_expectancy": statistics.median(exps) if exps else 0.0,
-                "worst_expectancy": min(exps) if exps else 0.0,
-                "worst_profit_factor": min(pfs) if pfs else None,
-            }
+            sensitivity[str(int(total_bps))] = {"friction_bps": total_bps, "folds": fm, "positive_fold_rate": positive_folds / len(exps) if exps else 0.0, "median_expectancy": statistics.median(exps) if exps else 0.0, "worst_expectancy": min(exps) if exps else 0.0, "worst_profit_factor": min(pfs) if pfs else None}
         base = sensitivity["10"]
         stress = sensitivity["15"]
-        eligible = bool(
-            base["positive_fold_rate"] >= 0.75
-            and base["worst_expectancy"] > 0
-            and base["worst_profit_factor"] is not None and base["worst_profit_factor"] >= 1.05
-            and stress["positive_fold_rate"] >= 0.75
-            and stress["median_expectancy"] > 0
-        )
+        eligible = bool(base["positive_fold_rate"] >= 0.75 and base["worst_expectancy"] > 0 and base["worst_profit_factor"] is not None and base["worst_profit_factor"] >= 1.05 and stress["positive_fold_rate"] >= 0.75 and stress["median_expectancy"] > 0)
         reasons = []
         if base["positive_fold_rate"] < 0.75: reasons.append("unstable_positive_fold_rate")
         if base["worst_expectancy"] <= 0: reasons.append("negative_base_cost_fold")
@@ -213,15 +190,7 @@ def main():
         results.append(result)
         print(f"OPTION FAMILY V6: {family} base10_median={base['median_expectancy']:.6f} worst={base['worst_expectancy']:.6f} worstPF={base['worst_profit_factor']} stress15_median={stress['median_expectancy']:.6f} positive15={stress['positive_fold_rate']:.2f} eligible={eligible} reasons={','.join(reasons) if reasons else 'NONE'}", flush=True)
 
-    report = {
-        "methodology": {"folds": len(folds), "horizon_bars": a.horizon, "base_friction_bps": 10.0, "stress_friction_bps": [15.0, 20.0], "selection_note": "V5 eligibility is fixed input; V6 is a temporal stability and cost-sensitivity audit, not a new discovery pass."},
-        "families": len(results),
-        "next_gate_count": sum(r["eligible_for_next_research_gate"] for r in results),
-        "results": results,
-        "promotion_status": "RESEARCH_ONLY_NO_PAPER_TRADING",
-        "critical_limit": "The underlying option cache is rolling strike-wise expired-options data; exact historical contract/expiry identity, bid-ask spread, fills and lot mechanics remain unvalidated.",
-        "elapsed_seconds": round(time.time() - started, 2),
-    }
+    report = {"methodology": {"folds": len(folds), "horizon_bars": a.horizon, "base_friction_bps": 10.0, "stress_friction_bps": [15.0, 20.0], "selection_note": "V5 eligibility is fixed input; V6 is a temporal stability and cost-sensitivity audit, not a new discovery pass."}, "families": len(results), "next_gate_count": sum(r["eligible_for_next_research_gate"] for r in results), "results": results, "promotion_status": "RESEARCH_ONLY_NO_PAPER_TRADING", "critical_limit": "The underlying option cache is rolling strike-wise expired-options data; exact historical contract/expiry identity, bid-ask spread, fills and lot mechanics remain unvalidated.", "elapsed_seconds": round(time.time() - started, 2)}
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     Path(a.out).write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps({"families": len(results), "next_gate": report["next_gate_count"], "elapsed_seconds": report["elapsed_seconds"], "out": a.out}, indent=2), flush=True)
