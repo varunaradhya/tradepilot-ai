@@ -16,8 +16,16 @@ def parse_name(name):
 
 
 def family_signature(name):
-    side, _, conditions = parse_name(name)
-    return side, conditions
+    """Return the canonical side + condition signature for either a family label or V3 candidate."""
+    parts = name.split(':')
+    side = parts[0]
+    if len(parts) >= 3:
+        conditions = parts[2].split('+')
+    elif len(parts) == 2:
+        conditions = parts[1].split('+')
+    else:
+        conditions = []
+    return side, tuple(sorted(c for c in conditions if c and c != 'base'))
 
 
 def enrich(rows):
@@ -136,7 +144,8 @@ def evaluate_family(family, candidates, groups, horizon, cost_bps, slippage_bps,
         'family_final_expectancy': fe, 'family_final_profit_factor': fpf,
         'family_final_win_rate': fw, 'family_final_return': fr,
         'family_final_drawdown': _drawdown(fiv), 'monte_carlo': mcres,
-        'eligible_for_contract_gate': bool(variant_rows) and not reasons, 'rejection_reasons': reasons if variant_rows else ['no_matching_v3_candidates'],
+        'eligible_for_contract_gate': bool(variant_rows) and not reasons,
+        'rejection_reasons': reasons if variant_rows else ['no_matching_v3_candidates'],
         'variant_results': sorted(variant_rows, key=lambda x: x['final_expectancy'], reverse=True),
         'research_limit': 'Rolling option series only; exact contract, expiry, spread, fill and lot mechanics remain unvalidated.'
     }
@@ -163,9 +172,6 @@ def main():
     v3 = json.loads(v3_path.read_text(encoding='utf-8'))
     all_candidates = v3.get('results', [])
 
-    # Match V4 family labels to V3 candidate names by exact side + exact condition set.
-    # Strike is deliberately ignored when forming the family, but no signal condition
-    # is dropped. This makes the V4->V5 handoff canonical and auditable.
     fams = {}
     for family in approved_families:
         sig = family_signature(family)
