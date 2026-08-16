@@ -18,12 +18,10 @@ def canonical_indian_symbol(symbol: str) -> str:
 
     try:
         results = _search_provider.search(normalized)
-    except MarketSearchProviderError:
-        # Exact symbols are valid user input even when the external search
-        # provider is temporarily unavailable. This keeps watchlist creation
-        # independent of a transient Yahoo/NSE lookup outage; quote retrieval
-        # can still report market_data_available=False when data is unavailable.
-        return normalized
+    except MarketSearchProviderError as exc:
+        raise IndianSymbolError(
+            "Indian stock validation is temporarily unavailable. Please try again shortly."
+        ) from exc
 
     exact = [item for item in results if item.symbol.upper() == normalized]
     if not exact:
