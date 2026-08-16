@@ -1,3 +1,13 @@
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+# Allow this script to be executed directly from backend/scripts with the venv Python.
+BACKEND = Path(__file__).resolve().parents[1]
+if str(BACKEND) not in sys.path:
+    sys.path.insert(0, str(BACKEND))
+
 from app.services.option_research_pipeline import normalize_rolling
 
 
