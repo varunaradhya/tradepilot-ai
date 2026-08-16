@@ -39,6 +39,10 @@ class ResearchDataCache:
             rows=self.db.execute('SELECT symbol,timestamp,open,high,low,close,volume FROM equity_bars WHERE dataset_id=? ORDER BY symbol,timestamp',(dataset_id,)); cols=('symbol','timestamp','open','high','low','close','volume')
         return [dict(zip(cols,r)) for r in rows]
     def counts(self):
-        return {'spot_bars':self.db.execute('SELECT COUNT(*) FROM spot_bars').fetchone()[0],'option_rows':self.db.execute('SELECT COUNT(*) FROM option_bars').fetchone()[0],'equity_rows':self.db.execute('SELECT COUNT(*) FROM equity_bars').fetchone()[0],'windows':self.db.execute('SELECT COUNT(*) FROM windows').fetchone()[0]}
+        return {'spot_bars':self.db.execute('SELECT COUNT(*) FROM spot_bars').fetchone()[0],'option_rows':self.db.execute('SELECT COUNT(*) FROM option_bars').fetchone()[0],'windows':self.db.execute('SELECT COUNT(*) FROM windows').fetchone()[0]}
+    def equity_counts(self,dataset_id=None):
+        if dataset_id:
+            return self.db.execute('SELECT COUNT(*) FROM equity_bars WHERE dataset_id=?',(dataset_id,)).fetchone()[0]
+        return self.db.execute('SELECT COUNT(*) FROM equity_bars').fetchone()[0]
     def __enter__(self): return self
     def __exit__(self,*args): self.close()
