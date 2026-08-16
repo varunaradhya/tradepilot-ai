@@ -23,6 +23,8 @@ The project currently includes:
 - Multi-broker abstraction for Dhan, Groww and Angel One foundations
 - Docker Compose deployment stack
 - GitHub Actions CI for backend tests and frontend production builds
+- Runtime error boundary and resilient application navigation
+- India/NSE-first market search and market-data presentation
 
 ## Safety boundary
 
@@ -77,7 +79,7 @@ The backend exposes `/health` for liveness and `/ready` for database readiness.
 
 ## Verification baseline
 
-The current verified development checkpoint is **362 backend tests passing** with a successful Vite production build. Always rerun the local test/build commands after pulling changes.
+The latest local verification checkpoint is **368 backend tests passing** with a successful Vite production build. The latest GitHub Actions run also passed backend tests, frontend build, and Docker Compose validation. Always rerun the local test/build commands after pulling changes.
 
 ## Project structure
 
