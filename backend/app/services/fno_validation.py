@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class ValidationGate:
-    """Promotion gate: failing any required condition blocks live execution."""
+    """Every condition is mandatory; failure blocks promotion to live trading."""
     min_trades: int = 250
     min_profit_factor: float = 1.25
     min_expectancy_per_trade: float = 0.0
@@ -30,3 +30,16 @@ def final_promotion(backtest_gate:dict,paper_gate:dict,data_quality_ok:bool,fixe
     flags={"backtest":backtest_gate.get("eligible"),"paper":paper_gate.get("eligible"),"data_quality":data_quality_ok,"fixed_contract_validation":fixed_contract_validation_ok}
     eligible=all(bool(v) for v in flags.values())
     return {"status":"PROMOTE" if eligible else "REJECT","eligible":eligible,"reasons":[] if eligible else [k for k,v in flags.items() if not v]}
+
+
+def chronological_split(rows:list[dict], train_fraction:float=0.60, validation_fraction:float=0.20) -> tuple[list[dict],list[dict],list[dict]]:
+    if not 0<train_fraction<1 or not 0<=validation_fraction<1 or train_fraction+validation_fraction>=1: raise ValueError("invalid split fractions")
+    ordered=sorted(rows,key=lambda r:r.get("timestamp",0)); n=len(ordered); a=int(n*train_fraction); b=int(n*(train_fraction+validation_fraction)); return ordered[:a],ordered[a:b],ordered[b:]
+
+
+def walk_forward_windows(rows:list[dict], train_bars:int, test_bars:int, step_bars:int|None=None) -> list[tuple[list[dict],list[dict]]]:
+    if train_bars<=0 or test_bars<=0: raise ValueError("window sizes must be positive")
+    step=step_bars or test_bars; ordered=sorted(rows,key=lambda r:r.get("timestamp",0)); out=[]; start=0
+    while start+train_bars+test_bars<=len(ordered):
+        out.append((ordered[start:start+train_bars],ordered[start+train_bars:start+train_bars+test_bars])); start+=step
+    return out
