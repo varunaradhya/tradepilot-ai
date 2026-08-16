@@ -11,6 +11,8 @@ from app.models.user import User
 
 
 RESET_TOKEN_MINUTES = 15
+ACCESS_TOKEN_PURPOSE = "access"
+PASSWORD_RESET_TOKEN_PURPOSE = "password_reset"
 
 
 def get_user_by_email(db: Session, email: str) -> User | None:
@@ -43,7 +45,12 @@ def create_user(db: Session, full_name: str, email: str, password: str) -> User:
 
 def create_access_token(user_id: int, expires_minutes: int = JWT_EXPIRE_MINUTES) -> str:
     now = datetime.now(timezone.utc)
-    payload = {"sub": str(user_id), "iat": now, "exp": now + timedelta(minutes=expires_minutes)}
+    payload = {
+        "sub": str(user_id),
+        "purpose": ACCESS_TOKEN_PURPOSE,
+        "iat": now,
+        "exp": now + timedelta(minutes=expires_minutes),
+    }
     return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
 
 
@@ -54,17 +61,25 @@ def decode_access_token(token: str) -> dict:
     Authentication dependencies deliberately translate any decode failure into
     a generic 401 response so token details are not leaked to clients.
     """
-    return jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+    payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+    if payload.get("purpose") != ACCESS_TOKEN_PURPOSE:
+        raise ValueError("Invalid access token purpose")
+    return payload
 
 
 def create_password_reset_token(user_id: int) -> str:
     now = datetime.now(timezone.utc)
-    payload = {"sub": str(user_id), "purpose": "password_reset", "iat": now, "exp": now + timedelta(minutes=RESET_TOKEN_MINUTES)}
+    payload = {
+        "sub": str(user_id),
+        "purpose": PASSWORD_RESET_TOKEN_PURPOSE,
+        "iat": now,
+        "exp": now + timedelta(minutes=RESET_TOKEN_MINUTES),
+    }
     return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
 
 
 def decode_password_reset_token(token: str) -> int:
     payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
-    if payload.get("purpose") != "password_reset":
+    if payload.get("purpose") != PASSWORD_RESET_TOKEN_PURPOSE:
         raise ValueError("Invalid password reset token")
     return int(payload["sub"])
