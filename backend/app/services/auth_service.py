@@ -47,6 +47,16 @@ def create_access_token(user_id: int, expires_minutes: int = JWT_EXPIRE_MINUTES)
     return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
 
 
+def decode_access_token(token: str) -> dict:
+    """Decode and validate an access JWT.
+
+    PyJWT validates the signature and registered time claims such as ``exp``.
+    Authentication dependencies deliberately translate any decode failure into
+    a generic 401 response so token details are not leaked to clients.
+    """
+    return jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+
+
 def create_password_reset_token(user_id: int) -> str:
     now = datetime.now(timezone.utc)
     payload = {"sub": str(user_id), "purpose": "password_reset", "iat": now, "exp": now + timedelta(minutes=RESET_TOKEN_MINUTES)}
