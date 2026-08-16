@@ -6,6 +6,7 @@ from app.core.config import JWT_ALGORITHM, JWT_SECRET_KEY
 from app.core.security import hash_password
 from app.db.database import SessionLocal
 from app.models.user import User
+from app.services.auth_service import create_password_reset_token
 from main import app
 
 
@@ -83,6 +84,7 @@ def test_valid_jwt_contains_user_subject():
         )
 
         assert payload["sub"] == str(user_id)
+        assert payload["purpose"] == "access"
         assert "iat" in payload
         assert "exp" in payload
 
@@ -151,10 +153,30 @@ def test_current_user_rejects_expired_token():
                 "sub": "1",
                 "iat": 1,
                 "exp": 1,
+                "purpose": "access",
             },
             JWT_SECRET_KEY,
             algorithm=JWT_ALGORITHM,
         )
+
+        response = client.get(
+            "/api/v1/users/me",
+            headers={
+                "Authorization": f"Bearer {token}",
+            },
+        )
+
+        assert response.status_code == 401
+
+    finally:
+        clean_user()
+
+
+def test_current_user_rejects_password_reset_token():
+    user_id = create_test_user()
+
+    try:
+        token = create_password_reset_token(user_id)
 
         response = client.get(
             "/api/v1/users/me",
