@@ -18,7 +18,7 @@ def normalize(payload):
 
 def load_symbols(path,master):
     wanted=[x.strip().upper() for x in Path(path).read_text(encoding='utf-8').splitlines() if x.strip() and not x.strip().startswith('#')]
-    with Path(master).open(newline='',encoding='utf-8-sig') as f: rows=csv.DictReader(f); records=list(rows)
+    with Path(master).open(newline='',encoding='utf-8-sig') as f: records=list(csv.DictReader(f))
     by={}
     for r in records:
         if r.get('EXCH_ID')=='NSE' and r.get('SEGMENT')=='E' and r.get('INSTRUMENT')=='EQUITY':
@@ -34,19 +34,15 @@ def main():
     cid=os.environ.get('DHAN_CLIENT_ID');token=os.environ.get('DHAN_ACCESS_TOKEN')
     if not cid or not token:raise SystemExit('Set DHAN_CLIENT_ID and DHAN_ACCESS_TOKEN before downloading equity research data.')
     start=date.fromisoformat(a.from_date);end=date.fromisoformat(a.to_date)
-    symbols=load_symbols(a.symbols_file,a.master);windows=chunk_date_range(start,end,90);dataset=f'equity_nse_discovery_{a.interval}m'
-    client=DhanClient(cid,token)
+    symbols=load_symbols(a.symbols_file,a.master);windows=chunk_date_range(start,end,90);dataset=f'equity_nse_discovery_{a.interval}m';client=DhanClient(cid,token)
     with ResearchDataCache(a.db) as cache:
         cache.dataset(dataset,'Dhan',a.interval,a.from_date,a.to_date,{'exchange':'NSE_EQ','instrument':'EQUITY','symbols':[s for s,_ in symbols],'universe_type':'liquid discovery universe; survivorship-biased until historical membership is added','fields':['OHLC','VOLUME']})
-        total=len(symbols)*len(windows);done=0
-        print(f'Dataset: {dataset} | symbols={len(symbols)} | windows={len(windows)} | requests={total}')
-        for si,(symbol,sid) in enumerate(symbols,1):
-            for wi,w in enumerate(windows,1):
-                key=f'{symbol}:{w.start}:{w.end}'
-                done+=1
+        total=len(symbols)*len(windows);done=0;print(f'Dataset: {dataset} | symbols={len(symbols)} | windows={len(windows)} | requests={total}')
+        for symbol,sid in symbols:
+            for w in windows:
+                key=f'{symbol}:{w.start}:{w.end}';done+=1
                 if cache.done(dataset,key):print(f'[{done}/{total}] cached {symbol} {w.start}->{w.end}');continue
                 print(f'[{done}/{total}] {symbol} ({sid}) {w.start}->{w.end}')
-                payload=client.historical_intraday(sid,'NSE_EQ','EQUITY',a.interval,w.start.isoformat(),w.end.isoformat(),oi=False,expiry_code=0)
-                rows=normalize(payload);cache.put_equity(dataset,symbol,rows);cache.mark_done(dataset,key);print(f'  bars={len(rows)} cache={cache.counts()}')
-        print('EQUITY DOWNLOAD COMPLETE');print(cache.counts())
+                rows=normalize(client.historical_intraday(sid,'NSE_EQ','EQUITY',a.interval,w.start.isoformat(),w.end.isoformat(),oi=False,expiry_code=0));cache.put_equity(dataset,symbol,rows);cache.mark_done(dataset,key);print(f'  bars={len(rows)} equity_cache_rows={cache.equity_counts(dataset)}')
+        print('EQUITY DOWNLOAD COMPLETE');print({'equity_rows':cache.equity_counts(dataset),'base_counts':cache.counts()})
 if __name__=='__main__':main()
