@@ -106,8 +106,6 @@ def family_fold_metrics(family, candidates, groups, timestamps, horizon, frictio
                 if start <= ts < end:
                     fold_returns[idx].append((ts, value))
                     break
-    # Combine simultaneous strike variants by timestamp so one market event is not
-    # counted once per strike. This mirrors the V5 family aggregation rule.
     result = []
     for values in fold_returns:
         by_ts = {}
@@ -122,12 +120,16 @@ def make_folds(all_timestamps, count=4):
     unique = sorted(set(all_timestamps))
     if not unique:
         return []
+    count = max(1, min(int(count), len(unique)))
     folds = []
     n = len(unique)
     for i in range(count):
         lo = unique[(i * n) // count]
-        hi = unique[((i + 1) * n) // count] if i < count - 1 else unique[-1] + "\uffff"
-        folds.append((lo, hi))
+        if i < count - 1:
+            hi = unique[((i + 1) * n) // count]
+        else:
+            hi = unique[-1]
+        folds.append((lo, hi, i == count - 1))
     return folds
 
 
@@ -212,7 +214,7 @@ def main():
         print(f"OPTION FAMILY V6: {family} base10_median={base['median_expectancy']:.6f} worst={base['worst_expectancy']:.6f} worstPF={base['worst_profit_factor']} stress15_median={stress['median_expectancy']:.6f} positive15={stress['positive_fold_rate']:.2f} eligible={eligible} reasons={','.join(reasons) if reasons else 'NONE'}", flush=True)
 
     report = {
-        "methodology": {"folds": a.folds, "horizon_bars": a.horizon, "base_friction_bps": 10.0, "stress_friction_bps": [15.0, 20.0], "selection_note": "V5 eligibility is fixed input; V6 is a temporal stability and cost-sensitivity audit, not a new discovery pass."},
+        "methodology": {"folds": len(folds), "horizon_bars": a.horizon, "base_friction_bps": 10.0, "stress_friction_bps": [15.0, 20.0], "selection_note": "V5 eligibility is fixed input; V6 is a temporal stability and cost-sensitivity audit, not a new discovery pass."},
         "families": len(results),
         "next_gate_count": sum(r["eligible_for_next_research_gate"] for r in results),
         "results": results,
