@@ -69,4 +69,16 @@ class DhanClient:
     def rolling_option(self, security_id: str, expiry_flag: str, expiry_code: int, strike: str, option_type: str, from_date: str, to_date: str, interval: str = "5"):
         if expiry_code not in (0, 1, 2):
             raise ValueError("rolling option expiry_code must be 0/1/2 (0=current/near, 1=next, 2=far expiry)")
-        return self._request("POST", "/charts/rollingoption", {"exchangeSegment": "NSE_FNO", "interval": interval, "securityId": security_id, "instrument": "OPTIDX", "expiryFlag": expiry_flag, "expiryCode": expiry_code, "strike": strike, "drvOptionType": option_type, "requiredData": ["open", "high", "low", "close", "iv", "volume", "strike", "oi", "spot"], "fromDate": from_date, "toDate": to_date})
+        payload = {"exchangeSegment": "NSE_FNO", "interval": interval, "securityId": security_id, "instrument": "OPTIDX", "expiryFlag": expiry_flag, "expiryCode": expiry_code, "strike": strike, "drvOptionType": option_type, "requiredData": ["open", "high", "low", "close", "iv", "volume", "strike", "oi", "spot"], "fromDate": from_date, "toDate": to_date}
+        try:
+            return self._request("POST", "/charts/rollingoption", payload)
+        except DhanAPIError as exc:
+            # Dhan's generic docs define 0 as near/current expiry, but the
+            # rollingoption endpoint currently rejects 0 with DH-905. For
+            # compatibility, retry near-expiry requests as code 1, which is
+            # the value verified against the live rolling endpoint.
+            if expiry_code == 0 and "DH-905" in str(exc) and "expiryCode" in str(exc):
+                fallback = dict(payload)
+                fallback["expiryCode"] = 1
+                return self._request("POST", "/charts/rollingoption", fallback)
+            raise
