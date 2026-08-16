@@ -24,10 +24,17 @@ def parse_name(name):
 
 
 def family_signature(name):
+    """Parse both V5 family keys (pe:premium_weak) and candidate names (pe:ATM+4:premium_weak)."""
     parts = name.split(":")
     side = parts[0]
-    conditions = parts[2].split("+") if len(parts) >= 3 else []
-    return side, tuple(sorted(c for c in conditions if c and c != "base"))
+    if len(parts) >= 3:
+        raw_conditions = parts[2].split("+")
+    elif len(parts) == 2:
+        raw_conditions = parts[1].split("+")
+    else:
+        raw_conditions = []
+    conditions = tuple(sorted(c for c in raw_conditions if c and c != "base"))
+    return side, conditions
 
 
 def enrich(rows):
@@ -83,7 +90,14 @@ def returns_for(rows, conditions, horizon, friction):
 def metric(values):
     vals = [x[1] for x in values]
     n, expectancy, win_rate, pf, total_return = _stats(vals)
-    return {"trades": n, "expectancy": expectancy, "win_rate": win_rate, "profit_factor": pf, "return": total_return, "drawdown": _drawdown(vals)}
+    return {
+        "trades": n,
+        "expectancy": expectancy,
+        "win_rate": win_rate,
+        "profit_factor": pf,
+        "return": total_return,
+        "drawdown": _drawdown(vals),
+    }
 
 
 def family_fold_metrics(family, candidates, groups, timestamps, horizon, friction):
