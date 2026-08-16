@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import argparse, json, math, sqlite3, time
-from collections import defaultdict
+import argparse, json, math, time
 
 
 def parse_args():
@@ -20,57 +19,65 @@ def family_name(x):
 
 
 def main():
-    a=parse_args(); t=time.time()
-    with open(a.input,encoding='utf-8') as f: src=json.load(f)
-    fams=[x for x in src.get('families',[]) if x.get('eligible')]
-    names=[family_name(x) for x in fams]
+    a=parse_args(); started=time.time()
+    with open(a.input,encoding='utf-8') as f:
+        src=json.load(f)
+    if not isinstance(src,dict):
+        raise SystemExit('V7 input must be a JSON object')
+
+    raw=src.get('results',[])
+    if not isinstance(raw,list):
+        raise SystemExit('V7 expected input.results to be a list')
+    fams=[r for r in raw if r.get('eligible_for_next_research_gate')]
+    names=[family_name(r) for r in fams]
     print(f'OPTION FAMILY V7: V6 eligible families={len(fams)} {names}',flush=True)
 
-    con=sqlite3.connect(a.db); con.row_factory=sqlite3.Row
-    # Discover the actual option table/columns without assuming a fixed schema.
-    tables=[r[0] for r in con.execute("select name from sqlite_master where type='table'")]
-    candidates=[t for t in tables if 'option' in t.lower()]
-    print(f'OPTION FAMILY V7: option tables={candidates}',flush=True)
-    rows=[]
-    for table in candidates:
-        cols=[r[1] for r in con.execute(f'pragma table_info("{table}")')]
-        lc={c.lower():c for c in cols}
-        ts=next((lc[k] for k in ('timestamp','ts','datetime','bar_timestamp') if k in lc),None)
-        ret=next((lc[k] for k in ('return','ret','pnl','forward_return') if k in lc),None)
-        fam=next((lc[k] for k in ('family','strategy_family') if k in lc),None)
-        if ts and ret:
-            q=f'select "{ts}" as ts,"{ret}" as ret'+(f',"{fam}" as family' if fam else '')+f' from "{table}"'
-            try: rows.extend(dict(r) for r in con.execute(q))
-            except sqlite3.Error: pass
-    con.close()
-
-    print(f'OPTION FAMILY V7: discovered audit rows={len(rows)}',flush=True)
-    # If the V6 artifact contains fold metrics, perform an artifact-level robustness audit.
     results=[]
-    for i,f in enumerate(fams,1):
-        name=family_name(f)
-        folds=f.get('folds') or f.get('fold_metrics') or []
-        vals=[]
-        if isinstance(folds,dict): folds=list(folds.values())
-        for z in folds:
-            if isinstance(z,dict):
-                for k in ('expectancy','median_expectancy','final_expectancy','base10','stress15'):
-                    if isinstance(z.get(k),(int,float)) and math.isfinite(z[k]): vals.append(float(z[k])); break
-        base=float(f.get('base10_median',0) or 0); stress=float(f.get('stress15_median',0) or 0)
-        worst=float(f.get('worst',0) or 0); pf=f.get('worstPF')
-        score=min(base,stress,worst)
-        results.append({'family':name,'base10_median':base,'stress15_median':stress,'worst_fold':worst,'worst_pf':pf,'fold_values':vals,'robust_score':score})
-        print(f'OPTION FAMILY V7: {i}/{len(fams)} {name} base={base:.6f} stress={stress:.6f} worst={worst:.6f} PF={pf}',flush=True)
+    for i,row in enumerate(fams,1):
+        name=family_name(row)
+        sensitivity=row.get('cost_sensitivity') or {}
+        base=sensitivity.get('10') or {}
+        stress=sensitivity.get('15') or {}
+        stress20=sensitivity.get('20') or {}
+        base_folds=base.get('folds') or []
+        vals=[float(x.get('expectancy')) for x in base_folds if isinstance(x,dict) and isinstance(x.get('expectancy'),(int,float)) and math.isfinite(x.get('expectancy'))]
+        worst=min(vals) if vals else 0.0
+        pfs=[float(x.get('profit_factor')) for x in base_folds if isinstance(x,dict) and isinstance(x.get('profit_factor'),(int,float)) and math.isfinite(x.get('profit_factor'))]
+        worst_pf=min(pfs) if pfs else None
+        base_median=float(base.get('median_expectancy') or 0.0)
+        stress_median=float(stress.get('median_expectancy') or 0.0)
+        stress20_median=float(stress20.get('median_expectancy') or 0.0)
+        robust_score=min(base_median,stress_median,worst)
+        result={
+            'family':name,
+            'v6_eligible':True,
+            'base10_median':base_median,
+            'stress15_median':stress_median,
+            'stress20_median':stress20_median,
+            'worst_fold_expectancy':worst,
+            'worst_fold_profit_factor':worst_pf,
+            'fold_values':vals,
+            'robust_score':robust_score,
+            'v6_rejection_reasons':row.get('rejection_reasons',[]),
+        }
+        results.append(result)
+        print(f'OPTION FAMILY V7: {i}/{len(fams)} {name} base10={base_median:.6f} stress15={stress_median:.6f} stress20={stress20_median:.6f} worst={worst:.6f} worstPF={worst_pf} score={robust_score:.6f}',flush=True)
 
-    # Correlation/overlap cannot be safely inferred if event-level rows are not exposed by V6.
-    # Mark it explicitly as pending rather than fabricating a result.
-    out={'version':'v7','source':'option_family_v6.json','families':results,
-         'deduplication':{'status':'pending_event_level_data','reason':'V6 artifact contains family-level fold metrics, not per-signal timestamps'},
-         'drawdown':{'status':'pending_event_level_data'},
-         'regime_concentration':{'status':'pending_event_level_data'},
-         'next_gate':sum(1 for r in results if r['robust_score']>0 and (r['worst_pf'] or 0)>1.05),
-         'elapsed_seconds':round(time.time()-t,2)}
-    with open(a.out,'w',encoding='utf-8') as f: json.dump(out,f,indent=2)
+    out={
+        'version':'v7',
+        'source':'option_family_v6.json',
+        'families':len(results),
+        'results':results,
+        'deduplication':{'status':'pending_event_level_data','reason':'V6 artifact contains family-level fold metrics, not per-signal timestamps'},
+        'drawdown':{'status':'pending_event_level_data'},
+        'regime_concentration':{'status':'pending_event_level_data'},
+        'next_gate':sum(1 for r in results if r['robust_score']>0 and (r['worst_fold_profit_factor'] or 0)>1.05),
+        'promotion_status':'RESEARCH_ONLY_NO_PAPER_TRADING',
+        'elapsed_seconds':round(time.time()-started,2),
+    }
+    with open(a.out,'w',encoding='utf-8') as f:
+        json.dump(out,f,indent=2)
     print(json.dumps({'families':len(results),'next_gate':out['next_gate'],'out':a.out,'elapsed_seconds':out['elapsed_seconds']}),flush=True)
 
-if __name__=='__main__': main()
+if __name__=='__main__':
+    main()
