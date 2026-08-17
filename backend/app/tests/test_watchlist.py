@@ -1,11 +1,8 @@
-﻿from unittest.mock import patch
-
 from fastapi.testclient import TestClient
 
 from main import app
 
 from app.db.database import SessionLocal
-from app.models.watchlist import Watchlist
 from app.models.user import User
 from app.providers.market_search import SearchInstrument
 from app.services.auth_service import hash_password
@@ -18,19 +15,11 @@ PASSWORD = "TestPassword123!"
 
 
 def create_user():
-
     db = SessionLocal()
-
     try:
-
-        user = (
-            db.query(User)
-            .filter(User.email == EMAIL)
-            .first()
-        )
+        user = db.query(User).filter(User.email == EMAIL).first()
         if user:
             return user
-
         user = User(
             full_name="Watchlist Test User",
             email=EMAIL,
@@ -47,17 +36,13 @@ def create_user():
 def headers():
     response = client.post(
         "/api/v1/auth/login",
-        json={
-            "email": EMAIL,
-            "password": PASSWORD,
-        },
+        json={"email": EMAIL, "password": PASSWORD},
     )
     assert response.status_code == 200, response.text
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
 
 def test_add_and_list_watchlist(monkeypatch):
-
     create_user()
     monkeypatch.setattr(
         "app.services.instrument_service._search_provider.search",
@@ -72,56 +57,50 @@ def test_add_and_list_watchlist(monkeypatch):
 
     response = client.post(
         "/api/v1/watchlist",
-        json={
-            "symbol": "reliance",
-        },
+        json={"symbol": "reliance"},
         headers=headers(),
     )
 
     assert response.status_code == 201
     assert response.json()["symbol"] == "RELIANCE"
 
-    response = client.get(
-        "/api/v1/watchlist",
-        headers=headers(),
-    )
+    response = client.get("/api/v1/watchlist", headers=headers())
 
     assert response.status_code == 200
-
     data = response.json()
-
     assert len(data) == 1
     assert data[0]["symbol"] == "RELIANCE"
 
 
-def test_duplicate_watchlist_is_safe():
-
+def test_duplicate_watchlist_is_safe(monkeypatch):
     create_user()
+    monkeypatch.setattr(
+        "app.services.instrument_service._search_provider.search",
+        lambda query: [
+            SearchInstrument(
+                symbol="RELIANCE",
+                name="Reliance Industries Limited",
+                exchange="NSE",
+            )
+        ],
+    )
+
+    auth_headers = headers()
 
     response = client.post(
         "/api/v1/watchlist",
-        json={
-            "symbol": "reliance",
-        },
-        headers=headers(),
+        json={"symbol": "reliance"},
+        headers=auth_headers,
     )
-
     assert response.status_code == 201
 
     response = client.post(
         "/api/v1/watchlist",
-        json={
-            "symbol": "reliance",
-        },
-        headers=headers(),
+        json={"symbol": "reliance"},
+        headers=auth_headers,
     )
-
     assert response.status_code == 201
 
-    response = client.get(
-        "/api/v1/watchlist",
-        headers=headers(),
-    )
-
+    response = client.get("/api/v1/watchlist", headers=auth_headers)
     assert response.status_code == 200
     assert len(response.json()) == 1
