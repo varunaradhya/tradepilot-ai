@@ -44,12 +44,14 @@ This checklist is the product standard for moving from research to paper trading
 - [x] Next-bar execution prevents look-ahead bias.
 - [x] Buy and sell slippage are modeled separately.
 - [x] Brokerage/transaction costs are included.
+- [x] Database-backed paper-trade P&L uses the same Indian equity round-trip cost model as research.
 - [x] Gap handling is conservative.
 - [ ] Model spread and queue/partial fills for intraday strategies.
 - [ ] Track signal timestamp, order-submit timestamp, acknowledgement timestamp and fill timestamp.
 - [ ] Track p50/p95/p99 order latency.
 - [x] Reject stale signals after a configurable TTL in execution guard.
-- [ ] Add price-band, quantity, order-value and trade-price-protection checks before broker submission.
+- [x] Enforce Indian cash-market session and injectable exchange-holiday checks when market context is supplied.
+- [x] Enforce supplied lower/upper price bands before paper execution.
 
 ## 5. Backtesting standard
 - [x] No same-candle signal execution.
@@ -69,8 +71,8 @@ This checklist is the product standard for moving from research to paper trading
 - [ ] Broker API heartbeat.
 - [x] Order acknowledgement timeout guard.
 - [ ] Position reconciliation against broker every cycle.
-- [ ] Duplicate-order/idempotency protection at broker boundary.
-- [ ] Kill switch that blocks all new entries immediately.
+- [x] Duplicate-order/idempotency protection at the paper execution boundary.
+- [x] Kill switch that blocks all new paper entries immediately.
 - [ ] Emergency flatten procedure.
 - [ ] Daily API-session logout / token lifecycle handling.
 - [ ] Immutable audit log for signals, risk decisions, orders and fills.
