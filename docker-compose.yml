@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: tradepilot
       POSTGRES_USER: tradepilot
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-before-deployment}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set-in-your-environment}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -16,11 +16,11 @@ services:
   backend:
     build: ./backend
     environment:
-      TRADEPILOT_DATABASE_URL: postgresql+psycopg://tradepilot:${POSTGRES_PASSWORD:-change-me-before-deployment}@database:5432/tradepilot
+      TRADEPILOT_DATABASE_URL: postgresql+psycopg://tradepilot:${POSTGRES_PASSWORD:?set-in-your-environment}@database:5432/tradepilot
       TRADEPILOT_AUTO_CREATE_SCHEMA: "false"
       TRADEPILOT_JWT_SECRET: ${TRADEPILOT_JWT_SECRET:?set-in-your-environment}
       TRADEPILOT_BROKER_ENCRYPTION_KEY: ${TRADEPILOT_BROKER_ENCRYPTION_KEY:?set-in-your-environment}
-      TRADEPILOT_CORS_ORIGINS: ${TRADEPILOT_CORS_ORIGINS:-http://localhost:8080}
+      TRADEPILOT_CORS_ORIGINS: ${TRADEPILOT_CORS_ORIGINS:?set-in-your-environment}
       TRADEPILOT_AI_PROVIDER: ${TRADEPILOT_AI_PROVIDER:-mock}
       TRADEPILOT_AI_API_KEY: ${TRADEPILOT_AI_API_KEY:-}
       TRADEPILOT_AI_BASE_URL: ${TRADEPILOT_AI_BASE_URL:-}
@@ -30,14 +30,20 @@ services:
         condition: service_healthy
     ports:
       - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   frontend:
     build:
       context: ./frontend
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000/api/v1}
+        VITE_API_URL: ${VITE_API_URL:?set-in-your-environment}
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
       - "8080:80"
 
