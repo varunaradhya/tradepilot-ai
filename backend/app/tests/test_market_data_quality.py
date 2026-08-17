@@ -59,7 +59,8 @@ def test_market_data_quality_rejects_weekend_data():
 
 
 def test_market_data_quality_rejects_outside_session():
-    rows = [_bar(0, hour=8)]
+    # 03:00 UTC = 08:30 IST, before the cash session.
+    rows = [_bar(0, hour=3)]
     result = validate_intraday_candles(rows, stale_after_minutes=99999)
     assert result.valid is False
     assert result.outside_session == 1
