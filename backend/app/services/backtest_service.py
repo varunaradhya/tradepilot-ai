@@ -76,13 +76,16 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
         if min(open_price, close, high, low) <= 0 or low > high:
             continue
 
+        # Execute a signal generated only from candles that completed before this bar.
         if quantity == 0 and pending_signal is not None and not halted and daily_trades < config.max_trades_per_day:
             signal = pending_signal
             pending_signal = None
             actual_entry = _buy_fill(open_price, config.slippage_rate)
             actual_stop = float(signal.stop)
             actual_target = float(signal.target)
-            size = position_size(cash, actual_entry, actual_stop, config.strategy)
+            planned_entry = float(signal.entry) if signal.entry else actual_entry
+            sizing_entry = actual_entry if actual_entry > actual_stop else planned_entry
+            size = position_size(cash, sizing_entry, actual_stop, config.strategy)
             if size > 0:
                 entry_cost = size * actual_entry * config.brokerage_rate
                 total_entry_cash = size * actual_entry + entry_cost
@@ -92,7 +95,7 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
                     entry_price = actual_entry
                     stop = actual_stop
                     target = actual_target
-                    initial_risk = actual_entry - actual_stop
+                    initial_risk = max(0.0, planned_entry - actual_stop)
                     high_watermark = actual_entry
                     holding_bars = 1
                     daily_trades += 1
@@ -107,6 +110,8 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
             exit_price = None
             exit_reason = None
             high_watermark = max(high_watermark, high)
+            # Conservative OHLC assumption: when stop and target are both touched,
+            # stop is evaluated first because intrabar ordering is unknowable.
             if open_price <= stop:
                 exit_price, exit_reason = _sell_fill(open_price, config.slippage_rate), "STOP_GAP"
             elif open_price >= target:
@@ -141,8 +146,10 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
             halted = True
             pending_signal = None
 
+        # Generate the next signal from completed bars only. There must be a following
+        # candle available for execution, preventing same-candle look-ahead.
         if quantity == 0 and pending_signal is None and not halted and daily_trades < config.max_trades_per_day and i >= 60:
-            history = rows[: i + 1]
+            history = rows[:i]
             closes = [float(x["close"]) for x in history]
             highs = [float(x["high"]) for x in history]
             lows = [float(x["low"]) for x in history]
@@ -172,9 +179,7 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
     if not trades:
         expectancy = 0.0
     else:
-        win_expectancy = (sum(wins) / len(trades)) if wins else 0.0
-        loss_expectancy = (sum(losses) / len(trades)) if losses else 0.0
-        expectancy = win_expectancy + loss_expectancy
+        expectancy = ((sum(wins) if wins else 0.0) + (sum(losses) if losses else 0.0)) / len(trades)
 
     return {
         "initial_capital": round(config.initial_capital, 2),

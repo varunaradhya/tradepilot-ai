@@ -79,38 +79,28 @@ def generate_regime_momentum_signal(
     reasons: list[str] = []
     score = 0.0
 
-    trend_ok = price > fast > slow
-    breakout_ok = price > prior_high
-    volatility_ok = config.min_atr_percent <= atr_percent <= config.max_atr_percent
-    rsi_ok = config.rsi_min <= momentum_rsi <= config.rsi_max
-    rsi_low = momentum_rsi < config.rsi_min
-
-    if trend_ok:
-        score += 30
-        reasons.append("UPTREND")
-    else:
+    if price <= fast or fast <= slow:
         return Signal("NEUTRAL", score, None, None, None, ("TREND_FILTER_FAILED",))
+    score += 30
+    reasons.append("UPTREND")
 
-    # A high RSI is not automatically a rejection during a confirmed breakout:
-    # strong momentum can legitimately push RSI above the normal swing range.
-    # A low RSI remains a hard rejection because it contradicts the momentum thesis.
-    if rsi_ok:
+    # RSI is a confirmation score rather than an early hard rejection. This lets
+    # later hard risk gates (volatility/RR) explain the actual reason a setup fails,
+    # while still rewarding healthy momentum and explicitly flagging weak momentum.
+    if config.rsi_min <= momentum_rsi <= config.rsi_max:
         score += 20
         reasons.append("MOMENTUM_HEALTHY")
-    elif rsi_low:
-        return Signal("NEUTRAL", score, None, None, None, ("RSI_FILTER_FAILED",))
-    elif breakout_ok:
-        reasons.append("MOMENTUM_OVERBOUGHT_BREAKOUT")
+    elif momentum_rsi > config.rsi_max:
+        reasons.append("MOMENTUM_OVERBOUGHT")
     else:
-        return Signal("NEUTRAL", score, None, None, None, ("RSI_FILTER_FAILED",))
+        reasons.append("MOMENTUM_WEAK")
 
-    if breakout_ok:
-        score += 30
-        reasons.append("BREAKOUT")
-    else:
+    if price <= prior_high:
         return Signal("NEUTRAL", score, None, None, None, ("BREAKOUT_FILTER_FAILED",))
+    score += 30
+    reasons.append("BREAKOUT")
 
-    if not volatility_ok:
+    if not (config.min_atr_percent <= atr_percent <= config.max_atr_percent):
         return Signal("NEUTRAL", score, None, None, None, ("VOLATILITY_FILTER_FAILED",))
     reasons.append("VOLATILITY_OK")
 
