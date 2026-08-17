@@ -169,7 +169,13 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
         if peak:
             max_drawdown = max(max_drawdown, (peak - value) / peak * 100)
 
-    expectancy = ((sum(wins) / len(wins)) * (len(wins) / len(trades)) + (sum(losses) / len(losses)) * (len(losses) / len(trades))) if trades else 0.0
+    if not trades:
+        expectancy = 0.0
+    else:
+        win_expectancy = (sum(wins) / len(trades)) if wins else 0.0
+        loss_expectancy = (sum(losses) / len(trades)) if losses else 0.0
+        expectancy = win_expectancy + loss_expectancy
+
     return {
         "initial_capital": round(config.initial_capital, 2),
         "ending_capital": round(ending, 2),

@@ -31,12 +31,13 @@ class IndianEquityCostModel:
         gst_base = brokerage + exchange + sebi
         gst = gst_base * self.gst_rate
         slippage = trade_value * self.slippage_rate
-        total = brokerage + exchange + sebi + stt + gst + slippage
-        return {
+        rounded = {
             "brokerage": round(brokerage, 2), "exchange_charges": round(exchange, 2),
             "sebi_charges": round(sebi, 2), "stt": round(stt, 2), "stamp_duty": 0.0,
-            "ipft": 0.0, "gst": round(gst, 2), "slippage": round(slippage, 2), "total": round(total, 2),
+            "ipft": 0.0, "gst": round(gst, 2), "slippage": round(slippage, 2),
         }
+        rounded["total"] = round(sum(rounded.values()), 2)
+        return rounded
 
     def estimate_round_trip(self, buy_value: float, sell_value: float) -> dict:
         buy = self.estimate_order(buy_value, side="BUY", include_stt=False)

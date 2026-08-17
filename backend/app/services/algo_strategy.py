@@ -79,25 +79,38 @@ def generate_regime_momentum_signal(
     reasons: list[str] = []
     score = 0.0
 
-    if price > fast > slow:
+    trend_ok = price > fast > slow
+    breakout_ok = price > prior_high
+    volatility_ok = config.min_atr_percent <= atr_percent <= config.max_atr_percent
+    rsi_ok = config.rsi_min <= momentum_rsi <= config.rsi_max
+    rsi_low = momentum_rsi < config.rsi_min
+
+    if trend_ok:
         score += 30
         reasons.append("UPTREND")
     else:
         return Signal("NEUTRAL", score, None, None, None, ("TREND_FILTER_FAILED",))
 
-    if config.rsi_min <= momentum_rsi <= config.rsi_max:
+    # A high RSI is not automatically a rejection during a confirmed breakout:
+    # strong momentum can legitimately push RSI above the normal swing range.
+    # A low RSI remains a hard rejection because it contradicts the momentum thesis.
+    if rsi_ok:
         score += 20
         reasons.append("MOMENTUM_HEALTHY")
+    elif rsi_low:
+        return Signal("NEUTRAL", score, None, None, None, ("RSI_FILTER_FAILED",))
+    elif breakout_ok:
+        reasons.append("MOMENTUM_OVERBOUGHT_BREAKOUT")
     else:
         return Signal("NEUTRAL", score, None, None, None, ("RSI_FILTER_FAILED",))
 
-    if price > prior_high:
+    if breakout_ok:
         score += 30
         reasons.append("BREAKOUT")
     else:
         return Signal("NEUTRAL", score, None, None, None, ("BREAKOUT_FILTER_FAILED",))
 
-    if not (config.min_atr_percent <= atr_percent <= config.max_atr_percent):
+    if not volatility_ok:
         return Signal("NEUTRAL", score, None, None, None, ("VOLATILITY_FILTER_FAILED",))
     reasons.append("VOLATILITY_OK")
 
