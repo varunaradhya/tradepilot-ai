@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import floor
 from typing import Any
 
-from app.services.indian_costs import IndianFnoOptionCostModel
+from app.services.indian_costs import IndianEquityCostModel, IndianFnoOptionCostModel
 
 
 @dataclass(frozen=True)
@@ -19,11 +18,16 @@ class PaperRiskConfig:
     trailing_activation_pct: float = 0.01
     max_holding_bars: int = 24
     use_trailing_stop: bool = True
-    cost_model: IndianFnoOptionCostModel | None = None
+    cost_model: IndianEquityCostModel | IndianFnoOptionCostModel | None = None
 
 
 class PaperTradingEngine:
-    """Deterministic simulation-only ledger. It never sends broker orders."""
+    """Deterministic simulation-only ledger. It never sends broker orders.
+
+    Equity paper trading uses the equity cost model by default. F&O callers can
+    explicitly pass IndianFnoOptionCostModel through PaperRiskConfig; an options
+    fee schedule must never silently contaminate equity P&L.
+    """
 
     def __init__(self, config: PaperRiskConfig = PaperRiskConfig()):
         if config.trade_direction not in {"LONG_ONLY", "LONG_SHORT"}: raise ValueError("trade_direction must be LONG_ONLY or LONG_SHORT")
@@ -33,7 +37,7 @@ class PaperTradingEngine:
         if not 0 <= config.trailing_stop_pct < 1: raise ValueError("trailing_stop_pct must be between 0 and 1")
         if not 0 <= config.trailing_activation_pct < 1: raise ValueError("trailing_activation_pct must be between 0 and 1")
         self.config = config
-        self.cost_model = config.cost_model or IndianFnoOptionCostModel()
+        self.cost_model = config.cost_model or IndianEquityCostModel()
         self.cash = config.initial_capital; self.realized_pnl = 0.0; self.day_pnl = 0.0; self.day = None
         self.position: dict[str, Any] | None = None; self.trades: list[dict[str, Any]] = []; self.halted = False
 
@@ -79,7 +83,8 @@ class PaperTradingEngine:
                  "brokerage": p["entry_costs"]["brokerage"] + exit_costs["brokerage"], "stt": p["entry_costs"].get("stt", 0.0) + exit_costs.get("stt", 0.0),
                  "exchange_charges": p["entry_costs"]["exchange_charges"] + exit_costs["exchange_charges"], "sebi_charges": p["entry_costs"]["sebi_charges"] + exit_costs["sebi_charges"],
                  "stamp_duty": p["entry_costs"]["stamp_duty"] + exit_costs["stamp_duty"], "ipft": p["entry_costs"]["ipft"] + exit_costs["ipft"],
-                 "gst": p["entry_costs"]["gst"] + exit_costs["gst"], "total_charges": total_costs, "net_pnl": net_pnl, "pnl": net_pnl,
+                 "gst": p["entry_costs"]["gst"] + exit_costs["gst"], "slippage": p["entry_costs"].get("slippage", 0.0) + exit_costs.get("slippage", 0.0),
+                 "total_charges": total_costs, "net_pnl": net_pnl, "pnl": net_pnl,
                  "reason": reason, "exit_reason": "STOP_LOSS" if reason == "STOP" else reason, "direction": p["direction"], "bars_held": p["bars_held"]}
         self.trades.append(trade); self.position = None
         if self.day_pnl <= -(self.config.initial_capital * self.config.max_daily_loss): self.halted = True
