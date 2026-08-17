@@ -47,7 +47,7 @@ def test_daily_history_normalizes_dhan_columnar_response():
     assert client.calls[0][1]["security_id"] == "1333"
 
 
-def test_intraday_history_chunks_requests_at_90_days():
+def test_intraday_history_chunks_requests_at_90_days_without_overlap():
     client = FakeDhanClient([payload(count=1), payload(start=1704153600, count=1)])
     bars, diagnostics = fetch_intraday_history(
         client,
@@ -58,12 +58,13 @@ def test_intraday_history_chunks_requests_at_90_days():
 
     assert len(client.calls) == 2
     assert client.calls[0][1]["from_date"] == "2024-01-01"
-    assert client.calls[0][1]["to_date"] == "2024-03-31"
+    assert client.calls[0][1]["to_date"] == "2024-03-30"
+    assert client.calls[1][1]["from_date"] == "2024-03-31"
     assert diagnostics["bars"] == 2
     assert len(bars) == 2
 
 
-def test_intraday_history_deduplicates_overlapping_chunk_boundary():
+def test_intraday_history_deduplicates_provider_repeated_boundary():
     boundary = 1704067200
     client = FakeDhanClient([
         payload(start=boundary, count=2),
