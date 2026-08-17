@@ -32,28 +32,12 @@ type StockSearchProps = {
 
 function localFallback(query: string): StockInstrument[] {
   const normalized = query.trim().toLowerCase();
-  const local = POPULAR_INDIAN_STOCKS.filter(
+  if (!normalized) return POPULAR_INDIAN_STOCKS.slice(0, 8);
+  return POPULAR_INDIAN_STOCKS.filter(
     (item) =>
       item.symbol.toLowerCase().includes(normalized) ||
       item.name.toLowerCase().includes(normalized),
   ).slice(0, 8);
-
-  // Do not make the UI appear to know the whole NSE universe from a tiny
-  // hard-coded list. If live search is unavailable and the user typed what
-  // looks like a symbol, keep that exact NSE symbol selectable. The backend
-  // remains authoritative and validates it before a quote/watchlist action.
-  if (/^[A-Za-z0-9&._-]+$/.test(query.trim())) {
-    const symbol = query.trim().toUpperCase().replace(/\.(NS|BO)$/i, "");
-    if (symbol && !local.some((item) => item.symbol === symbol)) {
-      local.unshift({
-        symbol,
-        name: "Exact NSE symbol · validate on selection",
-        exchange: "NSE",
-      });
-    }
-  }
-
-  return local.slice(0, 8);
 }
 
 export default function StockSearch({
@@ -171,7 +155,7 @@ export default function StockSearch({
           {loading && <div className="px-4 py-3 text-sm text-slate-500">Searching Indian stocks…</div>}
           {!loading && matches.length === 0 && (
             <div className="px-4 py-3 text-sm text-slate-500">
-              No Indian stock found for “{query}”. You can still type an exact NSE symbol and submit it.
+              No Indian stock found for “{query}”. You can type the exact NSE symbol and use Search Indian Stock; the backend will validate it.
             </div>
           )}
           {!loading &&
@@ -200,7 +184,7 @@ export default function StockSearch({
             ))}
           {searchError && (
             <div className="border-t px-4 py-2 text-xs text-amber-700">
-              Live search unavailable; showing local matches or the exact symbol you typed. The backend validates the Indian listing before use.
+              Live search unavailable; showing only verified local suggestions. Exact symbols can still be submitted through the Search Indian Stock button and are validated by the backend.
             </div>
           )}
         </div>
