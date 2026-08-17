@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Sequence
 
 from app.services.algo_strategy import StrategyConfig, generate_regime_momentum_signal, position_size
+from app.services.technical_service import atr
 
 
 @dataclass(frozen=True)
@@ -39,6 +40,7 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
     entry_price = stop = target = 0.0
     initial_risk = 0.0
     high_watermark = 0.0
+    holding_bars = 0
     pending_signal = None
     trades: list[dict] = []
     equity_curve: list[float] = []
@@ -48,15 +50,16 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
     halted = False
 
     def close_position(exit_price: float, reason: str, entry_cost: float) -> None:
-        nonlocal cash, quantity, entry_price, stop, target, initial_risk, high_watermark, daily_pnl
+        nonlocal cash, quantity, entry_price, stop, target, initial_risk, high_watermark, holding_bars, daily_pnl
         gross = quantity * exit_price
         exit_cost = gross * config.brokerage_rate
         pnl = quantity * (exit_price - entry_price) - entry_cost - exit_cost
         cash += gross - exit_cost
         daily_pnl += pnl
-        trades.append({"entry": entry_price, "exit": exit_price, "quantity": quantity, "pnl": pnl, "reason": reason})
+        trades.append({"entry": entry_price, "exit": exit_price, "quantity": quantity, "pnl": pnl, "reason": reason, "holding_bars": holding_bars})
         quantity = 0
         entry_price = stop = target = initial_risk = high_watermark = 0.0
+        holding_bars = 0
 
     for i, row in enumerate(rows):
         session = row.get("date") or row.get("timestamp") or "BACKTEST"
@@ -91,6 +94,7 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
                     target = actual_target
                     initial_risk = actual_entry - actual_stop
                     high_watermark = actual_entry
+                    holding_bars = 1
                     daily_trades += 1
                     if open_price <= stop:
                         close_position(_sell_fill(open_price, config.slippage_rate), "STOP_GAP", entry_cost)
@@ -98,6 +102,8 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
                         close_position(_sell_fill(open_price, config.slippage_rate), "TARGET_GAP", entry_cost)
 
         if quantity:
+            if holding_bars > 1:
+                holding_bars += 1
             exit_price = None
             exit_reason = None
             high_watermark = max(high_watermark, high)
@@ -116,9 +122,18 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
         if quantity and config.trailing_stop_enabled:
             risk_unit = initial_risk
             if risk_unit > 0 and high_watermark >= entry_price + config.strategy.trailing_activation_r * risk_unit:
-                trailing = high_watermark - config.strategy.trailing_atr * max((high - low), entry_price * 0.001)
-                if trailing > stop:
-                    stop = min(trailing, target * 0.999)
+                history_highs = [float(x["high"]) for x in rows[: i + 1]]
+                history_lows = [float(x["low"]) for x in rows[: i + 1]]
+                history_closes = [float(x["close"]) for x in rows[: i + 1]]
+                current_atr = atr(history_highs, history_lows, history_closes, config.strategy.atr_period)
+                if current_atr and current_atr > 0:
+                    trailing = high_watermark - config.strategy.trailing_atr * current_atr
+                    if trailing > stop:
+                        stop = min(trailing, target * 0.999)
+
+        if quantity and config.strategy.max_holding_bars > 0 and holding_bars >= config.strategy.max_holding_bars:
+            entry_cost = quantity * entry_price * config.brokerage_rate
+            close_position(_sell_fill(close, config.slippage_rate), "MAX_HOLD", entry_cost)
 
         equity_curve.append(cash + quantity * close if quantity else cash)
 
