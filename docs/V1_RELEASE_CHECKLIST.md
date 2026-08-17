@@ -15,18 +15,29 @@
 - [x] Docker Compose stack
 - [x] CI workflow for backend tests and frontend build
 
-## Pre-paper-production checks
+## Phase 2 — Production paper trading
 
-- [ ] Configure PostgreSQL with a strong unique password
-- [ ] Configure a strong JWT secret
-- [ ] Configure the broker-encryption key from a real secret manager
+- [x] Production paper-trading runbook added
+- [ ] Provision managed PostgreSQL
+- [ ] Configure strong database password
+- [ ] Configure strong JWT secret
+- [ ] Configure broker-encryption key from a real secret manager
 - [ ] Restrict CORS to the deployed frontend origin
+- [ ] Deploy backend container
+- [ ] Deploy frontend
 - [ ] Confirm `/health` and `/ready` after deployment
 - [ ] Confirm paper mode is the only enabled execution mode
 - [ ] Confirm no broker credentials are present in source control or frontend bundles
-- [ ] Verify market-data provider rate limits and failure handling
-- [ ] Verify clock/timezone assumptions for the NSE trading session
-- [ ] Run a complete paper-trading session and reconcile trades
+- [ ] Connect Dhan for read-only account/market-data access
+- [ ] Verify NSE instrument lookup and live LTP
+- [ ] Verify paper position lifecycle using live LTP
+- [ ] Verify market-data rate limits and failure handling
+- [ ] Verify `Asia/Kolkata` / NSE trading-session assumptions
+- [ ] Run a complete paper-trading session
+- [ ] Reconcile paper trades, database state and market-data observations
+- [ ] Record strategy/data/operational evidence for promotion review
+
+See `docs/PHASE_2_PRODUCTION_PAPER_RUNBOOK.md` for the execution procedure.
 
 ## Strategy validation gate
 
