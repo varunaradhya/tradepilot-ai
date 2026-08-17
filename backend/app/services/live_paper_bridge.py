@@ -61,8 +61,6 @@ def mark_paper_position(
     stale = age > max_tick_age_seconds
 
     gross = (ltp - position.entry_price) * position.quantity
-    # Exit charges are supplied by the caller's existing charge model. This
-    # bridge intentionally does not invent brokerage/tax rates.
     estimated_exit = 0.0
     net = gross - position.entry_charges - estimated_exit
 
@@ -88,12 +86,18 @@ def mark_paper_position(
 
 
 def quote_payload_to_ltp(payload: dict[str, Any], symbol: str) -> float:
-    """Extract an LTP from normalized Dhan quote payloads.
-
-    Accepts either {symbol: {"last_price": ...}} or
-    {symbol: {"ltp": ...}} to keep the bridge independent of transport shape.
-    """
-    item = payload.get(symbol) or payload.get(symbol.upper())
+    """Extract an LTP from normalized Dhan quote payloads case-insensitively."""
+    wanted = symbol.strip().upper()
+    item = payload.get(symbol) or payload.get(wanted)
+    if not isinstance(item, dict):
+        item = next(
+            (
+                value
+                for key, value in payload.items()
+                if isinstance(key, str) and key.strip().upper() == wanted
+            ),
+            None,
+        )
     if not isinstance(item, dict):
         raise ValueError(f"missing quote for {symbol}")
     raw = item.get("last_price", item.get("ltp"))
