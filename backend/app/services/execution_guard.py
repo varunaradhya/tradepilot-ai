@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from app.services.broker_adapters import CanonicalOrder, get_broker_adapter
 from app.services.broker_capabilities import get_broker_capabilities, normalize_broker_name
+from app.services.market_execution_guard import MarketExecutionContext, validate_market_execution
 
 
 @dataclass
@@ -47,6 +48,7 @@ class ExecutionContext:
     max_order_value: float | None = None
     kill_switch_active: bool = False
     idempotency_key: str | None = None
+    market_execution: MarketExecutionContext | None = None
 
 
 @dataclass(frozen=True)
@@ -70,8 +72,6 @@ def authorize_order(
     if context.kill_switch_active or state.kill_switch_active:
         return ExecutionDecision(False, "KILL_SWITCH_ACTIVE", broker, mode)
 
-    # Explicit keys are idempotent. Legacy internal callers get a one-shot UUID
-    # so adding the safety gate does not silently break existing paper workflows.
     idempotency_key = context.idempotency_key or uuid4().hex
     if not state.authorize_idempotency_key(idempotency_key):
         return ExecutionDecision(False, "DUPLICATE_ORDER_INTENT", broker, mode)
@@ -96,6 +96,10 @@ def authorize_order(
         return ExecutionDecision(False, "STRATEGY_NOT_READY", broker, mode)
     if not context.risk_approved:
         return ExecutionDecision(False, "RISK_NOT_APPROVED", broker, mode)
+    if context.market_execution is not None:
+        market_decision = validate_market_execution(order.price, context.market_execution)
+        if not market_decision.allowed:
+            return ExecutionDecision(False, market_decision.reason, broker, mode)
     if context.max_quantity is not None and order.quantity > context.max_quantity:
         return ExecutionDecision(False, "QUANTITY_LIMIT_EXCEEDED", broker, mode)
     if context.max_order_value is not None:
