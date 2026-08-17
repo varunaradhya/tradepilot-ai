@@ -61,7 +61,6 @@ def simulate(events,initial,alloc,maxpos):
                 cash+=p['position_value']+p['pnl']; done.append(p)
             else: keep.append(p)
         active=keep; used=sum(p['position_value'] for p in active)
-        # One signal per timestamp, deterministic family rank, matching V11 policy.
         if by[ts]:
             c=sorted(by[ts],key=lambda x:(x['family_rank'],x['family'],x['strike_key']))[0]
             if len(active)>=maxpos or used+fixed>initial or cash<fixed:
@@ -76,8 +75,6 @@ def simulate(events,initial,alloc,maxpos):
 
 
 def build_events(groups,fam,horizon,friction,rank):
-    names=[]
-    for f in fam: names.extend(f.get('matched_candidate_names',[]))
     events=[]
     for f in fam:
         name=f['family']; side,cond=family_sig(name)
@@ -115,20 +112,17 @@ def main():
     horizons=[3,6,12,24]
     stress=[]
     for bps in costs:
-        ev=build_events(groups,fam,a.horizon,(bps)/10000,rank)
-        r=run_case(ev,a.initial_capital,a.allocation_pct,a.max_positions)
+        ev=build_events(groups,fam,a.horizon,bps/10000,rank); r=run_case(ev,a.initial_capital,a.allocation_pct,a.max_positions)
         stress.append({'cost_bps_total':bps,'trades':r['trades'],'expectancy':r['expectancy'],'profit_factor':r['profit_factor'],'return_pct':r['return_pct'],'max_drawdown_pct':r['max_drawdown_pct']})
         print(f"OPTION FAMILY V12: cost={bps}bps trades={r['trades']} return={r['return_pct']:.2%} PF={r['profit_factor']} DD={r['max_drawdown_pct']:.2%}",flush=True)
 
     horizon_results=[]
     for h in horizons:
-        ev=build_events(groups,fam,h,(a.cost_bps+a.slippage_bps)/10000,rank)
-        r=run_case(ev,a.initial_capital,a.allocation_pct,a.max_positions)
+        ev=build_events(groups,fam,h,(a.cost_bps+a.slippage_bps)/10000,rank); r=run_case(ev,a.initial_capital,a.allocation_pct,a.max_positions)
         horizon_results.append({'horizon_bars':h,'trades':r['trades'],'expectancy':r['expectancy'],'profit_factor':r['profit_factor'],'return_pct':r['return_pct'],'max_drawdown_pct':r['max_drawdown_pct']})
         print(f"OPTION FAMILY V12: horizon={h} trades={r['trades']} return={r['return_pct']:.2%} PF={r['profit_factor']} DD={r['max_drawdown_pct']:.2%}",flush=True)
 
-    allocation_results=[]
-    ev_base=build_events(groups,fam,a.horizon,(a.cost_bps+a.slippage_bps)/10000,rank)
+    allocation_results=[]; ev_base=build_events(groups,fam,a.horizon,(a.cost_bps+a.slippage_bps)/10000,rank); base_result=run_case(ev_base,a.initial_capital,a.allocation_pct,a.max_positions)
     for alloc in (.005,.01,.02,.05):
         r=run_case(ev_base,a.initial_capital,alloc,a.max_positions)
         allocation_results.append({'allocation_pct':alloc,'trades':r['trades'],'return_pct':r['return_pct'],'profit_factor':r['profit_factor'],'max_drawdown_pct':r['max_drawdown_pct'],'max_exposure_pct':r['max_exposure_pct']})
@@ -136,28 +130,20 @@ def main():
 
     ablation=[]
     for removed in names:
-        subset=[f for f in fam if f['family']!=removed]
-        subrank={n:i for i,n in enumerate([f['family'] for f in subset])}
-        ev=build_events(groups,subset,a.horizon,(a.cost_bps+a.slippage_bps)/10000,subrank)
-        r=run_case(ev,a.initial_capital,a.allocation_pct,a.max_positions)
+        subset=[f for f in fam if f['family']!=removed]; subrank={n:i for i,n in enumerate([f['family'] for f in subset])}
+        ev=build_events(groups,subset,a.horizon,(a.cost_bps+a.slippage_bps)/10000,subrank); r=run_case(ev,a.initial_capital,a.allocation_pct,a.max_positions)
         ablation.append({'removed_family':removed,'trades':r['trades'],'expectancy':r['expectancy'],'profit_factor':r['profit_factor'],'return_pct':r['return_pct'],'max_drawdown_pct':r['max_drawdown_pct']})
         print(f"OPTION FAMILY V12: ablation remove={removed} trades={r['trades']} return={r['return_pct']:.2%} PF={r['profit_factor']} DD={r['max_drawdown_pct']:.2%}",flush=True)
 
-    strikes=sorted({parse_name(n)[1] for f in fam for n in f.get('matched_candidate_names',[])})
-    strike_ablation=[]
+    strikes=sorted({parse_name(n)[1] for f in fam for n in f.get('matched_candidate_names',[])}); strike_ablation=[]
     for strike in strikes:
-        filtered={k:v for k,v in groups.items() if k[1]!=strike}
-        ev=build_events(filtered,fam,a.horizon,(a.cost_bps+a.slippage_bps)/10000,rank)
-        r=run_case(ev,a.initial_capital,a.allocation_pct,a.max_positions)
+        filtered={k:v for k,v in groups.items() if k[1]!=strike}; ev=build_events(filtered,fam,a.horizon,(a.cost_bps+a.slippage_bps)/10000,rank); r=run_case(ev,a.initial_capital,a.allocation_pct,a.max_positions)
         strike_ablation.append({'removed_strike_key':strike,'trades':r['trades'],'expectancy':r['expectancy'],'profit_factor':r['profit_factor'],'return_pct':r['return_pct'],'max_drawdown_pct':r['max_drawdown_pct']})
         print(f"OPTION FAMILY V12: strike_ablation remove={strike} trades={r['trades']} return={r['return_pct']:.2%} PF={r['profit_factor']} DD={r['max_drawdown_pct']:.2%}",flush=True)
 
     placebo=[]
-    # Timestamp permutation placebo: preserve each event's return and family/strike, but rotate returns across timestamps.
-    # Deterministic rotation avoids randomness and makes the audit reproducible.
     if ev_base:
-        returns=[e['return'] for e in ev_base]; shift=max(1,len(returns)//7); shuffled=[]
-        for i,e in enumerate(ev_base): shuffled.append({**e,'return':returns[(i+shift)%len(returns)]})
+        returns=[e['return'] for e in ev_base]; shift=max(1,len(returns)//7); shuffled=[{**e,'return':returns[(i+shift)%len(returns)]} for i,e in enumerate(ev_base)]
         r=run_case(shuffled,a.initial_capital,a.allocation_pct,a.max_positions)
         placebo.append({'method':'deterministic_return_rotation','shift':shift,'trades':r['trades'],'expectancy':r['expectancy'],'profit_factor':r['profit_factor'],'return_pct':r['return_pct'],'max_drawdown_pct':r['max_drawdown_pct']})
         print(f"OPTION FAMILY V12: placebo rotation trades={r['trades']} return={r['return_pct']:.2%} PF={r['profit_factor']} DD={r['max_drawdown_pct']:.2%}",flush=True)
@@ -167,14 +153,16 @@ def main():
     ablation_pass=sum(1 for x in ablation if x['profit_factor'] is not None and x['profit_factor']>=1.10 and x['expectancy']>0)
     strike_pass=sum(1 for x in strike_ablation if x['profit_factor'] is not None and x['profit_factor']>=1.10 and x['expectancy']>0)
     placebo_pf=placebo[0]['profit_factor'] if placebo else None
-    placebo_gap=(ev_base and (simulate(ev_base,a.initial_capital,a.allocation_pct,a.max_positions)['expectancy']-placebo[0]['expectancy'])) if placebo else None
+    placebo_expectancy=placebo[0]['expectancy'] if placebo else None
+    base_expectancy=base_result['expectancy']
+    placebo_gap=base_expectancy-placebo_expectancy if placebo else None
     reasons=[]
     if not stress_pass: reasons.append('cost_stress_failure')
     if horizon_positive<3: reasons.append('horizon_robustness_failure')
     if ablation_pass<len(ablation)-1: reasons.append('family_ablation_failure')
     if strike_pass<max(1,len(strike_ablation)-2): reasons.append('strike_ablation_failure')
-    if placebo and (placebo_pf is not None and placebo_pf>=1.10 and placebo[0]['expectancy']>=ev_base and ev_base): reasons.append('placebo_not_beaten')
-    result={'version':'v12','methodology':{'purpose':'robustness, ablation and anti-overfitting audit after chronological V11','base_horizon_bars':a.horizon,'base_friction_bps':a.cost_bps+a.slippage_bps,'initial_capital':a.initial_capital,'allocation_pct':a.allocation_pct,'max_positions':a.max_positions,'important_limitation':'Family selection remains inherited from V6; this is not a clean independent OOS discovery process.'},'data_quality':{'option_bar_rows':total,'contract_identity_coverage':nonnull/total,'identity_note':'Rows have complete rolling-series identity coverage after V3 cleanup; identity is synthetic rolling-series identity, not exact exchange contract expiry identity.'},'families':names,'cost_stress':stress,'horizon_robustness':horizon_results,'allocation_sensitivity':allocation_results,'family_ablation':ablation,'strike_ablation':strike_ablation,'placebo':placebo,'gate_metrics':{'cost_stress_pass':stress_pass,'positive_horizons_ge_pf105':horizon_positive,'family_ablation_pass_count':ablation_pass,'strike_ablation_pass_count':strike_pass,'placebo_profit_factor':placebo_pf,'placebo_expectancy_gap_vs_base':placebo_gap},'gate_reasons':reasons,'next_gate':not reasons,'promotion_status':'RESEARCH_ONLY_NO_PAPER_TRADING','elapsed_seconds':round(time.time()-start,2)}
-    Path(a.out).write_text(json.dumps(result,indent=2)); print(json.dumps({'families':len(names),'cost_stress_pass':stress_pass,'positive_horizons_ge_pf105':horizon_positive,'family_ablation_pass_count':ablation_pass,'strike_ablation_pass_count':strike_pass,'placebo_profit_factor':placebo_pf,'next_gate':result['next_gate'],'out':a.out,'elapsed_seconds':result['elapsed_seconds']},indent=2),flush=True)
+    if placebo and placebo_pf is not None and placebo_pf>=1.10 and placebo_expectancy>=base_expectancy: reasons.append('placebo_not_beaten')
+    result={'version':'v12','methodology':{'purpose':'robustness, ablation and anti-overfitting audit after chronological V11','base_horizon_bars':a.horizon,'base_friction_bps':a.cost_bps+a.slippage_bps,'initial_capital':a.initial_capital,'allocation_pct':a.allocation_pct,'max_positions':a.max_positions,'important_limitation':'Family selection remains inherited from V6; this is not a clean independent OOS discovery process.'},'data_quality':{'option_bar_rows':total,'contract_identity_coverage':nonnull/total,'identity_note':'Rows have complete rolling-series identity coverage after V3 cleanup; identity is synthetic rolling-series identity, not exact exchange contract expiry identity.'},'families':names,'cost_stress':stress,'horizon_robustness':horizon_results,'allocation_sensitivity':allocation_results,'family_ablation':ablation,'strike_ablation':strike_ablation,'placebo':placebo,'gate_metrics':{'cost_stress_pass':stress_pass,'positive_horizons_ge_pf105':horizon_positive,'family_ablation_pass_count':ablation_pass,'strike_ablation_pass_count':strike_pass,'base_expectancy':base_expectancy,'placebo_profit_factor':placebo_pf,'placebo_expectancy':placebo_expectancy,'placebo_expectancy_gap_vs_base':placebo_gap},'gate_reasons':reasons,'next_gate':not reasons,'promotion_status':'RESEARCH_ONLY_NO_PAPER_TRADING','elapsed_seconds':round(time.time()-start,2)}
+    Path(a.out).write_text(json.dumps(result,indent=2)); print(json.dumps({'families':len(names),'cost_stress_pass':stress_pass,'positive_horizons_ge_pf105':horizon_positive,'family_ablation_pass_count':ablation_pass,'strike_ablation_pass_count':strike_pass,'base_expectancy':base_expectancy,'placebo_profit_factor':placebo_pf,'placebo_expectancy_gap_vs_base':placebo_gap,'next_gate':result['next_gate'],'out':a.out,'elapsed_seconds':result['elapsed_seconds']},indent=2),flush=True)
 
 if __name__=='__main__': main()
