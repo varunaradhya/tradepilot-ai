@@ -3,9 +3,9 @@ from datetime import datetime, timezone
 from app.services.market_data_quality import is_indian_cash_market_time, validate_intraday_candles
 
 
-def _bar(minute: int, *, day: int = 14, open_price: float = 100, high: float = 101, low: float = 99, close: float = 100):
+def _bar(minute: int, *, hour: int = 9, day: int = 14, open_price: float = 100, high: float = 101, low: float = 99, close: float = 100):
     return {
-        "timestamp": datetime(2026, 8, day, 9, minute, tzinfo=timezone.utc),
+        "timestamp": datetime(2026, 8, day, hour, minute, tzinfo=timezone.utc),
         "open": open_price,
         "high": high,
         "low": low,
@@ -30,7 +30,7 @@ def test_market_data_quality_detects_missing_intervals():
 
 
 def test_market_data_quality_does_not_count_overnight_as_missing():
-    rows = [_bar(25, day=14), _bar(15, day=15)]
+    rows = [_bar(25, hour=15, day=14), _bar(15, hour=9, day=15)]
     result = validate_intraday_candles(rows, expected_minutes=5, stale_after_minutes=99999)
     assert result.missing_intervals == 0
 
@@ -51,7 +51,6 @@ def test_market_data_quality_rejects_invalid_ohlc():
 
 
 def test_market_data_quality_rejects_weekend_data():
-    # 2026-08-15 is Saturday.
     rows = [_bar(15, day=15)]
     result = validate_intraday_candles(rows, stale_after_minutes=99999)
     assert result.valid is False
@@ -60,7 +59,7 @@ def test_market_data_quality_rejects_weekend_data():
 
 
 def test_market_data_quality_rejects_outside_session():
-    rows = [_bar(0)]
+    rows = [_bar(0, hour=8)]
     result = validate_intraday_candles(rows, stale_after_minutes=99999)
     assert result.valid is False
     assert result.outside_session == 1
