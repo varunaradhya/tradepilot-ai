@@ -1,97 +1,38 @@
-import httpx
-
-from app.providers.market_search import SearchInstrument, YahooFinanceSearchProvider
-
-
-def test_search_filters_to_indian_equities(monkeypatch):
-    def fake_get(url, **kwargs):
-        request = httpx.Request("GET", url)
-        return httpx.Response(200, request=request, json={"quotes": [
-            {"symbol": "TCS.NS", "longname": "Tata Consultancy Services", "quoteType": "EQUITY"},
-            {"symbol": "TCS.BO", "longname": "Tata Consultancy Services", "quoteType": "EQUITY"},
-            {"symbol": "AAPL", "longname": "Apple", "quoteType": "EQUITY"},
-            {"symbol": "TCS.NS", "longname": "Duplicate", "quoteType": "EQUITY"},
-            {"symbol": "TCS.NS", "longname": "Not equity", "quoteType": "ETF"},
-        ]})
-
-    monkeypatch.setattr("app.providers.market_search.httpx.get", fake_get)
-    YahooFinanceSearchProvider._cache.clear()
-    YahooFinanceSearchProvider._nse_master = None
-    results = YahooFinanceSearchProvider().search("tcs")
-
-    assert [(x.symbol, x.exchange) for x in results] == [("TCS", "NSE"), ("TCS", "BSE")]
+from app.providers.market_search import DhanInstrumentSearchProvider
+from app.services.instrument_master_service import IndianInstrument
 
 
 def test_search_requires_two_characters():
-    assert YahooFinanceSearchProvider().search("t") == []
+    assert DhanInstrumentSearchProvider().search("t") == []
 
 
-def test_nse_master_finds_less_popular_symbol_and_ranks_exact_prefix_first(monkeypatch):
-    YahooFinanceSearchProvider._cache.clear()
-    YahooFinanceSearchProvider._nse_master = None
+def test_search_ranks_exact_prefix_and_company_name(monkeypatch):
     monkeypatch.setattr(
-        YahooFinanceSearchProvider,
-        "_load_nse_master",
-        classmethod(lambda cls, timeout=8.0: [
-            SearchInstrument("ZOMATO", "Zomato Limited", "NSE"),
-            SearchInstrument("ZOMATOHOLD", "Zomato Holding Example", "NSE"),
-            SearchInstrument("DMART", "Avenue Supermarts", "NSE"),
-        ]),
+        "app.providers.market_search.instrument_master.search",
+        lambda query, limit=20: [
+            IndianInstrument("1", "NSE_EQ", "ZOMATO", "Zomato Limited", "EQ", None),
+            IndianInstrument("2", "NSE_EQ", "ZOMATOHOLD", "Zomato Holding Example", "EQ", None),
+            IndianInstrument("3", "NSE_EQ", "DMART", "Avenue Supermarts", "EQ", None),
+        ],
     )
-    monkeypatch.setattr(
-        YahooFinanceSearchProvider,
-        "_search_yahoo",
-        lambda self, query: [],
-    )
-
-    results = YahooFinanceSearchProvider().search("zomato")
-
-    assert results
+    results = DhanInstrumentSearchProvider().search("zomato")
     assert results[0].symbol == "ZOMATO"
     assert all(item.exchange == "NSE" for item in results)
-    assert any(item.symbol == "ZOMATOHOLD" for item in results)
 
 
-def test_search_by_company_name_uses_nse_master(monkeypatch):
-    YahooFinanceSearchProvider._cache.clear()
-    YahooFinanceSearchProvider._nse_master = None
+def test_search_by_company_name(monkeypatch):
     monkeypatch.setattr(
-        YahooFinanceSearchProvider,
-        "_load_nse_master",
-        classmethod(lambda cls, timeout=8.0: [
-            SearchInstrument("ABCIND", "ABC Industries Limited", "NSE"),
-            SearchInstrument("RELIANCE", "Reliance Industries Limited", "NSE"),
-        ]),
+        "app.providers.market_search.instrument_master.search",
+        lambda query, limit=20: [IndianInstrument("4", "NSE_EQ", "ABCIND", "ABC Industries Limited", "EQ", None)],
     )
-    monkeypatch.setattr(
-        YahooFinanceSearchProvider,
-        "_search_yahoo",
-        lambda self, query: [],
-    )
-
-    results = YahooFinanceSearchProvider().search("abc industries")
-
-    assert [(item.symbol, item.exchange) for item in results] == [("ABCIND", "NSE")]
+    results = DhanInstrumentSearchProvider().search("abc industries")
+    assert results[0].symbol == "ABCIND"
 
 
-def test_search_cache_is_normalized(monkeypatch):
-    YahooFinanceSearchProvider._cache.clear()
-    YahooFinanceSearchProvider._nse_master = None
-    calls = {"count": 0}
-
-    monkeypatch.setattr(
-        YahooFinanceSearchProvider,
-        "_load_nse_master",
-        classmethod(lambda cls, timeout=8.0: [SearchInstrument("TCS", "Tata Consultancy Services", "NSE")]),
-    )
-
-    def fake_yahoo(self, query):
-        calls["count"] += 1
-        return []
-
-    monkeypatch.setattr(YahooFinanceSearchProvider, "_search_yahoo", fake_yahoo)
-    provider = YahooFinanceSearchProvider()
-
-    assert provider.search("  tcs ")
-    assert provider.search("TCS")
-    assert calls["count"] == 1
+def test_unknown_company_is_not_accepted(monkeypatch):
+    monkeypatch.setattr("app.providers.market_search.instrument_master.search", lambda query, limit=100: [])
+    try:
+        DhanInstrumentSearchProvider().resolve_exact("NOT A REAL STOCK")
+        assert False
+    except ValueError:
+        assert True
