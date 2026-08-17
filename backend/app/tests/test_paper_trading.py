@@ -1,4 +1,4 @@
-from app.services.indian_costs import IndianFnoOptionCostModel
+from app.services.indian_costs import IndianEquityCostModel, IndianFnoOptionCostModel
 from app.services.paper_trading import PaperRiskConfig, PaperTradingEngine
 from app.services.paper_trading_service import paper_summary
 
@@ -74,6 +74,17 @@ def test_live_snapshot_reports_net_unrealized_pnl():
     snapshot = e.snapshot()
     assert snapshot['unrealized_net_pnl'] != 0
     assert snapshot['total_pnl'] == snapshot['unrealized_net_pnl']
+
+
+def test_equity_is_the_safe_default_cost_model_for_generic_paper_engine():
+    e = PaperTradingEngine(PaperRiskConfig())
+    assert isinstance(e.cost_model, IndianEquityCostModel)
+    assert not isinstance(e.cost_model, IndianFnoOptionCostModel)
+
+
+def test_fno_cost_model_can_be_explicitly_selected():
+    e = PaperTradingEngine(PaperRiskConfig(cost_model=IndianFnoOptionCostModel()))
+    assert isinstance(e.cost_model, IndianFnoOptionCostModel)
 
 
 def test_fno_cost_model_has_brokerage_and_statutory_components():
