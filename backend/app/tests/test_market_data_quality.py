@@ -29,6 +29,12 @@ def test_market_data_quality_detects_missing_intervals():
     assert result.reason == "MISSING_INTERVALS"
 
 
+def test_market_data_quality_does_not_count_overnight_as_missing():
+    rows = [_bar(25, day=14), _bar(15, day=15)]
+    result = validate_intraday_candles(rows, expected_minutes=5, stale_after_minutes=99999)
+    assert result.missing_intervals == 0
+
+
 def test_market_data_quality_detects_out_of_order_bars():
     rows = [_bar(20), _bar(15)]
     result = validate_intraday_candles(rows, expected_minutes=5, stale_after_minutes=99999)
@@ -51,6 +57,30 @@ def test_market_data_quality_rejects_weekend_data():
     assert result.valid is False
     assert result.non_trading_day == 1
     assert result.reason == "NON_TRADING_DAY"
+
+
+def test_market_data_quality_rejects_outside_session():
+    rows = [_bar(0)]
+    result = validate_intraday_candles(rows, stale_after_minutes=99999)
+    assert result.valid is False
+    assert result.outside_session == 1
+    assert result.reason == "OUTSIDE_MARKET_SESSION"
+
+
+def test_historical_data_is_not_marked_stale_without_reference_time():
+    rows = [_bar(15)]
+    result = validate_intraday_candles(rows, stale_after_minutes=1)
+    assert result.stale is False
+    assert result.valid is True
+
+
+def test_live_reference_time_marks_stale_data():
+    rows = [_bar(15)]
+    reference = datetime(2026, 8, 14, 9, 40, tzinfo=timezone.utc)
+    result = validate_intraday_candles(rows, stale_after_minutes=15, reference_time=reference)
+    assert result.stale is True
+    assert result.valid is False
+    assert result.reason == "STALE_DATA"
 
 
 def test_indian_cash_market_session_boundary():
