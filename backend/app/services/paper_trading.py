@@ -135,7 +135,9 @@ class PaperTradingEngine:
             "gst": p["entry_costs"]["gst"] + exit_costs["gst"],
             "total_charges": total_costs,
             "net_pnl": net_pnl, "pnl": net_pnl,
-            "reason": reason, "direction": p["direction"], "bars_held": p["bars_held"],
+            "reason": reason,
+            "exit_reason": "STOP_LOSS" if reason == "STOP" else reason,
+            "direction": p["direction"], "bars_held": p["bars_held"],
         }
         self.trades.append(trade)
         self.position = None
@@ -152,19 +154,26 @@ class PaperTradingEngine:
         p = self.position
         p["bars_held"] += 1
         p["last_price"] = close
+        previous_trailing_stop = p["trailing_stop"]
         p["high_watermark"] = max(p["high_watermark"], high)
+
+        # A trailing stop that becomes active on this bar is only eligible
+        # for execution on a subsequent bar. This avoids look-ahead within
+        # one OHLC candle where activation and the pullback are indistinguishable.
+        if previous_trailing_stop is not None and low <= previous_trailing_stop:
+            return self.close(previous_trailing_stop, "TRAILING_STOP")
         if low <= p["stop"]:
-            return self.close(p["stop"], "STOP_LOSS")
+            return self.close(p["stop"], "STOP")
         if high >= p["target"]:
             return self.close(p["target"], "TARGET")
+
         activation = p["entry"] * (1 + self.config.trailing_activation_pct)
         if self.config.use_trailing_stop and high >= activation:
             candidate = p["high_watermark"] * (1 - self.config.trailing_stop_pct)
             if candidate > p["stop"]:
                 p["stop"] = candidate
                 p["trailing_stop"] = candidate
-                if low <= candidate:
-                    return self.close(candidate, "TRAILING_STOP")
+
         if p["bars_held"] >= self.config.max_holding_bars:
             return self.close(close, "TIMEOUT")
         return None
