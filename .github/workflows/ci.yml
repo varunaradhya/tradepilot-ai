@@ -2,9 +2,9 @@ name: TradePilot CI
 
 on:
   push:
-    branches: [main, 'feat/**']
+    branches: [main, 'feat/**', 'fix/**']
   pull_request:
-    branches: [main, 'feat/**']
+    branches: [main, 'feat/**', 'fix/**']
 
 jobs:
   backend:
