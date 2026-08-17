@@ -84,9 +84,6 @@ def generate_regime_momentum_signal(
     score += 30
     reasons.append("UPTREND")
 
-    # RSI is a confirmation score rather than an early hard rejection. This lets
-    # later hard risk gates (volatility/RR) explain the actual reason a setup fails,
-    # while still rewarding healthy momentum and explicitly flagging weak momentum.
     if config.rsi_min <= momentum_rsi <= config.rsi_max:
         score += 20
         reasons.append("MOMENTUM_HEALTHY")
@@ -95,11 +92,16 @@ def generate_regime_momentum_signal(
     else:
         reasons.append("MOMENTUM_WEAK")
 
-    if price <= prior_high:
-        return Signal("NEUTRAL", score, None, None, None, ("BREAKOUT_FILTER_FAILED",))
-    score += 30
-    reasons.append("BREAKOUT")
+    breakout_ok = price > prior_high
+    if breakout_ok:
+        score += 30
+        reasons.append("BREAKOUT")
+    else:
+        reasons.append("BREAKOUT_FILTER_FAILED")
 
+    # Evaluate all downstream hard risk gates before returning a diagnostic.
+    # This makes a failed setup explain the most material risk blocker instead
+    # of hiding it behind an earlier soft/structural condition.
     if not (config.min_atr_percent <= atr_percent <= config.max_atr_percent):
         return Signal("NEUTRAL", score, None, None, None, ("VOLATILITY_FILTER_FAILED",))
     reasons.append("VOLATILITY_OK")
@@ -121,6 +123,8 @@ def generate_regime_momentum_signal(
         return Signal("NEUTRAL", score, None, None, None, ("STOP_TOO_WIDE",))
     if risk_reward < config.min_risk_reward:
         return Signal("NEUTRAL", score, None, None, None, ("RISK_REWARD_TOO_LOW",))
+    if not breakout_ok:
+        return Signal("NEUTRAL", score, None, None, None, ("BREAKOUT_FILTER_FAILED",))
 
     reasons.append(f"RR_{risk_reward:.2f}")
     return Signal("BUY", score, price, stop, target, tuple(reasons))
