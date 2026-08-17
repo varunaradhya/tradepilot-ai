@@ -38,3 +38,5 @@ class SearchInstrumentResponse(BaseModel):
     symbol: str
     name: str
     exchange: str
+    security_id: str
+    exchange_segment: str
