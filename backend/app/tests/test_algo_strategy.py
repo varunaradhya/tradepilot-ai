@@ -1,4 +1,5 @@
-from app.services.algo_strategy import StrategyConfig, generate_regime_momentum_signal, position_size
+from app.services import backtest_service
+from app.services.algo_strategy import Signal, StrategyConfig, generate_regime_momentum_signal, position_size
 from app.services.backtest_service import BacktestConfig, run_daily_backtest
 
 
@@ -35,9 +36,16 @@ def test_position_size_respects_risk_and_capital_limits():
     assert position_size(100000, 100, 95, config) == 200
 
 
-def test_backtest_never_counts_same_candle_stop_and_target_as_target():
-    rows = _trend_rows(100)
-    result = run_daily_backtest(rows + [{"close": 150, "high": 160, "low": 80, "volume": 5000}], BacktestConfig(strategy=StrategyConfig(max_holding_bars=1000)))
+def test_backtest_never_counts_same_candle_stop_and_target_as_target(monkeypatch):
+    def fake_signal(closes, highs, lows, volumes, config=StrategyConfig()):
+        return Signal("BUY", 100.0, 100.0, 90.0, 130.0, ("TEST",))
+
+    monkeypatch.setattr(backtest_service, "generate_regime_momentum_signal", fake_signal)
+    rows = [{"open": 100.0, "high": 101.0, "low": 99.0, "close": 100.0, "volume": 1000.0} for _ in range(63)]
+    rows[61]["high"] = 160.0
+    rows[61]["low"] = 80.0
+    rows[61]["close"] = 150.0
+    result = run_daily_backtest(rows, BacktestConfig(strategy=StrategyConfig(max_holding_bars=1000)))
     assert result["trades"] >= 1
     assert any(trade["reason"] == "STOP" for trade in result["trades_detail"])
 
