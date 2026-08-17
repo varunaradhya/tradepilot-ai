@@ -54,6 +54,18 @@ class DhanClient:
     def positions(self): return self._request("GET", "/positions") or []
     def orders(self): return self._request("GET", "/orders") or []
     def trades(self): return self._request("GET", "/trades") or []
+
+    def ltp(self, instruments: dict[str, list[str]]) -> Any:
+        """Read-only market LTP snapshot.
+
+        Example: {"NSE_EQ": ["1333"]}. This method only calls Dhan's
+        market-data endpoint and never places, modifies, or cancels an order.
+        """
+        if not instruments or any(not segment or not ids for segment, ids in instruments.items()):
+            raise ValueError("instruments must contain non-empty segment/id lists")
+        normalized = {str(segment): [str(security_id) for security_id in ids] for segment, ids in instruments.items()}
+        return self._request("POST", "/marketfeed/ltp", normalized)
+
     def option_expiries(self, underlying_security_id: int, underlying_segment: str): return self._request("POST", "/optionchain/expirylist", {"UnderlyingScrip": underlying_security_id, "UnderlyingSeg": underlying_segment})
     def option_chain(self, underlying_security_id: int, underlying_segment: str, expiry: str): return self._request("POST", "/optionchain", {"UnderlyingScrip": underlying_security_id, "UnderlyingSeg": underlying_segment, "Expiry": expiry})
     def place_order(self, order: dict[str, Any]): return self._request("POST", "/orders", order)
@@ -73,10 +85,6 @@ class DhanClient:
         try:
             return self._request("POST", "/charts/rollingoption", payload)
         except DhanAPIError as exc:
-            # Dhan's generic docs define 0 as near/current expiry, but the
-            # rollingoption endpoint currently rejects 0 with DH-905. For
-            # compatibility, retry near-expiry requests as code 1, which is
-            # the value verified against the live rolling endpoint.
             if expiry_code == 0 and "DH-905" in str(exc) and "expiryCode" in str(exc):
                 fallback = dict(payload)
                 fallback["expiryCode"] = 1
