@@ -27,14 +27,12 @@ def _buy_fill(price: float, slippage_rate: float) -> float:
 
 
 def _session_key(row: dict) -> str:
-    """Normalize daily/session identity for both daily and intraday timestamps."""
     raw = row.get("date") or row.get("timestamp")
     if raw is None:
         return "BACKTEST"
     text = str(raw).strip()
     if not text:
         return "BACKTEST"
-    # ISO datetime, common SQL timestamp, and pandas Timestamp string forms.
     if "T" in text:
         return text.split("T", 1)[0]
     if " " in text:
@@ -45,7 +43,7 @@ def _session_key(row: dict) -> str:
 
 
 def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestConfig()) -> dict:
-    """Conservative long-only daily backtest with execution and risk realism."""
+    """Conservative long-only backtest with next-bar execution and realistic costs."""
     if config.initial_capital <= 0:
         raise ValueError("initial_capital must be positive")
     if not rows:
@@ -56,33 +54,37 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
     cash = float(config.initial_capital)
     quantity = 0
     entry_price = stop = target = 0.0
-    initial_risk = 0.0
-    high_watermark = 0.0
+    entry_cost = 0.0
+    initial_risk = high_watermark = 0.0
     holding_bars = 0
     pending_signal = None
     trades: list[dict] = []
     equity_curve: list[float] = []
     daily_pnl = 0.0
+    daily_start_equity = float(config.initial_capital)
     daily_trades = 0
     current_session = None
     halted = False
 
-    def close_position(exit_price: float, reason: str, entry_cost: float) -> None:
-        nonlocal cash, quantity, entry_price, stop, target, initial_risk, high_watermark, holding_bars, daily_pnl
+    def close_position(exit_price: float, reason: str) -> None:
+        nonlocal cash, quantity, entry_price, stop, target, entry_cost, initial_risk, high_watermark, holding_bars, daily_pnl
         gross = quantity * exit_price
         exit_cost = gross * config.brokerage_rate
+        # Entry brokerage was already deducted from cash at entry; include it
+        # exactly once in realized P&L and charge exit brokerage once here.
         pnl = quantity * (exit_price - entry_price) - entry_cost - exit_cost
         cash += gross - exit_cost
         daily_pnl += pnl
         trades.append({"entry": entry_price, "exit": exit_price, "quantity": quantity, "pnl": pnl, "reason": reason, "holding_bars": holding_bars})
         quantity = 0
-        entry_price = stop = target = initial_risk = high_watermark = 0.0
+        entry_price = stop = target = entry_cost = initial_risk = high_watermark = 0.0
         holding_bars = 0
 
     for i, row in enumerate(rows):
         session = _session_key(row)
         if session != current_session:
             current_session = session
+            daily_start_equity = cash + quantity * float(row.get("open", row.get("close", 0.0)))
             daily_pnl = 0.0
             daily_trades = 0
             halted = False
@@ -103,17 +105,16 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
             actual_stop = float(signal.stop)
             actual_target = float(signal.target)
             planned_entry = float(signal.entry) if signal.entry else actual_entry
-            # For a gap through the stop, size from the planned setup and then
-            # model the unavoidable executable fill at the opening price.
             sizing_entry = actual_entry if actual_entry > actual_stop else planned_entry
             size = position_size(cash, sizing_entry, actual_stop, config.strategy)
             if size > 0:
-                entry_cost = size * actual_entry * config.brokerage_rate
-                total_entry_cash = size * actual_entry + entry_cost
+                new_entry_cost = size * actual_entry * config.brokerage_rate
+                total_entry_cash = size * actual_entry + new_entry_cost
                 if total_entry_cash <= cash:
                     cash -= total_entry_cash
                     quantity = size
                     entry_price = actual_entry
+                    entry_cost = new_entry_cost
                     stop = actual_stop
                     target = actual_target
                     initial_risk = max(0.0, planned_entry - actual_stop)
@@ -122,10 +123,10 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
                     entered_this_bar = True
                     daily_trades += 1
                     if open_price <= stop:
-                        close_position(_sell_fill(open_price, config.slippage_rate), "STOP_GAP", entry_cost)
+                        close_position(_sell_fill(open_price, config.slippage_rate), "STOP_GAP")
                         closed_this_bar = True
                     elif open_price >= target:
-                        close_position(_sell_fill(open_price, config.slippage_rate), "TARGET_GAP", entry_cost)
+                        close_position(_sell_fill(open_price, config.slippage_rate), "TARGET_GAP")
                         closed_this_bar = True
 
         if quantity:
@@ -134,8 +135,6 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
             exit_price = None
             exit_reason = None
             high_watermark = max(high_watermark, high)
-            # Conservative OHLC assumption: if stop and target are both touched,
-            # stop is evaluated first because intrabar ordering is unknowable.
             if open_price <= stop:
                 exit_price, exit_reason = _sell_fill(open_price, config.slippage_rate), "STOP_GAP"
             elif open_price >= target:
@@ -145,8 +144,7 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
             elif high >= target:
                 exit_price, exit_reason = _sell_fill(target, config.slippage_rate), "TARGET"
             if exit_price is not None:
-                entry_cost = quantity * entry_price * config.brokerage_rate
-                close_position(exit_price, exit_reason, entry_cost)
+                close_position(exit_price, exit_reason)
                 closed_this_bar = True
 
         if quantity and config.trailing_stop_enabled:
@@ -162,17 +160,15 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
                         stop = min(trailing, target * 0.999)
 
         if quantity and config.strategy.max_holding_bars > 0 and holding_bars >= config.strategy.max_holding_bars:
-            entry_cost = quantity * entry_price * config.brokerage_rate
-            close_position(_sell_fill(close, config.slippage_rate), "MAX_HOLD", entry_cost)
+            close_position(_sell_fill(close, config.slippage_rate), "MAX_HOLD")
             closed_this_bar = True
 
-        equity_curve.append(cash + quantity * close if quantity else cash)
-
-        if daily_pnl <= -(config.initial_capital * config.max_daily_loss_percent):
+        equity = cash + quantity * close if quantity else cash
+        equity_curve.append(equity)
+        if equity - daily_start_equity <= -(daily_start_equity * config.max_daily_loss_percent):
             halted = True
             pending_signal = None
 
-        # Do not immediately re-enter after a stop/target on the same candle.
         if not closed_this_bar and quantity == 0 and pending_signal is None and not halted and daily_trades < config.max_trades_per_day and i >= 60:
             history = rows[: i + 1]
             closes = [float(x["close"]) for x in history]
@@ -184,9 +180,8 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
                 pending_signal = signal
 
     if quantity:
-        entry_cost = quantity * entry_price * config.brokerage_rate
         final_price = _sell_fill(float(rows[-1]["close"]), config.slippage_rate)
-        close_position(final_price, "END_OF_TEST", entry_cost)
+        close_position(final_price, "END_OF_TEST")
         equity_curve[-1] = cash
 
     ending = cash
@@ -201,7 +196,7 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
         if peak:
             max_drawdown = max(max_drawdown, (peak - value) / peak * 100)
 
-    expectancy = ((sum(wins) if wins else 0.0) + (sum(losses) if losses else 0.0)) / len(trades) if trades else 0.0
+    expectancy = (sum(wins) + sum(losses)) / len(trades) if trades else 0.0
     return {
         "initial_capital": round(config.initial_capital, 2),
         "ending_capital": round(ending, 2),
