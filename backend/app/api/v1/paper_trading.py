@@ -47,6 +47,7 @@ class PaperSignalRequest(BaseModel):
     stop: float = Field(gt=0)
     target: float = Field(gt=0)
     symbol: str = Field(default="", max_length=30)
+    lot_size: int = Field(default=1, gt=0, le=100000)
 
 
 class PaperBarRequest(BaseModel):
@@ -111,10 +112,12 @@ def paper_dashboard(strategy_version: str | None = Query(default=None, pattern="
     if strategy_version:
         trades = [trade for trade in trades if trade.strategy_version == strategy_version]
     performance = aggregate_paper_performance(trades)
+    live = _orchestrator(current_user.id).summary()
     return {
         "mode": "SIMULATION_ONLY",
         "summary": paper_summary(trades),
         "performance": performance,
+        "live": live,
         "open_positions": [
             {
                 "id": trade.id,
@@ -149,11 +152,7 @@ def paper_readiness(
     trades = list_paper_trades(db, current_user.id)
     if strategy_version:
         trades = [trade for trade in trades if trade.strategy_version == strategy_version]
-    result = build_strategy_readiness(
-        {"status": qualification_status},
-        {"summary": {"symbols_tested": symbols_tested, "robust_percent": robust_percent}},
-        trades,
-    )
+    result = build_strategy_readiness({"status": qualification_status}, {"summary": {"symbols_tested": symbols_tested, "robust_percent": robust_percent}}, trades)
     return {"mode": "SIMULATION_ONLY", "strategy_version": strategy_version or "ALL", **result}
 
 
@@ -211,10 +210,7 @@ def paper_market_bar(payload: MarketBarRequest, current_user: User = Depends(get
     if payload.low > payload.high:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="low cannot exceed high")
     try:
-        return _market_coordinator(current_user.id).on_bar(
-            payload.session, payload.symbol, payload.open, payload.high, payload.low,
-            payload.close, payload.volume, payload.opening_high, payload.opening_low,
-        )
+        return _market_coordinator(current_user.id).on_bar(payload.session, payload.symbol, payload.open, payload.high, payload.low, payload.close, payload.volume, payload.opening_high, payload.opening_low)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
 
@@ -222,10 +218,7 @@ def paper_market_bar(payload: MarketBarRequest, current_user: User = Depends(get
 @router.post("/session/dhan")
 def paper_dhan_session(payload: DhanPaperRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict[str, Any]:
     try:
-        return run_dhan_paper_session(
-            db, current_user.id, payload.symbol, payload.session, payload.interval,
-            coordinator=_market_coordinator(current_user.id),
-        )
+        return run_dhan_paper_session(db, current_user.id, payload.symbol, payload.session, payload.interval, coordinator=_market_coordinator(current_user.id))
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
     except Exception as exc:
