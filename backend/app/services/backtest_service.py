@@ -26,13 +26,7 @@ def _buy_fill(price: float, slippage_rate: float) -> float:
 
 
 def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestConfig()) -> dict:
-    """Conservative long-only daily backtest with execution and risk realism.
-
-    Signals are generated only after candle close and filled no earlier than the
-    next candle open. Stops/targets are stop-first when both are touched. A
-    trailing stop activates after 1R and ratchets upward using ATR; it never
-    moves downward. Daily loss and trade-count gates prevent over-trading.
-    """
+    """Conservative long-only daily backtest with execution and risk realism."""
     if config.initial_capital <= 0:
         raise ValueError("initial_capital must be positive")
     if not rows:
@@ -65,7 +59,7 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
         entry_price = stop = target = initial_risk = high_watermark = 0.0
 
     for i, row in enumerate(rows):
-        session = row.get("date") or row.get("timestamp") or i
+        session = row.get("date") or row.get("timestamp") or "BACKTEST"
         if session != current_session:
             current_session = session
             daily_pnl = 0.0
@@ -98,7 +92,6 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
                     initial_risk = actual_entry - actual_stop
                     high_watermark = actual_entry
                     daily_trades += 1
-
                     if open_price <= stop:
                         close_position(_sell_fill(open_price, config.slippage_rate), "STOP_GAP", entry_cost)
                     elif open_price >= target:
@@ -108,8 +101,6 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
             exit_price = None
             exit_reason = None
             high_watermark = max(high_watermark, high)
-
-            # Gap protection always uses executable open.
             if open_price <= stop:
                 exit_price, exit_reason = _sell_fill(open_price, config.slippage_rate), "STOP_GAP"
             elif open_price >= target:
@@ -118,7 +109,6 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
                 exit_price, exit_reason = _sell_fill(stop, config.slippage_rate), "STOP"
             elif high >= target:
                 exit_price, exit_reason = _sell_fill(target, config.slippage_rate), "TARGET"
-
             if exit_price is not None:
                 entry_cost = quantity * entry_price * config.brokerage_rate
                 close_position(exit_price, exit_reason, entry_cost)
@@ -126,25 +116,16 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
         if quantity and config.trailing_stop_enabled:
             risk_unit = initial_risk
             if risk_unit > 0 and high_watermark >= entry_price + config.strategy.trailing_activation_r * risk_unit:
-                # Daily OHLC does not reveal intrabar ordering, so the new
-                # trailing stop only becomes active for the next bar.
-                trailing = high_watermark - config.strategy.trailing_atr * max(
-                    (high - low), entry_price * 0.001
-                )
+                trailing = high_watermark - config.strategy.trailing_atr * max((high - low), entry_price * 0.001)
                 if trailing > stop:
                     stop = min(trailing, target * 0.999)
 
-        if quantity:
-            marked_equity = cash + quantity * close
-        else:
-            marked_equity = cash
-        equity_curve.append(marked_equity)
+        equity_curve.append(cash + quantity * close if quantity else cash)
 
         if daily_pnl <= -(config.initial_capital * config.max_daily_loss_percent):
             halted = True
             pending_signal = None
 
-        # Only completed bars may generate signals. The next bar owns execution.
         if quantity == 0 and pending_signal is None and not halted and daily_trades < config.max_trades_per_day and i >= 60:
             history = rows[: i + 1]
             closes = [float(x["close"]) for x in history]
@@ -173,22 +154,16 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
         if peak:
             max_drawdown = max(max_drawdown, (peak - value) / peak * 100)
 
-    expectancy = ((sum(wins) / len(wins)) * (len(wins) / len(trades)) +
-                  (sum(losses) / len(losses)) * (len(losses) / len(trades))) if trades else 0.0
-
+    expectancy = ((sum(wins) / len(wins)) * (len(wins) / len(trades)) + (sum(losses) / len(losses)) * (len(losses) / len(trades))) if trades else 0.0
     return {
         "initial_capital": round(config.initial_capital, 2),
         "ending_capital": round(ending, 2),
         "return_percent": round((ending / config.initial_capital - 1) * 100, 2),
-        "trades": len(trades),
-        "wins": len(wins),
-        "losses": len(losses),
+        "trades": len(trades), "wins": len(wins), "losses": len(losses),
         "win_rate_percent": round(len(wins) / len(trades) * 100, 2) if trades else 0.0,
         "profit_factor": round(gross_profit / gross_loss, 4) if gross_loss else (None if not gross_profit else float("inf")),
         "expectancy_per_trade": round(expectancy, 2),
         "max_drawdown_percent": round(max_drawdown, 2),
-        "gross_profit": round(gross_profit, 2),
-        "gross_loss": round(gross_loss, 2),
-        "trades_detail": trades,
-        "equity_curve": [round(value, 2) for value in equity_curve],
+        "gross_profit": round(gross_profit, 2), "gross_loss": round(gross_loss, 2),
+        "trades_detail": trades, "equity_curve": [round(value, 2) for value in equity_curve],
     }
