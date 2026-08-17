@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
 import { apiRequest } from "../services/api";
+import ResearchDataPanel from "../components/ResearchDataPanel";
 
 type Row = { symbol:string; score:number; robustness:{status:string;reasons:string[]}; metrics:Record<string,unknown> };
 type Response = { status:string; interval:string; missing_datasets:string[]; assumptions:Record<string,unknown>; ranked:Row[] };
 function n(v: unknown, digits=2) { return typeof v === "number" ? v.toFixed(digits) : "—"; }
 function num(v: unknown) { return typeof v === "number" ? v : null; }
-
 type Filter = "ALL" | "ROBUST" | "POSITIVE" | "HIGH_PF";
 
 export default function IntradayScannerPage() {
@@ -25,9 +25,9 @@ export default function IntradayScannerPage() {
     {loading && <div className="tp-premium-card mt-6 h-64 animate-pulse rounded-2xl" />}
     {result && <>
       <section className="mt-6 grid gap-4 sm:grid-cols-3">{[["TESTED",result.ranked.length],["ROBUST",result.ranked.filter(x=>x.robustness.status==="ROBUST").length],["MISSING",result.missing_datasets.length]].map(([label,value])=><article key={String(label)} className="tp-kpi"><p className="tp-section-label">{label}</p><p className="tp-number mt-2 text-3xl font-black text-white">{value}</p></article>)}</section>
+      <ResearchDataPanel missingSymbols={result.missing_datasets} interval={interval} onComplete={() => void scan()} />
       <section className="tp-premium-card mt-5 overflow-hidden rounded-2xl"><div className="flex flex-wrap items-end justify-between gap-3 border-b border-white/10 p-5"><div><p className="tp-section-label">Opportunity radar</p><h2 className="mt-1 text-xl font-black text-white">Strongest evidence first</h2></div><div className="flex flex-wrap gap-1 rounded-xl bg-white/[.03] p-1">{(["ALL","ROBUST","POSITIVE","HIGH_PF"] as Filter[]).map(item=><button key={item} onClick={()=>setFilter(item)} className={`rounded-lg px-3 py-1.5 text-[10px] font-black ${filter===item?"bg-violet-500/20 text-violet-200":"text-slate-600 hover:text-white"}`}>{item==="HIGH_PF"?"HIGH PF":item}</button>)}</div></div>
         <div className="divide-y divide-white/5">{ranked.length===0?<div className="p-10 text-center text-sm text-slate-500">No candidates match this filter.</div>:ranked.map((row,i)=>{const score=Math.max(0,Math.min(100,row.score));const positive=(num(row.metrics.return_percent)??0)>=0;return <div key={row.symbol} className="grid gap-4 p-5 transition hover:bg-violet-400/[.025] md:grid-cols-[44px_1fr_150px] md:items-center"><div className="text-sm font-black text-slate-600">{String(i+1).padStart(2,"0")}</div><div><div className="flex flex-wrap items-center gap-2"><span className="text-lg font-black text-white">{row.symbol}</span><span className={`rounded-full px-2.5 py-1 text-[10px] font-black ${row.robustness.status==="ROBUST"?"bg-emerald-400/10 text-emerald-300":"bg-amber-400/10 text-amber-300"}`}>{row.robustness.status}</span></div><div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-teal-400 transition-all duration-700" style={{width:`${score}%`}} /></div><div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-slate-600"><span>PF <b className="text-slate-300">{n(row.metrics.profit_factor)}</b></span><span>Win <b className="text-slate-300">{n(row.metrics.win_rate_percent,1)}%</b></span><span>Return <b className={positive?"text-emerald-300":"text-rose-300"}>{n(row.metrics.return_percent,1)}%</b></span><span>DD <b className="text-slate-300">{n(row.metrics.max_drawdown_percent,1)}%</b></span></div>{row.robustness.reasons.length>0&&<p className="mt-2 text-[10px] text-amber-300">{row.robustness.reasons.join(" • ")}</p>}</div><div className="text-right"><p className="tp-section-label">Score</p><p className="tp-number text-3xl font-black text-white">{n(row.score,0)}</p><p className="text-[10px] text-slate-600">evidence score</p></div></div>})}</div></section>
-      {result.missing_datasets.length>0&&<section className="mt-4 rounded-2xl border border-amber-400/15 bg-amber-400/[.04] p-5"><p className="tp-section-label">Data still required</p><p className="mt-2 text-sm font-semibold text-amber-200">{result.missing_datasets.join(", ")}</p></section>}
       <div className="mt-5 rounded-xl border border-white/5 bg-white/[.02] p-4 text-xs text-slate-500"><b className="text-slate-300">Research boundary:</b> this scanner ranks evidence; it does not optimize parameters or authorize live execution.</div>
     </>}
   </main>;
