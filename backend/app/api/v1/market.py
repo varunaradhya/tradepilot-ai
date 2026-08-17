@@ -25,7 +25,16 @@ def market_search(
     q: str = Query(min_length=2, max_length=80),
 ):
     try:
-        return [SearchInstrumentResponse(symbol=item.symbol, name=item.name, exchange=item.exchange) for item in search_instruments(q)]
+        return [
+            SearchInstrumentResponse(
+                symbol=item.symbol,
+                name=item.name,
+                exchange=item.exchange,
+                security_id=item.security_id,
+                exchange_segment=item.exchange_segment,
+            )
+            for item in search_instruments(q)
+        ]
     except MarketSearchProviderError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
