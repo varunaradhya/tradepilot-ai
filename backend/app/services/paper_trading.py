@@ -14,7 +14,7 @@ class PaperRiskConfig:
     max_daily_loss: float = 0.01
     trade_direction: str = "LONG_ONLY"
     allocation_pct: float = 0.02
-    lot_size: int = 65
+    lot_size: int = 1
     trailing_stop_pct: float = 0.015
     trailing_activation_pct: float = 0.01
     max_holding_bars: int = 24
@@ -57,32 +57,31 @@ class PaperTradingEngine:
             self.halted = False
 
     def can_trade(self):
-        return (
-            not self.halted
-            and self.position is None
-            and self.day_pnl > -(self.config.initial_capital * self.config.max_daily_loss)
-        )
+        return not self.halted and self.position is None and self.day_pnl > -(self.config.initial_capital * self.config.max_daily_loss)
 
-    def _max_lots_from_allocation(self, price: float) -> int:
+    def _max_lots_from_allocation(self, price: float, lot_size: int) -> int:
         allocation_cash = self.cash * self.config.allocation_pct
-        lot_value = price * self.config.lot_size
+        lot_value = price * lot_size
         return floor(allocation_cash / lot_value) if lot_value > 0 else 0
 
-    def enter(self, price: float, stop: float, target: float, direction: str = "LONG"):
+    def enter(self, price: float, stop: float, target: float, direction: str = "LONG", lot_size: int | None = None):
         if direction != "LONG":
             return False
         if self.config.trade_direction != "LONG_ONLY" and direction not in {"LONG", "SHORT"}:
             return False
         if not self.can_trade() or price <= stop or target <= price:
             return False
+        lot_size = lot_size or self.config.lot_size
+        if lot_size < 1:
+            return False
 
         risk_cash = self.config.initial_capital * self.config.risk_per_trade
         risk_per_unit = price - stop
         risk_qty = floor(risk_cash / risk_per_unit) if risk_per_unit > 0 else 0
-        allocation_lots = self._max_lots_from_allocation(price)
-        cash_lots = floor(self.cash / (price * self.config.lot_size))
-        lots = min(floor(risk_qty / self.config.lot_size), allocation_lots, cash_lots)
-        qty = lots * self.config.lot_size
+        allocation_lots = self._max_lots_from_allocation(price, lot_size)
+        cash_lots = floor(self.cash / (price * lot_size))
+        lots = min(floor(risk_qty / lot_size), allocation_lots, cash_lots)
+        qty = lots * lot_size
         if qty <= 0:
             return False
 
@@ -100,6 +99,7 @@ class PaperTradingEngine:
             "target": target,
             "quantity": qty,
             "lots": lots,
+            "lot_size": lot_size,
             "last_price": price,
             "high_watermark": price,
             "trailing_stop": None,
@@ -123,13 +123,8 @@ class PaperTradingEngine:
         self.realized_pnl += net_pnl
         self.day_pnl += net_pnl
         trade = {
-            "entry": p["entry"],
-            "exit": price,
-            "quantity": p["quantity"],
-            "lots": p["lots"],
-            "stop": p["initial_stop"],
-            "final_stop": p["stop"],
-            "target": p["target"],
+            "entry": p["entry"], "exit": price, "quantity": p["quantity"], "lots": p["lots"], "lot_size": p["lot_size"],
+            "stop": p["initial_stop"], "final_stop": p["stop"], "target": p["target"],
             "gross_pnl": gross_pnl,
             "brokerage": p["entry_costs"]["brokerage"] + exit_costs["brokerage"],
             "stt": p["entry_costs"].get("stt", 0.0) + exit_costs.get("stt", 0.0),
@@ -139,11 +134,8 @@ class PaperTradingEngine:
             "ipft": p["entry_costs"]["ipft"] + exit_costs["ipft"],
             "gst": p["entry_costs"]["gst"] + exit_costs["gst"],
             "total_charges": total_costs,
-            "net_pnl": net_pnl,
-            "pnl": net_pnl,
-            "reason": reason,
-            "direction": p["direction"],
-            "bars_held": p["bars_held"],
+            "net_pnl": net_pnl, "pnl": net_pnl,
+            "reason": reason, "direction": p["direction"], "bars_held": p["bars_held"],
         }
         self.trades.append(trade)
         self.position = None
@@ -161,15 +153,10 @@ class PaperTradingEngine:
         p["bars_held"] += 1
         p["last_price"] = close
         p["high_watermark"] = max(p["high_watermark"], high)
-
-        # Hard stop and target are always active. If a single candle touches both,
-        # stop wins conservatively because intrabar ordering is unknown.
         if low <= p["stop"]:
             return self.close(p["stop"], "STOP_LOSS")
         if high >= p["target"]:
             return self.close(p["target"], "TARGET")
-
-        # Trailing stop is activated only after a meaningful move in our favour.
         activation = p["entry"] * (1 + self.config.trailing_activation_pct)
         if self.config.use_trailing_stop and high >= activation:
             candidate = p["high_watermark"] * (1 - self.config.trailing_stop_pct)
@@ -178,8 +165,6 @@ class PaperTradingEngine:
                 p["trailing_stop"] = candidate
                 if low <= candidate:
                     return self.close(candidate, "TRAILING_STOP")
-
-        # Time is only a safety fallback, never the primary exit condition.
         if p["bars_held"] >= self.config.max_holding_bars:
             return self.close(close, "TIMEOUT")
         return None
@@ -195,15 +180,10 @@ class PaperTradingEngine:
             exit_costs = self.cost_model.estimate_order(market_value, side="SELL", include_stt=True)
             unrealized_net = unrealized_gross - p["entry_costs"]["total"] - exit_costs["total"]
         return {
-            "mode": "SIMULATION_ONLY",
-            "trade_direction": self.config.trade_direction,
-            "cash": round(self.cash, 2),
-            "realized_pnl": round(self.realized_pnl, 2),
-            "unrealized_gross_pnl": round(unrealized_gross, 2),
-            "unrealized_net_pnl": round(unrealized_net, 2),
+            "mode": "SIMULATION_ONLY", "trade_direction": self.config.trade_direction,
+            "cash": round(self.cash, 2), "realized_pnl": round(self.realized_pnl, 2),
+            "unrealized_gross_pnl": round(unrealized_gross, 2), "unrealized_net_pnl": round(unrealized_net, 2),
             "total_pnl": round(self.realized_pnl + unrealized_net, 2),
-            "day_pnl": round(self.day_pnl + unrealized_net, 2),
-            "halted": self.halted,
-            "open_position": self.position,
-            "trades": len(self.trades),
+            "day_pnl": round(self.day_pnl + unrealized_net, 2), "halted": self.halted,
+            "open_position": self.position, "trades": len(self.trades),
         }
