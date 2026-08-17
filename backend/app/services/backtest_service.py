@@ -14,12 +14,34 @@ class BacktestConfig:
     strategy: StrategyConfig = StrategyConfig()
 
 
+def _sell_fill(price: float, slippage_rate: float) -> float:
+    return float(price) * (1.0 - slippage_rate)
+
+
+def _buy_fill(price: float, slippage_rate: float) -> float:
+    return float(price) * (1.0 + slippage_rate)
+
+
 def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestConfig()) -> dict:
+    """Run a conservative long-only daily backtest.
+
+    A signal is generated only after a bar has closed and can therefore be
+    executed no earlier than the following bar's open.  This is critical:
+    using the signal bar's close as its execution price introduces look-ahead
+    bias.  Existing positions are marked/exited using the current bar, with
+    stop-first ordering when both stop and target are touched.
+    """
+    if config.initial_capital <= 0:
+        raise ValueError("initial_capital must be positive")
+    if not rows:
+        raise ValueError("rows must not be empty")
+
     cash = float(config.initial_capital)
     quantity = 0
     entry_price = 0.0
     stop = 0.0
     target = 0.0
+    pending_signal = None
     trades: list[dict] = []
     equity_curve: list[float] = []
 
@@ -27,29 +49,79 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
         close = float(row["close"])
         high = float(row["high"])
         low = float(row["low"])
-        equity_curve.append(cash + quantity * close)
+        open_price = float(row.get("open", close))
 
+        # Execute yesterday's signal at today's open.  Position sizing is
+        # recalculated using the actual fill so an overnight gap cannot silently
+        # invalidate the configured risk budget.
+        if quantity == 0 and pending_signal is not None:
+            signal = pending_signal
+            pending_signal = None
+            actual_entry = _buy_fill(open_price, config.slippage_rate)
+            actual_stop = float(signal.stop)
+            actual_target = float(signal.target)
+            size = position_size(cash, actual_entry, actual_stop, config.strategy)
+            if size > 0:
+                entry_cost = size * actual_entry * config.brokerage_rate
+                total_entry_cash = size * actual_entry + entry_cost
+                if total_entry_cash <= cash:
+                    cash -= total_entry_cash
+                    quantity = size
+                    entry_price = actual_entry
+                    stop = actual_stop
+                    target = actual_target
+
+                    # A gap through the protective levels must be filled at the
+                    # executable open, not at an impossible historical stop/target.
+                    if open_price <= stop:
+                        exit_price = _sell_fill(open_price, config.slippage_rate)
+                        gross = quantity * exit_price
+                        exit_cost = gross * config.brokerage_rate
+                        cash += gross - exit_cost
+                        pnl = quantity * (exit_price - entry_price) - entry_cost - exit_cost
+                        trades.append({"entry": entry_price, "exit": exit_price, "quantity": quantity, "pnl": pnl, "reason": "STOP_GAP"})
+                        quantity = 0
+                        entry_price = stop = target = 0.0
+                    elif open_price >= target:
+                        exit_price = _sell_fill(open_price, config.slippage_rate)
+                        gross = quantity * exit_price
+                        exit_cost = gross * config.brokerage_rate
+                        cash += gross - exit_cost
+                        pnl = quantity * (exit_price - entry_price) - entry_cost - exit_cost
+                        trades.append({"entry": entry_price, "exit": exit_price, "quantity": quantity, "pnl": pnl, "reason": "TARGET_GAP"})
+                        quantity = 0
+                        entry_price = stop = target = 0.0
+
+        # Manage an existing position using only information available during
+        # the current bar.  If both levels are touched, stop wins conservatively.
         if quantity:
             exit_price = None
             exit_reason = None
-            # Conservative rule: if both stop and target are touched in one candle,
-            # assume the stop was hit first. This avoids optimistic intrabar bias.
-            if low <= stop:
-                exit_price, exit_reason = stop * (1 - config.slippage_rate), "STOP"
+            if open_price <= stop:
+                exit_price, exit_reason = _sell_fill(open_price, config.slippage_rate), "STOP_GAP"
+            elif open_price >= target:
+                exit_price, exit_reason = _sell_fill(open_price, config.slippage_rate), "TARGET_GAP"
+            elif low <= stop:
+                exit_price, exit_reason = _sell_fill(stop, config.slippage_rate), "STOP"
             elif high >= target:
-                exit_price, exit_reason = target * (1 - config.slippage_rate), "TARGET"
+                exit_price, exit_reason = _sell_fill(target, config.slippage_rate), "TARGET"
+
             if exit_price is not None:
                 gross = quantity * exit_price
-                costs = gross * config.brokerage_rate
-                cash += gross - costs
-                pnl = quantity * (exit_price - entry_price) - costs
+                exit_cost = gross * config.brokerage_rate
+                cash += gross - exit_cost
+                pnl = quantity * (exit_price - entry_price) - exit_cost
                 trades.append({"entry": entry_price, "exit": exit_price, "quantity": quantity, "pnl": pnl, "reason": exit_reason})
                 quantity = 0
                 entry_price = stop = target = 0.0
-                equity_curve[-1] = cash
-                continue
 
-        if not quantity and i >= 60:
+        # Equity is marked after execution/exit processing.  This prevents a
+        # stale pre-trade cash value from contaminating drawdown calculations.
+        equity_curve.append(cash + quantity * close)
+
+        # Only a completed bar may generate a signal.  Store it for execution
+        # on the next bar, never on the same bar.
+        if quantity == 0 and pending_signal is None and i >= 60:
             history = rows[: i + 1]
             closes = [float(x["close"]) for x in history]
             highs = [float(x["high"]) for x in history]
@@ -57,21 +129,17 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
             volumes = [float(x["volume"]) for x in history] if all(x.get("volume") is not None for x in history) else None
             signal = generate_regime_momentum_signal(closes, highs, lows, volumes, config.strategy)
             if signal.action == "BUY" and signal.entry and signal.stop and signal.target:
-                size = position_size(cash, signal.entry, signal.stop, config.strategy)
-                if size > 0:
-                    entry_price = signal.entry * (1 + config.slippage_rate)
-                    entry_cost = size * entry_price * config.brokerage_rate
-                    cash -= size * entry_price + entry_cost
-                    quantity = size
-                    stop = signal.stop
-                    target = signal.target
+                pending_signal = signal
 
+    # If the final bar created a signal, it has no following bar and therefore
+    # must not be executed.  If a position is still open, close it at the final
+    # close with conservative sell-side slippage.
     if quantity:
-        final_price = float(rows[-1]["close"]) * (1 - config.slippage_rate)
+        final_price = _sell_fill(float(rows[-1]["close"]), config.slippage_rate)
         gross = quantity * final_price
-        costs = gross * config.brokerage_rate
-        cash += gross - costs
-        pnl = quantity * (final_price - entry_price) - costs
+        exit_cost = gross * config.brokerage_rate
+        cash += gross - exit_cost
+        pnl = quantity * (final_price - entry_price) - exit_cost
         trades.append({"entry": entry_price, "exit": final_price, "quantity": quantity, "pnl": pnl, "reason": "END_OF_TEST"})
         equity_curve[-1] = cash
 
