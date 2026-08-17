@@ -1,6 +1,6 @@
 from app.services.indian_costs import IndianEquityCostModel, IndianFnoOptionCostModel
 from app.services.paper_trading import PaperRiskConfig, PaperTradingEngine
-from app.services.paper_trading_service import paper_summary
+from app.services.paper_trading_service import _net_pnl, paper_summary
 
 
 def test_paper_trade_hits_stop():
@@ -30,7 +30,6 @@ def test_daily_risk_baseline_resets_to_realized_session_equity():
     assert trade['reason'] == 'TARGET'
     profitable_equity = e.cash
     assert profitable_equity > 100000
-
     e.new_session('2026-01-05')
     assert e.day_start_equity == profitable_equity
     assert e.day_pnl == 0.0
@@ -121,3 +120,17 @@ def test_paper_summary_separates_open_and_realized_pnl():
     assert result["open_trades"] == 1
     assert result["realized_pnl"] == 150.0
     assert result["pnl"] == 175.0
+
+
+def test_database_paper_pnl_includes_round_trip_execution_costs():
+    entry = 100.0
+    exit = 110.0
+    quantity = 100
+    gross = (exit - entry) * quantity
+    costs = IndianEquityCostModel().estimate_round_trip(entry * quantity, exit * quantity)["total"]
+    assert _net_pnl(entry, exit, quantity) == round(gross - costs, 2)
+    assert _net_pnl(entry, exit, quantity) < gross
+
+
+def test_database_paper_pnl_can_be_negative_after_costs():
+    assert _net_pnl(100.0, 100.01, 1) < 0
