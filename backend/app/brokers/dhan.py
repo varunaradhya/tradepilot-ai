@@ -54,6 +54,13 @@ class DhanClient:
     def positions(self): return self._request("GET", "/positions") or []
     def orders(self): return self._request("GET", "/orders") or []
     def trades(self): return self._request("GET", "/trades") or []
+    def market_ltp(self, exchange_segment: str, security_ids: list[str]) -> dict[str, Any]:
+        """Return real-time LTP snapshots without placing orders."""
+        if not security_ids:
+            return {"data": {}, "status": "success"}
+        return self._request("POST", "/marketfeed/ltp", {exchange_segment: [int(x) for x in security_ids]})
+    def market_ohlc(self, exchange_segment: str, security_ids: list[str]) -> dict[str, Any]:
+        return self._request("POST", "/marketfeed/ohlc", {exchange_segment: [int(x) for x in security_ids]})
     def option_expiries(self, underlying_security_id: int, underlying_segment: str): return self._request("POST", "/optionchain/expirylist", {"UnderlyingScrip": underlying_security_id, "UnderlyingSeg": underlying_segment})
     def option_chain(self, underlying_security_id: int, underlying_segment: str, expiry: str): return self._request("POST", "/optionchain", {"UnderlyingScrip": underlying_security_id, "UnderlyingSeg": underlying_segment, "Expiry": expiry})
     def place_order(self, order: dict[str, Any]): return self._request("POST", "/orders", order)
@@ -73,10 +80,6 @@ class DhanClient:
         try:
             return self._request("POST", "/charts/rollingoption", payload)
         except DhanAPIError as exc:
-            # Dhan's generic docs define 0 as near/current expiry, but the
-            # rollingoption endpoint currently rejects 0 with DH-905. For
-            # compatibility, retry near-expiry requests as code 1, which is
-            # the value verified against the live rolling endpoint.
             if expiry_code == 0 and "DH-905" in str(exc) and "expiryCode" in str(exc):
                 fallback = dict(payload)
                 fallback["expiryCode"] = 1
