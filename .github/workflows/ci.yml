@@ -2,9 +2,9 @@ name: TradePilot CI
 
 on:
   push:
-    branches: [main, 'feat/**']
+    branches: [main, 'feat/**', 'phase-2-**']
   pull_request:
-    branches: [main, 'feat/**']
+    branches: [main, 'feat/**', 'phase-2-**']
 
 jobs:
   backend:
@@ -50,4 +50,6 @@ jobs:
           POSTGRES_PASSWORD: ci-placeholder-password
           TRADEPILOT_JWT_SECRET: ci-placeholder-jwt-secret
           TRADEPILOT_BROKER_ENCRYPTION_KEY: ci-placeholder-broker-key
+          TRADEPILOT_CORS_ORIGINS: http://localhost:5173
+          VITE_API_URL: http://localhost:8000/api/v1
         run: docker compose config --quiet
