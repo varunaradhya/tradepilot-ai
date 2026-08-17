@@ -14,21 +14,35 @@ class IndianEquityCostModel:
     sebi_rate: float = 0.000001
     gst_rate: float = 0.18
 
-    def estimate_round_trip(self, buy_value: float, sell_value: float) -> dict:
-        turnover = max(0.0, buy_value) + max(0.0, sell_value)
-        brokerage = turnover * self.brokerage_rate
-        exchange = turnover * self.exchange_rate
-        sebi = turnover * self.sebi_rate
-        stt = max(0.0, sell_value) * self.stt_rate
+    def estimate_order(self, trade_value: float, *, side: str, include_stt: bool = True) -> dict:
+        """Return one-side equity costs using the same model as research round trips.
+
+        Keeping a per-order interface lets paper execution use the equity model
+        without accidentally applying an options-specific brokerage/STT model.
+        """
+        if trade_value < 0:
+            raise ValueError("trade_value cannot be negative")
+        if side not in {"BUY", "SELL"}:
+            raise ValueError("side must be BUY or SELL")
+        brokerage = trade_value * self.brokerage_rate
+        exchange = trade_value * self.exchange_rate
+        sebi = trade_value * self.sebi_rate
+        stt = trade_value * self.stt_rate if side == "SELL" and include_stt else 0.0
         gst_base = brokerage + exchange + sebi
         gst = gst_base * self.gst_rate
-        slippage = turnover * self.slippage_rate
+        slippage = trade_value * self.slippage_rate
         total = brokerage + exchange + sebi + stt + gst + slippage
         return {
             "brokerage": round(brokerage, 2), "exchange_charges": round(exchange, 2),
             "sebi_charges": round(sebi, 2), "stt": round(stt, 2), "stamp_duty": 0.0,
             "ipft": 0.0, "gst": round(gst, 2), "slippage": round(slippage, 2), "total": round(total, 2),
         }
+
+    def estimate_round_trip(self, buy_value: float, sell_value: float) -> dict:
+        buy = self.estimate_order(buy_value, side="BUY", include_stt=False)
+        sell = self.estimate_order(sell_value, side="SELL", include_stt=True)
+        keys = ["brokerage", "exchange_charges", "sebi_charges", "stt", "stamp_duty", "ipft", "gst", "slippage", "total"]
+        return {key: round(buy[key] + sell[key], 2) for key in keys}
 
 
 @dataclass(frozen=True)
