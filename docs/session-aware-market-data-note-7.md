@@ -1,0 +1,1 @@
+Session-aware validation is the active market data safety boundary.
