@@ -7,6 +7,7 @@ MARKET_CLOSE = time(15, 30)
 
 
 def to_india_time(value: datetime) -> datetime:
+    """Normalize aware/naive timestamps to Asia/Kolkata for session decisions."""
     if value.tzinfo is None:
         return value.replace(tzinfo=INDIA_TZ)
     return value.astimezone(INDIA_TZ)
