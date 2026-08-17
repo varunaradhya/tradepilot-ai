@@ -8,7 +8,8 @@ def test_paper_trade_hits_stop():
     e.new_session('2026-01-02')
     assert e.enter(100, 98, 104)
     trade = e.on_bar('2026-01-02', 101, 97, 99)
-    assert trade['reason'] == 'STOP_LOSS'
+    assert trade['reason'] == 'STOP'
+    assert trade['exit_reason'] == 'STOP_LOSS'
     assert trade['net_pnl'] < 0
     assert trade['total_charges'] > 0
 
