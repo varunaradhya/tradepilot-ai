@@ -1,33 +1,29 @@
-from app.providers.market_search import MarketSearchProviderError, YahooFinanceSearchProvider
+from app.services.instrument_master_service import InstrumentMasterError, instrument_master
 
 
 class IndianSymbolError(ValueError):
-    """Raised when a symbol is not available in the Indian equity universe."""
-
-
-_search_provider = YahooFinanceSearchProvider()
+    """Raised when a symbol is not available in the authoritative NSE universe."""
 
 
 def canonical_indian_symbol(symbol: str) -> str:
     normalized = symbol.strip().upper()
+    if normalized.endswith(".NS"):
+        normalized = normalized[:-3]
+    if normalized.endswith(".BO"):
+        raise IndianSymbolError("TradePilot currently supports NSE cash equities only. Select an NSE stock from the suggestions.")
     if not normalized:
-        raise IndianSymbolError("Enter an Indian NSE/BSE equity symbol.")
-
-    if normalized.endswith(".NS") or normalized.endswith(".BO"):
-        normalized = normalized.rsplit(".", 1)[0]
+        raise IndianSymbolError("Select an NSE stock from the suggestions.")
 
     try:
-        results = _search_provider.search(normalized)
-    except MarketSearchProviderError as exc:
+        items = instrument_master.search(normalized, limit=100)
+    except InstrumentMasterError as exc:
         raise IndianSymbolError(
-            "Indian stock validation is temporarily unavailable. Please try again shortly."
+            "The Indian stock universe is temporarily unavailable. Please try again shortly."
         ) from exc
 
-    exact = [item for item in results if item.symbol.upper() == normalized]
-    if not exact:
+    exact = next((item for item in items if item.symbol.upper() == normalized), None)
+    if exact is None:
         raise IndianSymbolError(
-            f"{normalized} is not available in the Indian NSE/BSE equity universe."
+            f"{normalized} is not an active NSE equity instrument. Select a stock from the suggestions."
         )
-
-    exact.sort(key=lambda item: 0 if item.exchange == "NSE" else 1)
-    return exact[0].symbol.upper()
+    return exact.symbol.upper()
