@@ -57,23 +57,26 @@ def _response_to_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _deduplicate_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Remove duplicate candles introduced when adjacent Dhan request windows overlap."""
+    """Remove duplicate candles if the provider repeats a request boundary."""
     unique: dict[datetime, dict[str, Any]] = {}
     for row in rows:
-        timestamp = row["timestamp"]
-        unique[timestamp] = row
+        unique[row["timestamp"]] = row
     return [unique[timestamp] for timestamp in sorted(unique)]
 
 
 def _request_ranges(start: date, end: date, max_days: int) -> list[tuple[date, date]]:
+    """Build non-overlapping inclusive date windows."""
     if start >= end:
         return []
+    if max_days < 1:
+        raise ValueError("max_days must be positive")
+
     ranges: list[tuple[date, date]] = []
     cursor = start
     while cursor < end:
-        chunk_end = min(cursor + timedelta(days=max_days), end)
+        chunk_end = min(cursor + timedelta(days=max_days - 1), end)
         ranges.append((cursor, chunk_end))
-        cursor = chunk_end
+        cursor = chunk_end + timedelta(days=1)
     return ranges
 
 
@@ -121,8 +124,8 @@ def fetch_intraday_history(
         )
         rows.extend(_response_to_rows(payload))
 
-    # Dhan's date windows can include the boundary candle in both adjacent
-    # requests. Clean provider-boundary duplicates before dataset validation.
+    # Dhan/provider boundaries occasionally repeat candles. Remove those
+    # duplicates before strict dataset validation and persistence.
     rows = _deduplicate_rows(rows)
     bars = normalize_bars(rows)
     diagnostics = validate_dataset(bars)
