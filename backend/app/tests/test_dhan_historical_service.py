@@ -63,6 +63,26 @@ def test_intraday_history_chunks_requests_at_90_days():
     assert len(bars) == 2
 
 
+def test_intraday_history_deduplicates_overlapping_chunk_boundary():
+    boundary = 1704067200
+    client = FakeDhanClient([
+        payload(start=boundary, count=2),
+        payload(start=boundary + 86400, count=2),
+    ])
+
+    bars, diagnostics = fetch_intraday_history(
+        client,
+        HistoricalRequest("1333", interval="5"),
+        date(2024, 1, 1),
+        date(2024, 5, 1),
+    )
+
+    assert len(bars) == 3
+    assert diagnostics["valid"] is True
+    assert diagnostics["duplicates"] == 0
+    assert diagnostics["non_increasing_timestamps"] == 0
+
+
 def test_intraday_rejects_unsupported_interval():
     with pytest.raises(ValueError, match="interval"):
         fetch_intraday_history(
