@@ -37,18 +37,20 @@ class PaperTradingEngine:
         if config.max_holding_bars < 1: raise ValueError("max_holding_bars must be positive")
         if not 0 <= config.trailing_stop_pct < 1: raise ValueError("trailing_stop_pct must be between 0 and 1")
         if not 0 <= config.trailing_activation_pct < 1: raise ValueError("trailing_activation_pct must be between 0 and 1")
+        if not 0 < config.max_daily_loss <= 1: raise ValueError("max_daily_loss must be between 0 and 1")
         self.config = config
         self.cost_model = config.cost_model or IndianEquityCostModel()
         self.cash = config.initial_capital; self.realized_pnl = 0.0; self.day_pnl = 0.0; self.day = None
+        self.day_start_equity = config.initial_capital
         self.position: dict[str, Any] | None = None; self.trades: list[dict[str, Any]] = []; self.halted = False
 
     def new_session(self, session: str):
         if self.day != session:
             if self.position is not None: self.close(self.position["last_price"], "SESSION_CLOSE")
-            self.day = session; self.day_pnl = 0.0; self.halted = False
+            self.day = session; self.day_pnl = 0.0; self.day_start_equity = self.cash; self.halted = False
 
     def can_trade(self):
-        return not self.halted and self.position is None and self.day_pnl > -(self.config.initial_capital * self.config.max_daily_loss)
+        return not self.halted and self.position is None and self.day_pnl > -(self.day_start_equity * self.config.max_daily_loss)
 
     def _max_lots_from_allocation(self, price: float, lot_size: int) -> int:
         allocation_cash = self.cash * self.config.allocation_pct; lot_value = price * lot_size
@@ -60,7 +62,7 @@ class PaperTradingEngine:
         if not self.can_trade() or price <= stop or target <= price: return False
         lot_size = lot_size or self.config.lot_size
         if lot_size < 1: return False
-        risk_cash = self.config.initial_capital * self.config.risk_per_trade; risk_per_unit = price - stop
+        risk_cash = self.day_start_equity * self.config.risk_per_trade; risk_per_unit = price - stop
         risk_qty = floor(risk_cash / risk_per_unit) if risk_per_unit > 0 else 0
         allocation_lots = self._max_lots_from_allocation(price, lot_size); cash_lots = floor(self.cash / (price * lot_size))
         lots = min(floor(risk_qty / lot_size), allocation_lots, cash_lots); qty = lots * lot_size
@@ -88,7 +90,7 @@ class PaperTradingEngine:
                  "total_charges": total_costs, "net_pnl": net_pnl, "pnl": net_pnl,
                  "reason": reason, "exit_reason": "STOP_LOSS" if reason == "STOP" else reason, "direction": p["direction"], "bars_held": p["bars_held"]}
         self.trades.append(trade); self.position = None
-        if self.day_pnl <= -(self.config.initial_capital * self.config.max_daily_loss): self.halted = True
+        if self.day_pnl <= -(self.day_start_equity * self.config.max_daily_loss): self.halted = True
         return trade
 
     def _check_price(self, price: float):
