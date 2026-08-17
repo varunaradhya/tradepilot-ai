@@ -22,7 +22,7 @@ def build_walk_forward_windows(
     step: int | None = None,
 ) -> list[WalkForwardWindow]:
     """Create chronological train/validation windows with no look-ahead."""
-    if train_size <= 0 or validation_size <= 0 or length <= train_size + validation_size:
+    if train_size <= 0 or validation_size <= 0 or length < train_size + validation_size:
         return []
     step = validation_size if step is None else step
     if step <= 0:
@@ -65,14 +65,18 @@ def run_walk_forward(
 
 
 def summarize_walk_forward(results: Sequence[dict]) -> dict:
-    """Summarize validation outcomes without hiding failed windows."""
+    """Summarize validation outcomes without treating malformed results as wins."""
     if not results:
         return {"windows": 0, "successful_windows": 0, "success_rate_percent": 0.0}
     successful = 0
     for result in results:
         value = result.get("result")
-        if isinstance(value, dict) and float(value.get("return_percent", 0.0)) > 0:
-            successful += 1
+        if isinstance(value, dict):
+            try:
+                if float(value.get("return_percent", 0.0)) > 0:
+                    successful += 1
+            except (TypeError, ValueError):
+                pass
     return {
         "windows": len(results),
         "successful_windows": successful,
