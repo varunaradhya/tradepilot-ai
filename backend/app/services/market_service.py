@@ -8,12 +8,12 @@ from app.providers.market_data import (
 from app.providers.market_search import (
     MarketSearchProviderError,
     SearchInstrument,
-    YahooFinanceSearchProvider,
+    get_search_provider,
 )
 from app.services.instrument_service import IndianSymbolError, canonical_indian_symbol
 
 _provider = YahooFinanceProvider()
-_search_provider = YahooFinanceSearchProvider()
+_search_provider = get_search_provider()
 
 
 def get_quote(symbol: str) -> QuoteData:
