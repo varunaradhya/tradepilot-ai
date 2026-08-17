@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from app.schemas.market import HistoryResponse, QuoteResponse, SearchInstrumentResponse
 from app.services.market_service import (
+    IndianSymbolError,
     MarketDataNotFoundError,
     MarketDataProviderError,
     MarketSearchProviderError,
@@ -39,6 +40,11 @@ def market_search(
 def market_quote(symbol: str):
     try:
         quote = get_quote(symbol)
+    except IndianSymbolError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
     except MarketDataNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -83,6 +89,11 @@ def market_history(
 
     try:
         history = get_history(symbol=symbol, range_=range_, interval=interval)
+    except IndianSymbolError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
     except MarketDataNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except MarketDataProviderError as exc:
