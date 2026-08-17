@@ -5,9 +5,18 @@ from pydantic import BaseModel, Field
 
 from app.dependencies.auth import get_current_user
 from app.models.user import User
+from app.services.portfolio_risk import PortfolioPosition
+from app.services.risk_decision_engine import build_risk_aware_paper_trade_decision
 from app.services.trade_decision_service import build_paper_trade_decision
 
 router = APIRouter(prefix="/trade-decision", tags=["Trade Decision"])
+
+
+class PortfolioPositionRequest(BaseModel):
+    symbol: str = Field(min_length=1, max_length=30)
+    market_value: float = Field(gt=0)
+    stop_loss_value: float = Field(ge=0)
+    sector: str | None = Field(default=None, max_length=60)
 
 
 class TradeDecisionRequest(BaseModel):
@@ -26,11 +35,23 @@ class TradeDecisionRequest(BaseModel):
     risk_approved: bool = True
     daily_risk_used: float = Field(default=0, ge=0)
     min_confidence: float = Field(default=65, ge=0, le=100)
+    existing_positions: list[PortfolioPositionRequest] = Field(default_factory=list)
+    sector: str | None = Field(default=None, max_length=60)
 
 
 @router.post("/paper", response_model=dict[str, Any])
 def paper_trade_decision(payload: TradeDecisionRequest, current_user: User = Depends(get_current_user)):
-    # User authentication is required, but the decision engine itself is
-    # deliberately stateless and does not place broker orders.
-    result = build_paper_trade_decision(**payload.model_dump())
+    result = build_paper_trade_decision(
+        **payload.model_dump(exclude={"existing_positions", "sector"})
+    )
+    return {"mode": "SIMULATION_ONLY", "user_id": current_user.id, **result.as_dict()}
+
+
+@router.post("/paper/risk-aware", response_model=dict[str, Any])
+def risk_aware_paper_trade_decision(payload: TradeDecisionRequest, current_user: User = Depends(get_current_user)):
+    positions = [PortfolioPosition(**position.model_dump()) for position in payload.existing_positions]
+    result = build_risk_aware_paper_trade_decision(
+        **payload.model_dump(exclude={"existing_positions"}),
+        existing_positions=positions,
+    )
     return {"mode": "SIMULATION_ONLY", "user_id": current_user.id, **result.as_dict()}
