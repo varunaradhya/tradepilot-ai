@@ -22,10 +22,24 @@ def test_daily_loss_halts_engine():
     assert e.halted
 
 
+def test_daily_risk_baseline_resets_to_realized_session_equity():
+    e = PaperTradingEngine(PaperRiskConfig(initial_capital=100000, risk_per_trade=.01, max_daily_loss=.01, allocation_pct=.20, lot_size=1))
+    e.new_session('2026-01-02')
+    assert e.enter(100, 90, 120)
+    trade = e.on_bar('2026-01-02', 121, 100, 120)
+    assert trade['reason'] == 'TARGET'
+    profitable_equity = e.cash
+    assert profitable_equity > 100000
+
+    e.new_session('2026-01-05')
+    assert e.day_start_equity == profitable_equity
+    assert e.day_pnl == 0.0
+    assert e.halted is False
+
+
 def test_lot_size_and_allocation_reject_partial_lot():
     e = PaperTradingEngine(PaperRiskConfig(initial_capital=100000, risk_per_trade=.01, allocation_pct=.02, lot_size=65))
     e.new_session('2026-01-02')
-    # One NIFTY option lot at ₹141.45 costs more than the ₹2,000 allocation.
     assert not e.enter(141.45, 138.0, 150.0)
     assert e.position is None
 
