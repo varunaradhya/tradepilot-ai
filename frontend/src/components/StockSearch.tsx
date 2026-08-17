@@ -30,6 +30,32 @@ type StockSearchProps = {
   className?: string;
 };
 
+function localFallback(query: string): StockInstrument[] {
+  const normalized = query.trim().toLowerCase();
+  const local = POPULAR_INDIAN_STOCKS.filter(
+    (item) =>
+      item.symbol.toLowerCase().includes(normalized) ||
+      item.name.toLowerCase().includes(normalized),
+  ).slice(0, 8);
+
+  // Do not make the UI appear to know the whole NSE universe from a tiny
+  // hard-coded list. If live search is unavailable and the user typed what
+  // looks like a symbol, keep that exact NSE symbol selectable. The backend
+  // remains authoritative and validates it before a quote/watchlist action.
+  if (/^[A-Za-z0-9&._-]+$/.test(query.trim())) {
+    const symbol = query.trim().toUpperCase().replace(/\.(NS|BO)$/i, "");
+    if (symbol && !local.some((item) => item.symbol === symbol)) {
+      local.unshift({
+        symbol,
+        name: "Exact NSE symbol · validate on selection",
+        exchange: "NSE",
+      });
+    }
+  }
+
+  return local.slice(0, 8);
+}
+
 export default function StockSearch({
   value,
   onChange,
@@ -49,14 +75,7 @@ export default function StockSearch({
 
   useEffect(() => {
     if (query.length < 2) {
-      const local = query
-        ? POPULAR_INDIAN_STOCKS.filter(
-            (item) =>
-              item.symbol.toLowerCase().includes(query.toLowerCase()) ||
-              item.name.toLowerCase().includes(query.toLowerCase()),
-          ).slice(0, 8)
-        : POPULAR_INDIAN_STOCKS.slice(0, 8);
-      setMatches(local);
+      setMatches(localFallback(query));
       setHighlighted(0);
       setLoading(false);
       setSearchError("");
@@ -75,13 +94,7 @@ export default function StockSearch({
         }
       } catch (error) {
         if (currentRequest !== requestId.current) return;
-        setMatches(
-          POPULAR_INDIAN_STOCKS.filter(
-            (item) =>
-              item.symbol.toLowerCase().includes(query.toLowerCase()) ||
-              item.name.toLowerCase().includes(query.toLowerCase()),
-          ).slice(0, 8),
-        );
+        setMatches(localFallback(query));
         setHighlighted(0);
         setSearchError(error instanceof Error ? error.message : "Search is temporarily unavailable.");
       } finally {
@@ -187,7 +200,7 @@ export default function StockSearch({
             ))}
           {searchError && (
             <div className="border-t px-4 py-2 text-xs text-amber-700">
-              Live search unavailable; showing local matches. Exact NSE/BSE validation will still happen when saved.
+              Live search unavailable; showing local matches or the exact symbol you typed. The backend validates the Indian listing before use.
             </div>
           )}
         </div>
