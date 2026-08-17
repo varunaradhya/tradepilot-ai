@@ -64,7 +64,7 @@ class PaperTradingEngine:
         lot_value = price * lot_size
         return floor(allocation_cash / lot_value) if lot_value > 0 else 0
 
-    def enter(self, price: float, stop: float, target: float, direction: str = "LONG", lot_size: int | None = None):
+    def enter(self, price: float, stop: float, target: float, direction: str = "LONG", lot_size: int | None = None, symbol: str | None = None):
         if direction != "LONG":
             return False
         if self.config.trade_direction != "LONG_ONLY" and direction not in {"LONG", "SHORT"}:
@@ -93,19 +93,11 @@ class PaperTradingEngine:
 
         self.cash -= required_cash
         self.position = {
-            "entry": price,
-            "stop": stop,
-            "initial_stop": stop,
-            "target": target,
-            "quantity": qty,
-            "lots": lots,
-            "lot_size": lot_size,
-            "last_price": price,
-            "high_watermark": price,
-            "trailing_stop": None,
-            "bars_held": 0,
-            "entry_costs": entry_costs,
-            "direction": "LONG",
+            "symbol": symbol.upper() if symbol else None,
+            "entry": price, "stop": stop, "initial_stop": stop, "target": target,
+            "quantity": qty, "lots": lots, "lot_size": lot_size, "last_price": price,
+            "high_watermark": price, "trailing_stop": None, "bars_held": 0,
+            "entry_costs": entry_costs, "direction": "LONG",
         }
         return True
 
@@ -123,9 +115,8 @@ class PaperTradingEngine:
         self.realized_pnl += net_pnl
         self.day_pnl += net_pnl
         trade = {
-            "entry": p["entry"], "exit": price, "quantity": p["quantity"], "lots": p["lots"], "lot_size": p["lot_size"],
-            "stop": p["initial_stop"], "final_stop": p["stop"], "target": p["target"],
-            "gross_pnl": gross_pnl,
+            "symbol": p.get("symbol"), "entry": p["entry"], "exit": price, "quantity": p["quantity"], "lots": p["lots"], "lot_size": p["lot_size"],
+            "stop": p["initial_stop"], "final_stop": p["stop"], "target": p["target"], "gross_pnl": gross_pnl,
             "brokerage": p["entry_costs"]["brokerage"] + exit_costs["brokerage"],
             "stt": p["entry_costs"].get("stt", 0.0) + exit_costs.get("stt", 0.0),
             "exchange_charges": p["entry_costs"]["exchange_charges"] + exit_costs["exchange_charges"],
@@ -133,10 +124,8 @@ class PaperTradingEngine:
             "stamp_duty": p["entry_costs"]["stamp_duty"] + exit_costs["stamp_duty"],
             "ipft": p["entry_costs"]["ipft"] + exit_costs["ipft"],
             "gst": p["entry_costs"]["gst"] + exit_costs["gst"],
-            "total_charges": total_costs,
-            "net_pnl": net_pnl, "pnl": net_pnl,
-            "reason": reason,
-            "exit_reason": "STOP_LOSS" if reason == "STOP" else reason,
+            "total_charges": total_costs, "net_pnl": net_pnl, "pnl": net_pnl,
+            "reason": reason, "exit_reason": "STOP_LOSS" if reason == "STOP" else reason,
             "direction": p["direction"], "bars_held": p["bars_held"],
         }
         self.trades.append(trade)
@@ -156,24 +145,18 @@ class PaperTradingEngine:
         p["last_price"] = close
         previous_trailing_stop = p["trailing_stop"]
         p["high_watermark"] = max(p["high_watermark"], high)
-
-        # A trailing stop that becomes active on this bar is only eligible
-        # for execution on a subsequent bar. This avoids look-ahead within
-        # one OHLC candle where activation and the pullback are indistinguishable.
         if previous_trailing_stop is not None and low <= previous_trailing_stop:
             return self.close(previous_trailing_stop, "TRAILING_STOP")
         if low <= p["stop"]:
             return self.close(p["stop"], "STOP")
         if high >= p["target"]:
             return self.close(p["target"], "TARGET")
-
         activation = p["entry"] * (1 + self.config.trailing_activation_pct)
         if self.config.use_trailing_stop and high >= activation:
             candidate = p["high_watermark"] * (1 - self.config.trailing_stop_pct)
             if candidate > p["stop"]:
                 p["stop"] = candidate
                 p["trailing_stop"] = candidate
-
         if p["bars_held"] >= self.config.max_holding_bars:
             return self.close(close, "TIMEOUT")
         return None
