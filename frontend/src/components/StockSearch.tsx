@@ -30,6 +30,16 @@ type StockSearchProps = {
   className?: string;
 };
 
+function localFallback(query: string): StockInstrument[] {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return POPULAR_INDIAN_STOCKS.slice(0, 8);
+  return POPULAR_INDIAN_STOCKS.filter(
+    (item) =>
+      item.symbol.toLowerCase().includes(normalized) ||
+      item.name.toLowerCase().includes(normalized),
+  ).slice(0, 8);
+}
+
 export default function StockSearch({
   value,
   onChange,
@@ -49,14 +59,7 @@ export default function StockSearch({
 
   useEffect(() => {
     if (query.length < 2) {
-      const local = query
-        ? POPULAR_INDIAN_STOCKS.filter(
-            (item) =>
-              item.symbol.toLowerCase().includes(query.toLowerCase()) ||
-              item.name.toLowerCase().includes(query.toLowerCase()),
-          ).slice(0, 8)
-        : POPULAR_INDIAN_STOCKS.slice(0, 8);
-      setMatches(local);
+      setMatches(localFallback(query));
       setHighlighted(0);
       setLoading(false);
       setSearchError("");
@@ -75,13 +78,7 @@ export default function StockSearch({
         }
       } catch (error) {
         if (currentRequest !== requestId.current) return;
-        setMatches(
-          POPULAR_INDIAN_STOCKS.filter(
-            (item) =>
-              item.symbol.toLowerCase().includes(query.toLowerCase()) ||
-              item.name.toLowerCase().includes(query.toLowerCase()),
-          ).slice(0, 8),
-        );
+        setMatches(localFallback(query));
         setHighlighted(0);
         setSearchError(error instanceof Error ? error.message : "Search is temporarily unavailable.");
       } finally {
@@ -158,7 +155,7 @@ export default function StockSearch({
           {loading && <div className="px-4 py-3 text-sm text-slate-500">Searching Indian stocks…</div>}
           {!loading && matches.length === 0 && (
             <div className="px-4 py-3 text-sm text-slate-500">
-              No Indian stock found for “{query}”. You can still type an exact NSE symbol and submit it.
+              No Indian stock found for “{query}”. You can type the exact NSE symbol and use Search Indian Stock; the backend will validate it.
             </div>
           )}
           {!loading &&
@@ -187,7 +184,7 @@ export default function StockSearch({
             ))}
           {searchError && (
             <div className="border-t px-4 py-2 text-xs text-amber-700">
-              Live search unavailable; showing local matches. Exact NSE/BSE validation will still happen when saved.
+              Live search unavailable; showing only verified local suggestions. Exact symbols can still be submitted through the Search Indian Stock button and are validated by the backend.
             </div>
           )}
         </div>

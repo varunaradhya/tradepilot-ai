@@ -13,6 +13,11 @@ class PaperOrchestratorConfig:
     max_daily_loss: float = 0.01
     max_trades_per_session: int = 3
     trade_direction: str = "LONG_ONLY"
+    allocation_pct: float = 0.02
+    lot_size: int = 1
+    trailing_stop_pct: float = 0.015
+    trailing_activation_pct: float = 0.01
+    max_holding_bars: int = 24
 
 
 class PaperTradingOrchestrator:
@@ -22,16 +27,16 @@ class PaperTradingOrchestrator:
         if config.max_trades_per_session < 1:
             raise ValueError("max_trades_per_session must be positive")
         self.config = config
-        # The paper engine itself only supports long positions today. Keep its
-        # risk model valid even when the caller asks for an unsupported mode;
-        # the orchestrator then rejects the order through the explicit safety
-        # gate below instead of failing during construction.
-        engine_direction = "LONG_ONLY"
         self.engine = PaperTradingEngine(PaperRiskConfig(
             initial_capital=config.initial_capital,
             risk_per_trade=config.risk_per_trade,
             max_daily_loss=config.max_daily_loss,
-            trade_direction=engine_direction,
+            trade_direction="LONG_ONLY",
+            allocation_pct=config.allocation_pct,
+            lot_size=config.lot_size,
+            trailing_stop_pct=config.trailing_stop_pct,
+            trailing_activation_pct=config.trailing_activation_pct,
+            max_holding_bars=config.max_holding_bars,
         ))
         self.session_trades = 0
         self.last_signal: dict[str, Any] | None = None
@@ -69,14 +74,14 @@ class PaperTradingOrchestrator:
         target = float(signal["target"])
         if not (stop < entry < target):
             return {"accepted": False, "reason": "INVALID_RISK_LEVELS", **self.engine.snapshot()}
-        accepted = self.engine.enter(entry, stop, target, "LONG")
+        lot_size = int(signal.get("lot_size") or self.config.lot_size)
+        accepted = self.engine.enter(entry, stop, target, "LONG", lot_size=lot_size)
         if not accepted:
-            return {"accepted": False, "reason": "ORDER_REJECTED", **self.engine.snapshot()}
+            return {"accepted": False, "reason": "ORDER_REJECTED_OR_ALLOCATION_TOO_SMALL", **self.engine.snapshot()}
         self.session_trades += 1
         return {"accepted": True, "reason": "PAPER_ORDER_OPENED", **self.engine.snapshot()}
 
     def close_session(self, session: str, close: float) -> dict[str, Any]:
-        """Force an end-of-day virtual exit without sending a broker order."""
         self._sync_session(session)
         trade = self.engine.close(float(close), "SESSION_CLOSE")
         return {"mode": "SIMULATION_ONLY", "trade": trade, **self.engine.snapshot()}

@@ -10,13 +10,14 @@ from app.providers.market_search import (
     SearchInstrument,
     YahooFinanceSearchProvider,
 )
+from app.services.instrument_service import IndianSymbolError, canonical_indian_symbol
 
 _provider = YahooFinanceProvider()
 _search_provider = YahooFinanceSearchProvider()
 
 
 def get_quote(symbol: str) -> QuoteData:
-    return _provider.get_quote(symbol)
+    return _provider.get_quote(canonical_indian_symbol(symbol))
 
 
 def get_history(
@@ -25,7 +26,7 @@ def get_history(
     interval: str = "1d",
 ) -> HistoricalData:
     return _provider.get_history(
-        symbol=symbol,
+        symbol=canonical_indian_symbol(symbol),
         range_=range_,
         interval=interval,
     )
@@ -39,6 +40,7 @@ __all__ = [
     "get_quote",
     "get_history",
     "search_instruments",
+    "IndianSymbolError",
     "MarketDataProviderError",
     "MarketDataNotFoundError",
     "MarketSearchProviderError",
