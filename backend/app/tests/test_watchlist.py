@@ -32,6 +32,7 @@ def create_user():
             return user
 
         user = User(
+            full_name="Watchlist Test User",
             email=EMAIL,
             password_hash=hash_password(PASSWORD),
         )
