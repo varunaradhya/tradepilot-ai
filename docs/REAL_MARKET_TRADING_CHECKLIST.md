@@ -22,18 +22,20 @@ This checklist is the product standard for moving from research to paper trading
 - [x] Maximum daily loss gate in backtest.
 - [x] Maximum trades per day in backtest.
 - [x] Paper risk guard supports daily loss, trade count, loss streak and open-position limits.
-- [ ] Add portfolio-level correlated exposure cap.
-- [ ] Add sector exposure cap.
+- [x] Portfolio total-exposure and total-risk gate.
+- [x] Sector exposure gate as a conservative correlation proxy.
 - [ ] Add max gap-at-entry rule (skip if opening gap invalidates planned risk).
 - [ ] Add broker margin/exposure reconciliation before live orders.
+- [ ] Add historical correlation matrix for portfolio-level correlation limits.
 
 ## 3. Stop loss and trade management
 - [x] Initial stop is ATR-based.
 - [x] Stop cannot be widened after entry.
 - [x] Gap-through-stop fills at executable market/open price in backtest.
 - [x] Trailing stop activates after a configurable R multiple.
-- [x] Trailing stop only ratchets upward for long trades.
+- [x] Trailing stop uses current ATR and only ratchets upward for long trades.
 - [x] Target remains protected by trailing logic.
+- [x] Maximum holding period is enforced.
 - [ ] Add breakeven transition policy as an explicit strategy option.
 - [ ] Add partial-profit policy only after it is validated by out-of-sample testing.
 - [ ] Add end-of-day forced exit policy for strategies that are not intended to hold overnight.
@@ -46,7 +48,7 @@ This checklist is the product standard for moving from research to paper trading
 - [ ] Model spread and queue/partial fills for intraday strategies.
 - [ ] Track signal timestamp, order-submit timestamp, acknowledgement timestamp and fill timestamp.
 - [ ] Track p50/p95/p99 order latency.
-- [ ] Reject stale signals after a configurable TTL.
+- [x] Reject stale signals after a configurable TTL in execution guard.
 - [ ] Add price-band, quantity, order-value and trade-price-protection checks before broker submission.
 
 ## 5. Backtesting standard
@@ -62,11 +64,12 @@ This checklist is the product standard for moving from research to paper trading
 - [ ] Require minimum trade count and stability thresholds before strategy promotion.
 
 ## 6. Monitoring and operational safety
-- [ ] Market-data heartbeat and stale-feed alarm.
+- [x] Market-data freshness guard.
+- [ ] Market-data heartbeat and stale-feed alarm UI/alerting.
 - [ ] Broker API heartbeat.
-- [ ] Order acknowledgement timeout.
+- [x] Order acknowledgement timeout guard.
 - [ ] Position reconciliation against broker every cycle.
-- [ ] Duplicate-order/idempotency protection.
+- [ ] Duplicate-order/idempotency protection at broker boundary.
 - [ ] Kill switch that blocks all new entries immediately.
 - [ ] Emergency flatten procedure.
 - [ ] Daily API-session logout / token lifecycle handling.
@@ -100,12 +103,13 @@ These are engineering targets, not promises of profitability:
 - Stale signal TTL: strategy-specific; never submit an order from an expired signal.
 
 ## 9. Regulatory / broker readiness
-NSE/SEBI retail-algo rules must be treated as a release gate, not a documentation afterthought. Current NSE implementation standards include API/static-IP requirements and daily API-session logout requirements. Algo order risk controls include price, quantity, order-value and trade-price-protection checks.
+NSE/SEBI retail-algo rules are a release gate, not a documentation afterthought. Current SEBI retail-algo policy is designed around safer retail participation, with the current framework applicable to brokers from April 1, 2026. Order-level controls include price and quantity checks and broader risk-control requirements. Re-check broker/exchange implementation standards immediately before enabling automated live orders.
 
 Sources reviewed:
-- NSE implementation standards for safer retail participation in algorithmic trading.
-- NSE retail algo FAQ.
-- NSE risk-control requirements.
-- Zerodha guidance/disclosures on stop-loss, trailing stop-loss, backtesting and execution risks.
+- SEBI circular on safer participation of retail investors in algorithmic trading.
+- SEBI extension/implementation timeline for the retail-algo framework.
+- SEBI master circular provisions on algorithmic order risk controls and dysfunctional-algo monitoring.
+- NSE market timings.
+- Zerodha educational/disclosure material on trading-system execution and stop-loss behavior.
 
-Always re-check the current broker/exchange rules immediately before enabling live automated orders.
+The product must remain paper-first until every live-execution release gate is independently verified.
