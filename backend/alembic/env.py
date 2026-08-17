@@ -9,6 +9,7 @@ from app.models.holding import Holding
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.models.watchlist import Watchlist
+from app.models.paper_trade import PaperTrade
 
 config = context.config
 config.set_main_option("sqlalchemy.url", DATABASE_URL)
