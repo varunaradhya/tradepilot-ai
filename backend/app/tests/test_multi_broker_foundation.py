@@ -36,8 +36,11 @@ def test_market_data_quality_detects_duplicates_and_missing_intervals():
     duplicate = [{"timestamp": base}, {"timestamp": base}]
     assert validate_intraday_candles(duplicate).duplicate is True
 
-    rows = [{"timestamp": base}, {"timestamp": base + timedelta(minutes=15)}]
-    result = validate_intraday_candles(rows, expected_minutes=5)
+    rows = [
+        {"timestamp": base, "open": 100, "high": 101, "low": 99, "close": 100, "volume": 1000},
+        {"timestamp": base + timedelta(minutes=15), "open": 100, "high": 102, "low": 99, "close": 101, "volume": 1000},
+    ]
+    result = validate_intraday_candles(rows, expected_minutes=5, stale_after_minutes=99999)
     assert result.missing_intervals == 2
     assert result.reason == "MISSING_INTERVALS"
 
