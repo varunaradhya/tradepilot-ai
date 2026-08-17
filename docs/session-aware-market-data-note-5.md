@@ -1,0 +1,1 @@
+Market data quality is fail-closed and session-aware.

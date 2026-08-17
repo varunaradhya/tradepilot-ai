@@ -1,0 +1,1 @@
+Session-aware market data validation prevents overnight and weekend gaps from being counted as missing intraday candles and separates historical validation from live staleness checks.
