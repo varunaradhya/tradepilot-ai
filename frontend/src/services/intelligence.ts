@@ -15,7 +15,7 @@ export interface HistoryItem { id:number; analysis_type:string; symbol:string|nu
 export interface IntelligenceResponse { analysis:AIAnalysis; context_summary:Record<string,unknown>; }
 export interface TradingTradeStat { symbol:string; realized_pnl:number; return_percent:number; quantity:number; sell_price:number; cost_basis:number; }
 export interface TradingGeneral { realized_pnl:number; total_closed_quantity:number; winning_trades:number; losing_trades:number; breakeven_trades:number; win_rate_percent:number; average_win:number; average_loss:number; profit_factor:number|null; expectancy_per_trade:number; best_trade:TradingTradeStat|null; worst_trade:TradingTradeStat|null; largest_win_percent:number|null; largest_loss_percent:number|null; strategy_score:number; strategy_label:string; strategy_insights:string[]; loss_patterns:string[]; profit_patterns:string[]; suggested_rules:string[]; sample_size:number; disclaimer:string; }
-export function getTechnicalSignal(symbol:string){return apiRequest<SignalResponse>(`/api/v1/signals/technical?symbol=${encodeURIComponent(symbol)}`);}
+export function getTechnicalSignal(symbol:string){return apiRequest<SignalResponse>(`/signals/technical?symbol=${encodeURIComponent(symbol)}`);}
 export function getAdvancedAnalytics(){return apiRequest<AdvancedAnalytics>("/analytics/advanced");}
 export function getReconciliation(){return apiRequest<ReconciliationResponse>("/reconciliation/");}
 export function getPortfolioIntelligence(){return apiRequest<IntelligenceResponse>("/intelligence/portfolio");}
