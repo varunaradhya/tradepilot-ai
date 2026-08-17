@@ -26,6 +26,24 @@ def _buy_fill(price: float, slippage_rate: float) -> float:
     return float(price) * (1.0 + slippage_rate)
 
 
+def _session_key(row: dict) -> str:
+    """Normalize daily/session identity for both daily and intraday timestamps."""
+    raw = row.get("date") or row.get("timestamp")
+    if raw is None:
+        return "BACKTEST"
+    text = str(raw).strip()
+    if not text:
+        return "BACKTEST"
+    # ISO datetime, common SQL timestamp, and pandas Timestamp string forms.
+    if "T" in text:
+        return text.split("T", 1)[0]
+    if " " in text:
+        return text.split(" ", 1)[0]
+    if len(text) >= 10 and text[4] == "-" and text[7] == "-":
+        return text[:10]
+    return text
+
+
 def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestConfig()) -> dict:
     """Conservative long-only daily backtest with execution and risk realism."""
     if config.initial_capital <= 0:
@@ -62,7 +80,7 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
         holding_bars = 0
 
     for i, row in enumerate(rows):
-        session = row.get("date") or row.get("timestamp") or "BACKTEST"
+        session = _session_key(row)
         if session != current_session:
             current_session = session
             daily_pnl = 0.0
@@ -77,6 +95,7 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
             continue
 
         closed_this_bar = False
+        entered_this_bar = False
         if quantity == 0 and pending_signal is not None and not halted and daily_trades < config.max_trades_per_day:
             signal = pending_signal
             pending_signal = None
@@ -100,6 +119,7 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
                     initial_risk = max(0.0, planned_entry - actual_stop)
                     high_watermark = actual_entry
                     holding_bars = 1
+                    entered_this_bar = True
                     daily_trades += 1
                     if open_price <= stop:
                         close_position(_sell_fill(open_price, config.slippage_rate), "STOP_GAP", entry_cost)
@@ -109,7 +129,8 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
                         closed_this_bar = True
 
         if quantity:
-            holding_bars += 1 if holding_bars >= 1 else 1
+            if not entered_this_bar:
+                holding_bars += 1
             exit_price = None
             exit_reason = None
             high_watermark = max(high_watermark, high)
