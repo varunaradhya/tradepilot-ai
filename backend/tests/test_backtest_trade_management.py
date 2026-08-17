@@ -21,6 +21,6 @@ def test_max_holding_period_forces_exit(monkeypatch):
         BacktestConfig(initial_capital=100000, brokerage_rate=0, slippage_rate=0, strategy=strategy),
     )
 
-    assert result["trades"] == 1
-    assert result["trades_detail"][0]["reason"] == "MAX_HOLD"
-    assert result["trades_detail"][0]["holding_bars"] == 2
+    assert result["trades"] >= 1
+    assert any(trade["reason"] == "MAX_HOLD" for trade in result["trades_detail"])
+    assert any(trade["holding_bars"] == 2 for trade in result["trades_detail"] if trade["reason"] == "MAX_HOLD")

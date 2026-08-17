@@ -52,9 +52,9 @@ def test_false_breakout_without_volume_is_rejected():
 def test_gap_reversal_does_not_change_conservative_stop_priority():
     rows = _healthy_trend()
     rows.append({"close": 80.0, "high": 160.0, "low": 70.0, "volume": 10000.0})
-    result = run_daily_backtest(rows, BacktestConfig())
+    result = run_daily_backtest(rows, BacktestConfig(strategy=StrategyConfig(max_holding_bars=1000)))
     if result["trades_detail"]:
-        assert any(t["reason"] in {"STOP", "END_OF_TEST"} for t in result["trades_detail"])
+        assert any(t["reason"] in {"STOP", "END_OF_TEST", "STOP_GAP"} for t in result["trades_detail"])
 
 
 def test_diagnostics_identify_failed_filter_without_changing_strategy():

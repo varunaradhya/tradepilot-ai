@@ -6,11 +6,8 @@ def _trend_rows(n=100):
     rows = []
     price = 100.0
     for i in range(n):
-        # Positive drift with regular pullbacks keeps RSI inside the configured
-        # momentum zone instead of creating an overbought fixture.
         price += 0.8 if i % 3 else -0.8
         rows.append({"close": price, "high": price + 1.0, "low": price - 1.0, "volume": 2000.0})
-    # Create a breakout on the final bar with healthy volume.
     rows[-1]["close"] += 8
     rows[-1]["high"] += 8
     rows[-1]["volume"] = 5000.0
@@ -40,8 +37,7 @@ def test_position_size_respects_risk_and_capital_limits():
 
 def test_backtest_never_counts_same_candle_stop_and_target_as_target():
     rows = _trend_rows(100)
-    # Make the next candle touch both stop and target; conservative engine must exit at stop.
-    result = run_daily_backtest(rows + [{"close": 150, "high": 160, "low": 80, "volume": 5000}], BacktestConfig())
+    result = run_daily_backtest(rows + [{"close": 150, "high": 160, "low": 80, "volume": 5000}], BacktestConfig(strategy=StrategyConfig(max_holding_bars=1000)))
     assert result["trades"] >= 1
     assert any(trade["reason"] == "STOP" for trade in result["trades_detail"])
 

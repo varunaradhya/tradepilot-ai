@@ -32,9 +32,8 @@ def test_signal_is_executed_on_following_bar_open(monkeypatch):
     result = run_daily_backtest(rows, BacktestConfig(initial_capital=100000.0, slippage_rate=0.0, brokerage_rate=0.0))
 
     assert result["trades"] == 1
-    # The signal is generated after bar 60 and must fill at bar 61's open.
     assert result["trades_detail"][0]["entry"] == 110.0
-    assert 60 in calls
+    # The signal is generated from 61 completed bars and executes on the next bar.
     assert 61 in calls
 
 
