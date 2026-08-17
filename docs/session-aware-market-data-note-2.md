@@ -1,0 +1,1 @@
+Session-aware validation is required for reliable Indian intraday backtests and live data safety.
