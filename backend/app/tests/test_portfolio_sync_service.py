@@ -2,15 +2,19 @@ import app.services.portfolio_sync_service as service
 
 
 class FakeColumn:
+    def __init__(self, name):
+        self.name = name
+
     def __eq__(self, other):
-        return self
+        return lambda row: getattr(row, self.name) == other
 
 
 class FakeHolding:
-    user_id = FakeColumn()
-    symbol = FakeColumn()
+    user_id = FakeColumn("user_id")
+    symbol = FakeColumn("symbol")
 
-    def __init__(self, symbol, quantity, average_buy_price):
+    def __init__(self, symbol, quantity, average_buy_price, user_id=1):
+        self.user_id = user_id
         self.symbol = symbol
         self.quantity = quantity
         self.average_buy_price = average_buy_price
@@ -20,7 +24,10 @@ class FakeQuery:
     def __init__(self, rows):
         self.rows = rows
 
-    def filter(self, *args):
+    def filter(self, *predicates):
+        for predicate in predicates:
+            if callable(predicate):
+                self.rows = [row for row in self.rows if predicate(row)]
         return self
 
     def first(self):
@@ -53,7 +60,11 @@ def test_sync_holdings_removes_stale_positions():
     original = service.Holding
     service.Holding = FakeHolding
     try:
-        updated = service._sync_holdings(db, 1, [{"tradingSymbol": "TCS", "totalQty": 7, "avgCostPrice": 3100}])
+        updated = service._sync_holdings(
+            db,
+            1,
+            [{"tradingSymbol": "TCS", "totalQty": 7, "avgCostPrice": 3100}],
+        )
     finally:
         service.Holding = original
     assert updated == 1
