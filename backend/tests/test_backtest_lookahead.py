@@ -53,17 +53,17 @@ def test_final_bar_signal_is_not_executed_without_a_following_bar(monkeypatch):
 
 def test_gap_through_stop_is_filled_at_open(monkeypatch):
     def fake_signal(closes, highs, lows, volumes, config=StrategyConfig()):
-        return Signal("BUY", 100.0, 100.0, 95.0, 120.0, ("TEST",))
+        return Signal("BUY", 100.0, 100.0, 85.0, 120.0, ("TEST",))
 
     monkeypatch.setattr(backtest_service, "generate_regime_momentum_signal", fake_signal)
     rows = _rows()
-    rows[61]["open"] = 90.0
-    rows[61]["close"] = 90.0
+    rows[61]["open"] = 80.0
+    rows[61]["close"] = 80.0
 
     result = run_daily_backtest(rows, BacktestConfig(initial_capital=100000.0, slippage_rate=0.0, brokerage_rate=0.0))
 
     assert result["trades"] == 1
     trade = result["trades_detail"][0]
-    assert trade["entry"] == 90.0
-    assert trade["exit"] == 90.0
+    assert trade["entry"] == 80.0
+    assert trade["exit"] == 80.0
     assert trade["reason"] == "STOP_GAP"
