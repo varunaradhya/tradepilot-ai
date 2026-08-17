@@ -1,0 +1,1 @@
+The market data validator now distinguishes live freshness from historical age and ignores cross-session gaps when counting missing intraday bars.
