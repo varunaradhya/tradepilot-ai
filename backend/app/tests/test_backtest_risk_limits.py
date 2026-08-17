@@ -35,3 +35,23 @@ def test_intraday_timestamps_share_one_daily_risk_session(monkeypatch):
     )
 
     assert result["trades"] == 1
+
+
+def test_entry_bar_counts_as_one_holding_bar(monkeypatch):
+    def fake_signal(closes, highs, lows, volumes, config=StrategyConfig()):
+        return Signal("BUY", 100.0, 100.0, 90.0, 120.0, ("TEST",))
+
+    monkeypatch.setattr(backtest_service, "generate_regime_momentum_signal", fake_signal)
+    result = run_daily_backtest(
+        _intraday_rows(),
+        BacktestConfig(
+            initial_capital=100000.0,
+            brokerage_rate=0.0,
+            slippage_rate=0.0,
+            strategy=StrategyConfig(max_holding_bars=2),
+        ),
+    )
+
+    assert result["trades"] >= 1
+    assert result["trades_detail"][0]["reason"] == "MAX_HOLD"
+    assert result["trades_detail"][0]["holding_bars"] == 2
