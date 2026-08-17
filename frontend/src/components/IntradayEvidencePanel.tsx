@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "../services/api";
+import ResearchDataPanel from "./ResearchDataPanel";
 
 type Ranking = { symbol: string; score?: number; robustness?: { status?: string }; metrics?: { return_percent?: number; profit_factor?: number; max_drawdown_percent?: number; trades?: number } };
 type Evidence = { status: string; interval: string; missing_symbols: string[]; summary: { symbols_tested: number; robust_symbols: number; robust_percent: number; average_return_percent: number; median_profit_factor: number; worst_drawdown_percent: number }; ranking: Ranking[] };
@@ -38,7 +39,7 @@ export default function IntradayEvidencePanel() {
       <div className="mt-5 grid gap-3 md:grid-cols-5">
         {[['Stocks', result.summary.symbols_tested], ['Robust', result.summary.robust_percent + "%"], ['Avg return', result.summary.average_return_percent + "%"], ['Median PF', n(result.summary.median_profit_factor)], ['Worst DD', result.summary.worst_drawdown_percent + "%"]].map(([label, value]) => <div key={String(label)} className="rounded-xl bg-slate-50 p-4"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-xl font-bold">{value}</p></div>)}
       </div>
-      {result.missing_symbols.length > 0 && <p className="mt-4 rounded-xl bg-amber-50 p-3 text-sm font-medium text-amber-800">Data still required: {result.missing_symbols.join(", ")}</p>}
+      <ResearchDataPanel missingSymbols={result.missing_symbols} interval={interval} onComplete={() => void run()} />
       <div className="mt-5 overflow-x-auto"><table className="w-full min-w-[700px] text-left text-sm"><thead><tr className="border-b text-xs uppercase tracking-wide text-slate-400"><th className="p-3">Rank</th><th className="p-3">Symbol</th><th className="p-3">Status</th><th className="p-3">Score</th><th className="p-3">Return</th><th className="p-3">PF</th><th className="p-3">Drawdown</th></tr></thead><tbody>{result.ranking.map((item, index) => <tr key={item.symbol} className="border-b last:border-0"><td className="p-3 font-bold">#{index + 1}</td><td className="p-3 font-bold">{item.symbol}</td><td className="p-3"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${item.robustness?.status === "ROBUST" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{item.robustness?.status ?? "REVIEW"}</span></td><td className="p-3">{n(item.score)}</td><td className="p-3">{n(item.metrics?.return_percent)}%</td><td className="p-3">{n(item.metrics?.profit_factor)}</td><td className="p-3">{n(item.metrics?.max_drawdown_percent)}%</td></tr>)}</tbody></table></div>
     </>}
   </section>;
