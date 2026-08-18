@@ -1,3 +1,5 @@
+import pytest
+
 from app.services.intraday_backtest import IntradayBacktestConfig
 from app.services.intraday_walk_forward import run_fixed_parameter_walk_forward
 
@@ -36,6 +38,7 @@ def test_fixed_parameter_walk_forward_reports_both_versions():
 
 
 def test_walk_forward_rejects_insufficient_data_at_service_level():
-    result = run_fixed_parameter_walk_forward(_rows(30), train_size=20, validation_size=20, config=IntradayBacktestConfig())
-    assert result["windows"] == 0
-    assert result["v1"]["summary"]["success_rate_percent"] == 0.0
+    with pytest.raises(ValueError, match="Not enough rows"):
+        run_fixed_parameter_walk_forward(
+            _rows(30), train_size=20, validation_size=20, config=IntradayBacktestConfig()
+        )
