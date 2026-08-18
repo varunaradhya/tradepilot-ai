@@ -56,7 +56,7 @@ def _orchestrator(user_id: int) -> PaperTradingOrchestrator:
 
 
 def _market_coordinator(user_id: int) -> PaperMarketCoordinator:
-    return _market.setdefault(user_id, PaperMarketCoordinator())
+    return _market.setdefault(user_id, PaperMarketCoordinator(orchestrator=_orchestrator(user_id)))
 
 
 def _research_rows(symbol: str, interval: str) -> list[dict]:
@@ -96,15 +96,7 @@ def _authorize_from_research(db: Session, user_id: int, symbol: str, symbols: st
     fingerprint = evidence.get("strategy_fingerprint")
     if not qualification.get("paper_trading_allowed") or not fingerprint:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={"reason": "STRATEGY_NOT_QUALIFIED", "qualification": qualification})
-    record = authorize_strategy(
-        db,
-        user_id,
-        symbol=symbol,
-        interval=interval,
-        strategy_version=strategy_version,
-        fingerprint=fingerprint,
-        evidence=evidence,
-    )
+    record = authorize_strategy(db, user_id, symbol=symbol, interval=interval, strategy_version=strategy_version, fingerprint=fingerprint, evidence=evidence)
     _orchestrator(user_id).authorize_strategy(fingerprint=fingerprint)
     return {"authorized": True, "authorization_id": record.id, "symbol": record.symbol, "interval": record.interval, "strategy_version": record.strategy_version, "fingerprint": record.fingerprint, "authorized_at": record.authorized_at}
 
@@ -172,9 +164,7 @@ def close_trade(trade_id: int, payload: PaperCloseRequest, current_user: User = 
     except ValueError as exc: raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
 
 @router.get("/session")
-def paper_session_summary(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict[str, Any]:
-    live = _orchestrator(current_user.id).summary()
-    return {"mode":"SIMULATION_ONLY",**live}
+def paper_session_summary(current_user: User = Depends(get_current_user)) -> dict[str, Any]: return {"mode":"SIMULATION_ONLY",**_orchestrator(current_user.id).summary()}
 
 @router.post("/session/signal")
 def paper_session_signal(payload: PaperSignalRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict[str, Any]:
@@ -195,7 +185,10 @@ def paper_live_ltp(current_user: User = Depends(get_current_user), db: Session =
 
 @router.post("/session/reset")
 def paper_session_reset(current_user: User = Depends(get_current_user)) -> dict[str, Any]:
-    _sessions[current_user.id] = PaperTradingOrchestrator(PaperOrchestratorConfig(trade_direction="LONG_ONLY")); return {"mode":"SIMULATION_ONLY","reset":True}
+    orchestrator = PaperTradingOrchestrator(PaperOrchestratorConfig(trade_direction="LONG_ONLY"))
+    _sessions[current_user.id] = orchestrator
+    _market[current_user.id] = PaperMarketCoordinator(orchestrator=orchestrator)
+    return {"mode":"SIMULATION_ONLY","reset":True}
 
 @router.post("/session/market-bar")
 def paper_market_bar(payload: MarketBarRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict[str, Any]:
@@ -215,4 +208,4 @@ def paper_dhan_session(payload: DhanPaperRequest, current_user: User = Depends(g
 
 @router.post("/session/market-reset")
 def paper_market_reset(current_user: User = Depends(get_current_user)) -> dict[str, Any]:
-    _market[current_user.id] = PaperMarketCoordinator(); return {"mode":"SIMULATION_ONLY","reset":True}
+    _market[current_user.id] = PaperMarketCoordinator(orchestrator=_orchestrator(current_user.id)); return {"mode":"SIMULATION_ONLY","reset":True}
