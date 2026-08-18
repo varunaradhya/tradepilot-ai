@@ -44,6 +44,26 @@
 
 **P2 safety boundary:** all execution remains `SIMULATION_ONLY`; broker orders are disabled. Divergence evidence is diagnostic and can never authorize live trading.
 
+## P3 — Strategy readiness
+
+| Capability | Status |
+|---|---|
+| Minimum sustained paper-trade sample | IMPLEMENTED |
+| Paper profit-factor gate | IMPLEMENTED |
+| Paper drawdown ceiling | IMPLEMENTED |
+| Maximum consecutive-loss gate | IMPLEMENTED |
+| Average-R quality gate | IMPLEMENTED |
+| Statistical lower-confidence bound | IMPLEMENTED |
+| Chronological regime-window stability | IMPLEMENTED |
+| Backtest-vs-paper return/drawdown divergence gate | IMPLEMENTED |
+| Strategy fingerprint / parameter-drift gate | IMPLEMENTED |
+| Evidence freshness gate | IMPLEMENTED |
+| Fail-closed strategy readiness API | IMPLEMENTED |
+| Adversarial P3 regression coverage | IMPLEMENTED |
+| Live execution promotion | LOCKED |
+
+**P3 safety boundary:** `READY_FOR_STRATEGY_REVIEW` is an evidence result, not permission to place live orders. `live_trading_allowed` remains permanently false in this phase.
+
 ## Permanent constraints
 
 1. India/NSE first.
@@ -65,12 +85,12 @@ Research data, intraday strategy, backtesting, robustness and walk-forward quali
 ### Phase 2 — Paper-market validation
 **Status: IMPLEMENTED — CI GATE**
 
-P2 now covers the end-to-end simulation boundary: qualified signal capture → risk checks → simulated execution → position lifecycle → net P&L → persistence/reconciliation → evidence comparison.
+P2 covers the end-to-end simulation boundary: qualified signal capture → risk checks → simulated execution → position lifecycle → net P&L → persistence/reconciliation → evidence comparison.
 
 ### Phase 3 — Strategy readiness
-**Status: EVIDENCE GATED / NEXT**
+**Status: IMPLEMENTED — EVIDENCE GATED**
 
-A strategy must pass historical qualification **and** sustained paper-performance gates before readiness review. Positive return alone is insufficient.
+A strategy must pass historical qualification, cross-stock consistency, sustained paper performance, statistical confidence, regime stability, bounded drawdown/loss streaks, parameter-fingerprint stability, divergence limits and evidence freshness before it can reach `READY_FOR_STRATEGY_REVIEW`.
 
 ### Phase 4 — Live execution
 **Status: LOCKED**
@@ -91,4 +111,4 @@ Live order placement remains disabled until production safeguards, broker integr
 
 ## Latest engineering focus
 
-P2 completes the controlled intraday paper-market evidence boundary. The next attack is Phase 3 strategy-readiness hardening: sustained paper-performance gates, statistical confidence, regime stability, drawdown/loss-streak limits, parameter drift detection, and fail-closed promotion from PAPER to READINESS.
+P3 hardens the promotion boundary rather than adding execution power. The next phase should attack production operationalization: reliable market-data runtime, evidence persistence/retention, monitoring SLAs, deployment configuration and only then a separately reviewed live-broker safety architecture.
