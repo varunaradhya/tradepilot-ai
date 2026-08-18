@@ -6,21 +6,18 @@
 **Last audited:** 2026-08-18  
 **Status:** Active
 
-## Current P1 implementation
+## P1 — Paper operations
 
-| Priority | Feature | Status |
-|---|---|---|
-| P1 | Paper monitoring/alerting foundation | IMPLEMENTED |
-| P1 | Read-only paper health endpoint | IMPLEMENTED |
-| P1 | Paper state/ledger reconciliation halt gate | IMPLEMENTED |
-| P1 | Simulation-only operational monitoring | IMPLEMENTED |
-| P1 | Deterministic/order-independent reconciliation | IMPLEMENTED |
-| P1 | Fail-closed invalid reconciliation data handling | IMPLEMENTED |
-| P1 | Minimum paper-evidence monitoring warning | IMPLEMENTED |
-| P1 | Production market-data scheduler | ENVIRONMENTAL |
-| P1 | Strategy research dashboard | EXISTING / EXTEND |
-| P1 | Parameter sensitivity visualization | EXISTING / EXTEND |
-| P1 | Regime-performance visualization | EXISTING / EXTEND |
+| Capability | Status |
+|---|---|
+| Paper monitoring/alerting foundation | IMPLEMENTED |
+| Read-only paper health endpoint | IMPLEMENTED |
+| Paper state/ledger reconciliation halt gate | IMPLEMENTED |
+| Simulation-only operational monitoring | IMPLEMENTED |
+| Deterministic/order-independent reconciliation | IMPLEMENTED |
+| Fail-closed invalid reconciliation data handling | IMPLEMENTED |
+| Minimum paper-evidence monitoring warning | IMPLEMENTED |
+| Production market-data scheduler | ENVIRONMENTAL |
 
 ## P2 — Intraday paper-market validation
 
@@ -40,9 +37,8 @@
 | Backtest-vs-paper divergence evidence | IMPLEMENTED |
 | Paper evidence API | IMPLEMENTED |
 | Adversarial regression coverage | IMPLEMENTED |
-| Production continuous scheduler | ENVIRONMENTAL |
 
-**P2 safety boundary:** all execution remains `SIMULATION_ONLY`; broker orders are disabled. Divergence evidence is diagnostic and can never authorize live trading.
+**P2 safety boundary:** all execution remains `SIMULATION_ONLY`; broker orders are disabled.
 
 ## P3 — Strategy readiness
 
@@ -62,7 +58,26 @@
 | Adversarial P3 regression coverage | IMPLEMENTED |
 | Live execution promotion | LOCKED |
 
-**P3 safety boundary:** `READY_FOR_STRATEGY_REVIEW` is an evidence result, not permission to place live orders. `live_trading_allowed` remains permanently false in this phase.
+## P4 — Production safety foundation
+
+| Capability | Status |
+|---|---|
+| Central fail-closed execution safety policy | IMPLEMENTED |
+| Explicit `SIMULATION_ONLY` execution mode | IMPLEMENTED |
+| Permanent live-order block at safety layer | IMPLEMENTED |
+| Kill-switch-aware paper-operation gate | IMPLEMENTED |
+| Market-data freshness gate contract | IMPLEMENTED |
+| Reconciliation-health gate contract | IMPLEMENTED |
+| Read-only production safety status endpoint | IMPLEMENTED |
+| NSE session status included in operational status | IMPLEMENTED |
+| P4 adversarial safety regression coverage | IMPLEMENTED |
+| Production broker live-order enablement | LOCKED |
+| Automatic live-order promotion | LOCKED |
+| Production deployment/runtime SLOs | NEXT / ENVIRONMENTAL |
+| Durable multi-instance kill switch | NEXT |
+| Evidence retention/observability pipeline | NEXT |
+
+**P4 safety boundary:** no environment variable or broker connection can make live order execution available through this milestone. Live order authorization remains explicitly blocked in code. Paper operations require fresh market data, healthy reconciliation and an inactive kill switch.
 
 ## Permanent constraints
 
@@ -73,29 +88,29 @@
 5. Evidence before promotion.
 6. Never optimize against OOS data.
 7. Never use future information in signal/backtest calculations.
-8. Live execution remains locked.
+8. Live execution remains locked until a separate safety review.
 
 ## Agile lifecycle
 
 ### Phase 1 — Research / historical validation
 **Status: EXISTING FOUNDATION**
 
-Research data, intraday strategy, backtesting, robustness and walk-forward qualification already exist and remain evidence-gated.
+Research data, intraday strategy, backtesting, robustness and walk-forward qualification exist and remain evidence-gated.
 
 ### Phase 2 — Paper-market validation
 **Status: IMPLEMENTED — CI GATE**
 
-P2 covers the end-to-end simulation boundary: qualified signal capture → risk checks → simulated execution → position lifecycle → net P&L → persistence/reconciliation → evidence comparison.
+Qualified signal capture → risk checks → simulated execution → position lifecycle → net P&L → persistence/reconciliation → evidence comparison.
 
 ### Phase 3 — Strategy readiness
 **Status: IMPLEMENTED — EVIDENCE GATED**
 
-A strategy must pass historical qualification, cross-stock consistency, sustained paper performance, statistical confidence, regime stability, bounded drawdown/loss streaks, parameter-fingerprint stability, divergence limits and evidence freshness before it can reach `READY_FOR_STRATEGY_REVIEW`.
+Historical qualification, cross-stock consistency, sustained paper performance, statistical confidence, regime stability, bounded drawdown/loss streaks, fingerprint stability, divergence limits and evidence freshness are required.
 
-### Phase 4 — Live execution
-**Status: LOCKED**
+### Phase 4 — Production safety
+**Status: FOUNDATION IMPLEMENTED — LIVE EXECUTION LOCKED**
 
-Live order placement remains disabled until production safeguards, broker integration validation, paper-performance gates, operational monitoring and explicit owner approval are satisfied.
+P4 establishes the central safety boundary and operational status contract. The remaining production work is environmental and operational: durable state, observability, deployment SLOs, broker sandbox validation and independent live-execution review.
 
 ## Definition of Done
 
@@ -111,4 +126,4 @@ Live order placement remains disabled until production safeguards, broker integr
 
 ## Latest engineering focus
 
-P3 hardens the promotion boundary rather than adding execution power. The next phase should attack production operationalization: reliable market-data runtime, evidence persistence/retention, monitoring SLAs, deployment configuration and only then a separately reviewed live-broker safety architecture.
+P4 establishes the fail-closed production safety boundary. The next move is operational hardening rather than live trading: durable kill-switch state, market-data watchdogs, evidence/audit retention, deployment SLOs and broker sandbox certification.
