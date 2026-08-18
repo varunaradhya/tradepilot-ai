@@ -11,7 +11,7 @@ from app.models.paper_signal_receipt import PaperSignalReceipt
 
 
 def build_signal_key(signal: dict[str, Any]) -> str:
-    """Build a stable request key when clients do not supply one."""
+    """Build a stable key when a caller does not supply one."""
     canonical = {
         "session": str(signal.get("session", "")),
         "symbol": str(signal.get("symbol", "")).strip().upper(),
@@ -42,14 +42,18 @@ def get_receipt(db: Session, user_id: int, idempotency_key: str) -> PaperSignalR
     )
 
 
-def record_receipt(
+def claim_signal(
     db: Session,
     user_id: int,
     *,
     idempotency_key: str,
     signal: dict[str, Any],
-    response: dict[str, Any],
-) -> PaperSignalReceipt:
+) -> tuple[PaperSignalReceipt, bool]:
+    """Atomically claim a signal. True means this request owns execution."""
+    existing = get_receipt(db, user_id, idempotency_key)
+    if existing is not None:
+        return existing, False
+
     record = PaperSignalReceipt(
         user_id=user_id,
         idempotency_key=idempotency_key,
@@ -58,8 +62,9 @@ def record_receipt(
         strategy_version=str(signal.get("strategy_version", "V1")),
         interval=str(signal.get("interval", "5")),
         request_fingerprint=build_request_fingerprint(signal),
-        accepted=bool(response.get("accepted")),
-        response_json=json.dumps(response, sort_keys=True, separators=(",", ":"), default=str),
+        status="PENDING",
+        accepted=False,
+        response_json="{}",
     )
     db.add(record)
     try:
@@ -69,10 +74,21 @@ def record_receipt(
         existing = get_receipt(db, user_id, idempotency_key)
         if existing is None:
             raise
-        return existing
+        return existing, False
+    db.refresh(record)
+    return record, True
+
+
+def complete_signal(db: Session, record: PaperSignalReceipt, response: dict[str, Any]) -> PaperSignalReceipt:
+    record.status = "COMPLETED"
+    record.accepted = bool(response.get("accepted"))
+    record.response_json = json.dumps(response, sort_keys=True, separators=(",", ":"), default=str)
+    db.commit()
     db.refresh(record)
     return record
 
 
-def response_from_receipt(record: PaperSignalReceipt) -> dict[str, Any]:
+def response_from_receipt(record: PaperSignalReceipt) -> dict[str, Any] | None:
+    if record.status != "COMPLETED":
+        return None
     return json.loads(record.response_json)
