@@ -36,3 +36,21 @@ def test_revoke_strategy_closes_future_entry_path():
     )
     assert result["accepted"] is False
     assert result["reason"] == "STRATEGY_NOT_QUALIFIED"
+
+
+def test_reset_retains_server_authorization_but_clears_position_state():
+    orchestrator = PaperTradingOrchestrator(
+        PaperOrchestratorConfig(allocation_pct=0.50, risk_per_trade=0.01)
+    )
+    orchestrator.authorize_strategy(fingerprint="a1b2c3d4e5f6")
+    opened = orchestrator.on_signal(
+        "2026-08-18",
+        {"action": "BUY", "entry": 100.0, "stop": 95.0, "target": 110.0, "symbol": "RELIANCE"},
+    )
+    assert opened["accepted"] is True
+
+    orchestrator.reset()
+
+    assert orchestrator.summary()["strategy_ready"] is True
+    assert orchestrator.summary()["strategy_fingerprint"] == "a1b2c3d4e5f6"
+    assert orchestrator.summary()["open_position"] is None
