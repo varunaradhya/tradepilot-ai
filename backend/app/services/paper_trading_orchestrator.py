@@ -18,10 +18,15 @@ class PaperOrchestratorConfig:
     trailing_stop_pct: float = 0.015
     trailing_activation_pct: float = 0.01
     max_holding_bars: int = 24
+    qualification_required: bool = True
 
 
 class PaperTradingOrchestrator:
-    """Simulation-only signal-to-position coordinator. It never talks to a broker."""
+    """Simulation-only signal-to-position coordinator. It never talks to a broker.
+
+    A caller-provided signal cannot open a paper position unless the orchestrator
+    has been explicitly enabled by the server after strategy qualification.
+    """
 
     def __init__(self, config: PaperOrchestratorConfig = PaperOrchestratorConfig()):
         if config.max_trades_per_session < 1:
@@ -37,6 +42,18 @@ class PaperTradingOrchestrator:
         self.session_trades = 0
         self.last_signal: dict[str, Any] | None = None
         self._session: str | None = None
+        self._strategy_ready = not config.qualification_required
+        self._strategy_fingerprint: str | None = None
+
+    def authorize_strategy(self, *, fingerprint: str) -> None:
+        if not fingerprint or len(fingerprint) < 8:
+            raise ValueError("A valid strategy fingerprint is required")
+        self._strategy_ready = True
+        self._strategy_fingerprint = fingerprint
+
+    def revoke_strategy(self) -> None:
+        self._strategy_ready = False
+        self._strategy_fingerprint = None
 
     def _sync_session(self, session: str) -> None:
         if self._session != session:
@@ -66,6 +83,7 @@ class PaperTradingOrchestrator:
         self._sync_session(session)
         self.last_signal = dict(signal)
         if signal.get("action") != "BUY": return {"accepted": False, "reason": "SIGNAL_NOT_BUY", **self.engine.snapshot()}
+        if not self._strategy_ready: return {"accepted": False, "reason": "STRATEGY_NOT_QUALIFIED", **self.engine.snapshot()}
         if self.config.trade_direction != "LONG_ONLY": return {"accepted": False, "reason": "UNSUPPORTED_DIRECTION", **self.engine.snapshot()}
         if self.session_trades >= self.config.max_trades_per_session: return {"accepted": False, "reason": "MAX_TRADES_REACHED", **self.engine.snapshot()}
         if not self.engine.can_trade(): return {"accepted": False, "reason": "RISK_GATE_BLOCKED", **self.engine.snapshot()}
@@ -75,7 +93,7 @@ class PaperTradingOrchestrator:
         accepted = self.engine.enter(entry, stop, target, "LONG", lot_size=lot_size, symbol=signal.get("symbol"))
         if not accepted: return {"accepted": False, "reason": "ORDER_REJECTED_OR_ALLOCATION_TOO_SMALL", **self.engine.snapshot()}
         self.session_trades += 1
-        return {"accepted": True, "reason": "PAPER_ORDER_OPENED", **self.engine.snapshot()}
+        return {"accepted": True, "reason": "PAPER_ORDER_OPENED", "strategy_fingerprint": self._strategy_fingerprint, **self.engine.snapshot()}
 
     def close_session(self, session: str, close: float) -> dict[str, Any]:
         self._sync_session(session)
@@ -88,4 +106,6 @@ class PaperTradingOrchestrator:
         snapshot = self.engine.snapshot()
         snapshot["session_trades"] = self.session_trades
         snapshot["last_signal"] = self.last_signal
+        snapshot["strategy_ready"] = self._strategy_ready
+        snapshot["strategy_fingerprint"] = self._strategy_fingerprint
         return snapshot
