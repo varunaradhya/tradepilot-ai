@@ -10,15 +10,7 @@ from app.services.walk_forward_service import build_walk_forward_windows
 
 def _validation_summary(results: list[dict]) -> dict:
     if not results:
-        return {
-            "windows": 0,
-            "profitable_windows": 0,
-            "success_rate_percent": 0.0,
-            "average_return_percent": 0.0,
-            "worst_return_percent": 0.0,
-            "max_drawdown_percent": 0.0,
-            "total_validation_trades": 0,
-        }
+        return {"windows": 0, "profitable_windows": 0, "success_rate_percent": 0.0, "average_return_percent": 0.0, "worst_return_percent": 0.0, "max_drawdown_percent": 0.0, "total_validation_trades": 0}
     returns = [float(x["return_percent"]) for x in results]
     drawdowns = [float(x["max_drawdown_percent"]) for x in results]
     trades = [int(x.get("trades", 0) or 0) for x in results]
@@ -44,24 +36,31 @@ def run_fixed_parameter_walk_forward(
 ) -> dict:
     """Run chronological out-of-sample windows with fixed parameters.
 
-    The train slice is intentionally not used for parameter optimization. This keeps
-    the first research implementation honest: every validation window is evaluated
-    using parameters supplied before the run, preventing hidden look-ahead tuning.
+    Parameters are supplied before the run; the train slice is never used to tune
+    them. Validation windows must be non-overlapping so one observation cannot
+    contribute to multiple supposedly independent OOS results.
     """
     if train_size <= 0 or validation_size <= 0:
         raise ValueError("train_size and validation_size must be positive")
     if step is not None and step <= 0:
         raise ValueError("step must be positive")
+    effective_step = validation_size if step is None else step
+    if effective_step < validation_size:
+        raise ValueError("step cannot be smaller than validation_size; overlapping validation windows are not independent")
     if len(rows) < train_size + validation_size:
         raise ValueError("Not enough rows for a complete train and validation window")
-    windows = build_walk_forward_windows(len(rows), train_size, validation_size, step)
+    windows = build_walk_forward_windows(len(rows), train_size, validation_size, effective_step)
     if not windows:
         raise ValueError("No walk-forward windows can be constructed")
 
     v1_results: list[dict] = []
     v2_results: list[dict] = []
     comparisons: list[dict] = []
+    previous_validation_end = None
     for number, window in enumerate(windows, start=1):
+        if previous_validation_end is not None and window.validation_start < previous_validation_end:
+            raise ValueError("Walk-forward validation windows overlap")
+        previous_validation_end = window.validation_end
         validation = rows[window.validation_start:window.validation_end]
         v1 = run_intraday_backtest(validation, config)
         v2_config = IntradayBacktestConfig(
@@ -79,8 +78,9 @@ def run_fixed_parameter_walk_forward(
         )
         v2 = run_intraday_backtest(validation, v2_config)
         comparison = compare_intraday_strategies(validation, config)
-        v1_results.append({"window": number, "train_start": window.train_start, "train_end": window.train_end, "validation_start": window.validation_start, "validation_end": window.validation_end, **{k: v for k, v in v1.items() if k != "trades_detail"}})
-        v2_results.append({"window": number, "train_start": window.train_start, "train_end": window.train_end, "validation_start": window.validation_start, "validation_end": window.validation_end, **{k: v for k, v in v2.items() if k != "trades_detail"}})
+        metadata = {"window": number, "train_start": window.train_start, "train_end": window.train_end, "validation_start": window.validation_start, "validation_end": window.validation_end}
+        v1_results.append({**metadata, **{k: v for k, v in v1.items() if k != "trades_detail"}})
+        v2_results.append({**metadata, **{k: v for k, v in v2.items() if k != "trades_detail"}})
         comparisons.append({"window": number, "validation_start": window.validation_start, "validation_end": window.validation_end, "delta": comparison["delta"]})
 
     return {
@@ -88,7 +88,7 @@ def run_fixed_parameter_walk_forward(
         "parameter_selection": False,
         "train_size": train_size,
         "validation_size": validation_size,
-        "step": validation_size if step is None else step,
+        "step": effective_step,
         "windows": len(windows),
         "v1": {"windows": v1_results, "summary": _validation_summary(v1_results)},
         "v2": {"windows": v2_results, "summary": _validation_summary(v2_results)},
