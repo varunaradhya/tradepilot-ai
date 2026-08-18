@@ -24,6 +24,7 @@ from app.services.research_store import research_store
 from app.services.intraday_scorecard import build_intraday_scorecard, ScorecardConfig
 from app.services.intraday_evidence_aggregation import aggregate_scorecards
 from app.services.strategy_paper_authorization import authorize_strategy, get_active_authorization, revoke_strategy
+from app.services.paper_signal_request_service import claim_request, complete_request, replay_response, request_fingerprint
 
 router = APIRouter(prefix="/paper-trading", tags=["Paper Trading"])
 _sessions: dict[int, PaperTradingOrchestrator] = {}
@@ -36,7 +37,7 @@ class PaperMarkRequest(BaseModel):
 class PaperCloseRequest(BaseModel):
     exit_price: float = Field(gt=0); reason: str = Field(default="MANUAL", min_length=1, max_length=40)
 class PaperSignalRequest(BaseModel):
-    session: str = Field(min_length=1, max_length=40); action: str = Field(min_length=1, max_length=20); entry: float = Field(gt=0); stop: float = Field(gt=0); target: float = Field(gt=0); symbol: str = Field(min_length=1, max_length=30); interval: str = Field(default="5", pattern="^(1|5|15|25|60)$"); strategy_version: str = Field(default="V1", pattern="^(V1|V2)$"); lot_size: int = Field(default=1, gt=0, le=100000)
+    session: str = Field(min_length=1, max_length=40); action: str = Field(min_length=1, max_length=20); entry: float = Field(gt=0); stop: float = Field(gt=0); target: float = Field(gt=0); symbol: str = Field(min_length=1, max_length=30); interval: str = Field(default="5", pattern="^(1|5|15|25|60)$"); strategy_version: str = Field(default="V1", pattern="^(V1|V2)$"); lot_size: int = Field(default=1, gt=0, le=100000); request_id: str | None = Field(default=None, min_length=1, max_length=100)
 class PaperBarRequest(BaseModel):
     session: str = Field(min_length=1, max_length=40); high: float = Field(gt=0); low: float = Field(gt=0); close: float = Field(gt=0)
 class MarketBarRequest(BaseModel):
@@ -168,9 +169,27 @@ def paper_session_summary(current_user: User = Depends(get_current_user)) -> dic
 
 @router.post("/session/signal")
 def paper_session_signal(payload: PaperSignalRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict[str, Any]:
+    signal = payload.model_dump()
+    request_id = payload.request_id or request_fingerprint(signal)
+    signal["request_id"] = request_id
+
     if not _load_authorization(db, current_user.id, payload.symbol, payload.interval, payload.strategy_version):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No active qualified strategy authorization for this symbol and interval")
-    return {"mode":"SIMULATION_ONLY",**_orchestrator(current_user.id).on_signal(payload.session,payload.model_dump())}
+
+    record, owner = claim_request(db, current_user.id, request_id, signal)
+    fingerprint = request_fingerprint(signal)
+    if record.request_fingerprint != fingerprint:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="request_id was already used for a different signal")
+
+    if not owner:
+        replay = replay_response(record)
+        if replay is None:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Signal request is already being processed")
+        return {**replay, "idempotent_replay": True, "request_id": request_id}
+
+    response = {"mode": "SIMULATION_ONLY", **_orchestrator(current_user.id).on_signal(payload.session, signal)}
+    complete_request(db, record, response)
+    return {**response, "idempotent_replay": False, "request_id": request_id}
 
 @router.post("/session/bar")
 def paper_session_bar(payload: PaperBarRequest, current_user: User = Depends(get_current_user)) -> dict[str, Any]:
