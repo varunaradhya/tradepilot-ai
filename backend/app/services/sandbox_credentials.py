@@ -14,7 +14,16 @@ def sandbox_credential_status(broker: str) -> dict:
     name = broker.strip().lower()
     keys = BROKER_SANDBOX_ENV.get(name)
     if keys is None:
-        return {"broker": name, "supported": False, "configured": False, "missing": [], "mode": "SANDBOX_READ_ONLY"}
+        return {
+            "broker": name,
+            "supported": False,
+            "configured": False,
+            "missing": [],
+            "mode": "SANDBOX_READ_ONLY",
+            "secret_values_exposed": False,
+            "live_execution_allowed": False,
+        }
+
     missing = [key for key in keys if not os.getenv(key, "").strip()]
     return {
         "broker": name,
