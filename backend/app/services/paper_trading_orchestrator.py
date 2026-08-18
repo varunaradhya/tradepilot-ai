@@ -49,7 +49,6 @@ class PaperTradingOrchestrator:
         ))
 
     def reset(self) -> None:
-        """Reset simulation state while retaining the server-granted authorization."""
         self.engine = self._new_engine()
         self.session_trades = 0
         self.last_signal = None
@@ -64,6 +63,41 @@ class PaperTradingOrchestrator:
     def revoke_strategy(self) -> None:
         self._strategy_ready = False
         self._strategy_fingerprint = None
+
+    def export_state(self) -> dict[str, Any]:
+        return {
+            "session_trades": self.session_trades,
+            "last_signal": self.last_signal,
+            "session": self._session,
+            "strategy_ready": self._strategy_ready,
+            "strategy_fingerprint": self._strategy_fingerprint,
+            "engine": {
+                "cash": self.engine.cash,
+                "realized_pnl": self.engine.realized_pnl,
+                "day_pnl": self.engine.day_pnl,
+                "day": self.engine.day,
+                "day_start_equity": self.engine.day_start_equity,
+                "halted": self.engine.halted,
+                "position": self.engine.position,
+                "trades": self.engine.trades,
+            },
+        }
+
+    def restore_state(self, state: dict[str, Any]) -> None:
+        engine_state = state.get("engine") or {}
+        for name in ("cash", "realized_pnl", "day_pnl", "day_start_equity"):
+            value = engine_state.get(name)
+            if value is not None:
+                setattr(self.engine, name, float(value))
+        self.engine.day = engine_state.get("day")
+        self.engine.halted = bool(engine_state.get("halted", False))
+        self.engine.position = engine_state.get("position")
+        self.engine.trades = list(engine_state.get("trades") or [])
+        self.session_trades = int(state.get("session_trades", 0))
+        self.last_signal = state.get("last_signal")
+        self._session = state.get("session")
+        self._strategy_ready = bool(state.get("strategy_ready", False))
+        self._strategy_fingerprint = state.get("strategy_fingerprint")
 
     def _sync_session(self, session: str) -> None:
         if self._session != session:
