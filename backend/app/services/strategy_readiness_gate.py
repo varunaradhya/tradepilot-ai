@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from math import sqrt
 from typing import Iterable, Any
 
@@ -11,6 +11,7 @@ from app.services.paper_backtest_divergence import compare_backtest_to_paper
 
 @dataclass(frozen=True)
 class StrategyReadinessPolicy:
+    min_cross_stock_robust_percent: float = 60.0
     min_paper_trades: int = 30
     min_profit_factor: float = 1.10
     max_drawdown_percent: float = 10.0
@@ -35,9 +36,7 @@ def _ordered_closed(trades: Iterable[PaperTrade]) -> list[PaperTrade]:
 def _r_values(trades: list[PaperTrade]) -> list[float]:
     values: list[float] = []
     for trade in trades:
-        entry = float(trade.entry_price)
-        stop = float(trade.stop_price)
-        risk = abs(entry - stop) * abs(int(trade.quantity))
+        risk = abs(float(trade.entry_price) - float(trade.stop_price)) * abs(int(trade.quantity))
         if risk > 0:
             values.append(float(trade.pnl or 0.0) / risk)
     return values
@@ -95,9 +94,7 @@ def _paper_metrics(trades: list[PaperTrade]) -> dict[str, Any]:
     if len(rs) > 1 and mean_r is not None:
         variance = sum((value - mean_r) ** 2 for value in rs) / (len(rs) - 1)
         std_error = sqrt(variance / len(rs))
-        # Conservative normal approximation for a one-sided confidence bound.
-        z = 1.645
-        lower_bound = mean_r - z * std_error
+        lower_bound = mean_r - 1.645 * std_error
     else:
         lower_bound = None
     return {
@@ -126,6 +123,8 @@ def evaluate_strategy_readiness(
     """Fail-closed P3 promotion gate. It never authorizes live execution."""
     if policy.regime_windows < 1 or policy.min_profitable_regime_windows > policy.regime_windows:
         raise ValueError("invalid regime policy")
+    if not 0 < policy.min_cross_stock_robust_percent <= 100:
+        raise ValueError("min_cross_stock_robust_percent must be between 0 and 100")
     now = (reference_now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     closed = _ordered_closed(paper_trades)
     paper = _paper_metrics(closed)
@@ -146,7 +145,7 @@ def evaluate_strategy_readiness(
 
     checks = {
         "research_qualification": q.get("status") == "PAPER_CANDIDATE",
-        "cross_stock_consistency": robust_percent >= 60.0,
+        "cross_stock_consistency": robust_percent >= policy.min_cross_stock_robust_percent,
         "paper_sample": paper["trades"] >= policy.min_paper_trades,
         "paper_profit_factor": paper["profit_factor"] is not None and paper["profit_factor"] >= policy.min_profit_factor,
         "paper_drawdown": paper["max_drawdown_percent"] <= policy.max_drawdown_percent,
