@@ -21,7 +21,9 @@ def test_closed_trade_preserves_stop_and_target():
 
 
 def test_market_coordinator_routes_existing_position_to_bar_exit():
-    coordinator = PaperMarketCoordinator()
+    coordinator = PaperMarketCoordinator(
+        orchestrator=PaperTradingOrchestrator(PaperOrchestratorConfig(qualification_required=False))
+    )
     opened = coordinator.orchestrator.on_signal(
         "2026-01-02",
         {"action": "BUY", "entry": 100, "stop": 98, "target": 104, "symbol": "TCS"},
@@ -33,7 +35,7 @@ def test_market_coordinator_routes_existing_position_to_bar_exit():
 
 
 def test_orchestrator_close_session_forces_end_of_day_exit():
-    orchestrator = PaperTradingOrchestrator(PaperOrchestratorConfig())
+    orchestrator = PaperTradingOrchestrator(PaperOrchestratorConfig(qualification_required=False))
     opened = orchestrator.on_signal(
         "2026-01-02",
         {"action": "BUY", "entry": 100, "stop": 98, "target": 104, "symbol": "TCS"},

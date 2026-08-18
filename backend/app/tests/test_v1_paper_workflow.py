@@ -3,7 +3,7 @@ from app.services.paper_trading_orchestrator import PaperOrchestratorConfig, Pap
 
 def test_v1_paper_workflow_signal_position_exit_is_simulation_only():
     orchestrator = PaperTradingOrchestrator(
-        PaperOrchestratorConfig(initial_capital=100_000.0, max_trades_per_session=3)
+        PaperOrchestratorConfig(initial_capital=100_000.0, max_trades_per_session=3, qualification_required=False)
     )
 
     opened = orchestrator.on_signal(
@@ -22,7 +22,7 @@ def test_v1_paper_workflow_signal_position_exit_is_simulation_only():
 
 
 def test_v1_paper_workflow_rejects_neutral_before_position_creation():
-    orchestrator = PaperTradingOrchestrator()
+    orchestrator = PaperTradingOrchestrator(PaperOrchestratorConfig(qualification_required=False))
     result = orchestrator.on_signal(
         "2026-08-17",
         {"action": "NEUTRAL", "entry": 100.0, "stop": 95.0, "target": 110.0},
@@ -34,7 +34,7 @@ def test_v1_paper_workflow_rejects_neutral_before_position_creation():
 
 def test_v1_paper_workflow_enforces_long_only_contract():
     orchestrator = PaperTradingOrchestrator(
-        PaperOrchestratorConfig(trade_direction="SHORT_ONLY")
+        PaperOrchestratorConfig(trade_direction="SHORT_ONLY", qualification_required=False)
     )
     result = orchestrator.on_signal(
         "2026-08-17",
@@ -46,7 +46,7 @@ def test_v1_paper_workflow_enforces_long_only_contract():
 
 def test_v1_paper_workflow_resets_session_trade_count():
     orchestrator = PaperTradingOrchestrator(
-        PaperOrchestratorConfig(max_trades_per_session=1)
+        PaperOrchestratorConfig(max_trades_per_session=1, qualification_required=False)
     )
     first = orchestrator.on_signal(
         "2026-08-17",
