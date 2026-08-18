@@ -37,6 +37,8 @@ def authorize_strategy(
             interval=interval,
             strategy_version=strategy_version,
             fingerprint=fingerprint,
+            status="AUTHORIZED",
+            authorized_at=now,
         )
         db.add(record)
     else:
