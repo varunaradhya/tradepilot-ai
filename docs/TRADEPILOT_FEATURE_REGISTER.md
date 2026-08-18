@@ -73,11 +73,28 @@
 | P4 adversarial safety regression coverage | IMPLEMENTED |
 | Production broker live-order enablement | LOCKED |
 | Automatic live-order promotion | LOCKED |
-| Production deployment/runtime SLOs | NEXT / ENVIRONMENTAL |
-| Durable multi-instance kill switch | NEXT |
-| Evidence retention/observability pipeline | NEXT |
 
-**P4 safety boundary:** no environment variable or broker connection can make live order execution available through this milestone. Live order authorization remains explicitly blocked in code. Paper operations require fresh market data, healthy reconciliation and an inactive kill switch.
+## P5 — Production reliability & broker sandbox
+
+| Capability | Status |
+|---|---|
+| Durable database-backed kill switch | IMPLEMENTED |
+| Fail-safe kill switch defaults to active | IMPLEMENTED |
+| Application-level kill-switch activation endpoint | IMPLEMENTED |
+| Kill-switch deactivation via trading API | INTENTIONALLY NOT PROVIDED |
+| Market-data freshness watchdog with future/stale timestamp rejection | IMPLEMENTED |
+| Operational safety endpoint uses persisted market-data health | IMPLEMENTED |
+| Operational safety endpoint uses persisted paper reconciliation health | IMPLEMENTED |
+| Operational audit-event persistence | IMPLEMENTED |
+| Bounded recent audit-event API | IMPLEMENTED |
+| Configurable audit-event retention service | IMPLEMENTED |
+| Read-only broker sandbox certification contract | IMPLEMENTED |
+| Dhan/Groww/Angel One live-order capability remains blocked | LOCKED |
+| Production observability/SLO deployment | ENVIRONMENTAL |
+| Real broker sandbox credentials/certification | ENVIRONMENTAL |
+| Live execution | LOCKED |
+
+**P5 safety boundary:** P5 improves operational reliability without adding real-money execution. The durable kill switch defaults to active and can only be activated through the application. There is intentionally no trading API to deactivate it. Market data must be present, timestamped, non-future and within the configured freshness window before paper operations can be considered healthy. Broker certification is read-only and explicitly reports `live_execution_allowed: false`.
 
 ## Permanent constraints
 
@@ -108,9 +125,14 @@ Qualified signal capture → risk checks → simulated execution → position li
 Historical qualification, cross-stock consistency, sustained paper performance, statistical confidence, regime stability, bounded drawdown/loss streaks, fingerprint stability, divergence limits and evidence freshness are required.
 
 ### Phase 4 — Production safety
-**Status: FOUNDATION IMPLEMENTED — LIVE EXECUTION LOCKED**
+**Status: IMPLEMENTED — LIVE EXECUTION LOCKED**
 
-P4 establishes the central safety boundary and operational status contract. The remaining production work is environmental and operational: durable state, observability, deployment SLOs, broker sandbox validation and independent live-execution review.
+P4 establishes the central safety boundary and operational status contract.
+
+### Phase 5 — Production reliability & broker sandbox
+**Status: IMPLEMENTED — ENVIRONMENTAL ITEMS REMAIN**
+
+P5 establishes durable kill-switch state, fail-closed market-data watchdog logic, operational audit retention, runtime safety visibility and read-only broker sandbox certification. Real broker sandbox credentials, deployment SLOs and any future live-execution review remain environmental/separate work.
 
 ## Definition of Done
 
@@ -126,4 +148,4 @@ P4 establishes the central safety boundary and operational status contract. The 
 
 ## Latest engineering focus
 
-P4 establishes the fail-closed production safety boundary. The next move is operational hardening rather than live trading: durable kill-switch state, market-data watchdogs, evidence/audit retention, deployment SLOs and broker sandbox certification.
+P5 completes the application-level production reliability foundation. The next milestone should focus on deployment-level observability/SLOs and real broker sandbox credentials/certification, while the live-order path remains locked.
