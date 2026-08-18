@@ -1,0 +1,1 @@
+Merge gate: CI must validate backend compile/tests, frontend build and deployment configuration before merging P6.

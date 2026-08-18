@@ -1,0 +1,1 @@
+P6 must pass the repository CI suite before merge.
