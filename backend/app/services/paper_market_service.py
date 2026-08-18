@@ -55,28 +55,36 @@ class PaperMarketCoordinator:
     ) -> dict[str, Any]:
         if not session.strip() or not symbol.strip():
             raise ValueError("session and symbol are required")
-        key = (session, symbol.upper())
+        normalized_symbol = symbol.strip().upper()
+        key = (session, normalized_symbol)
         state = self._states.setdefault(key, PaperMarketState())
         state.append(open_price, high, low, close, volume)
 
-        had_position = self.orchestrator.summary().get("open_position") is not None
+        position = self.orchestrator.summary().get("open_position")
+        position_symbol = (position or {}).get("symbol")
+        has_position_for_symbol = position is not None and position_symbol == normalized_symbol
+
         signal = generate_intraday_signal(
             state.opens, state.highs, state.lows, state.closes, state.volumes,
             opening_high=opening_high, opening_low=opening_low, config=self.strategy,
         )
 
         routed: dict[str, Any] | None = None
-        if not had_position and signal.get("action") == "BUY":
-            routed = self.orchestrator.on_signal(session, {**signal, "symbol": symbol.upper()})
-        elif had_position:
+        if position is None and signal.get("action") == "BUY":
+            routed = self.orchestrator.on_signal(session, {**signal, "symbol": normalized_symbol})
+        elif has_position_for_symbol:
             routed = self.orchestrator.on_bar(session, high, low, close)
 
         return {
-            "mode": "SIMULATION_ONLY", "symbol": symbol.upper(), "bars": len(state.closes),
+            "mode": "SIMULATION_ONLY", "symbol": normalized_symbol, "bars": len(state.closes),
             "signal": signal, "execution": routed, "paper": self.orchestrator.summary(),
         }
 
     def close_session(self, session: str, symbol: str, close: float) -> dict[str, Any]:
+        position = self.orchestrator.summary().get("open_position")
+        normalized_symbol = symbol.strip().upper()
+        if position is not None and position.get("symbol") not in {None, normalized_symbol}:
+            return {"mode": "SIMULATION_ONLY", "trade": None, **self.orchestrator.summary()}
         return self.orchestrator.close_session(session, close)
 
     def reset(self) -> None:
