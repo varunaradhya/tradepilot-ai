@@ -30,7 +30,6 @@ def test_daily_risk_baseline_resets_to_realized_session_equity():
     assert trade['reason'] == 'TARGET'
     profitable_equity = e.cash
     assert profitable_equity > 100000
-
     e.new_session('2026-01-05')
     assert e.day_start_equity == profitable_equity
     assert e.day_pnl == 0.0
@@ -125,14 +124,7 @@ def test_paper_summary_separates_open_and_realized_pnl():
 
 def test_risk_config_rejects_non_finite_or_invalid_capital_and_risk():
     import math
-
-    for config in (
-        PaperRiskConfig(initial_capital=0),
-        PaperRiskConfig(initial_capital=math.inf),
-        PaperRiskConfig(risk_per_trade=0),
-        PaperRiskConfig(risk_per_trade=1.1),
-        PaperRiskConfig(risk_per_trade=math.nan),
-    ):
+    for config in (PaperRiskConfig(initial_capital=0), PaperRiskConfig(initial_capital=math.inf), PaperRiskConfig(risk_per_trade=0), PaperRiskConfig(risk_per_trade=1.1), PaperRiskConfig(risk_per_trade=math.nan)):
         try:
             PaperTradingEngine(config)
             assert False, 'invalid risk configuration was accepted'
@@ -142,7 +134,6 @@ def test_risk_config_rejects_non_finite_or_invalid_capital_and_risk():
 
 def test_engine_rejects_non_finite_trade_levels_without_mutating_position():
     import math
-
     e = PaperTradingEngine()
     e.new_session('2026-01-02')
     for levels in ((math.nan, 98, 104), (100, math.inf, 104), (100, 98, math.nan)):
@@ -156,7 +147,6 @@ def test_engine_rejects_non_finite_trade_levels_without_mutating_position():
 
 def test_engine_rejects_invalid_tick_values():
     import math
-
     e = PaperTradingEngine()
     e.new_session('2026-01-02')
     for price in (0, -1, math.inf, math.nan):
@@ -169,8 +159,8 @@ def test_engine_rejects_invalid_tick_values():
 
 def test_engine_rejects_invalid_bars_even_without_an_open_position():
     e = PaperTradingEngine()
-    with_values = ((10, 9, 9.5), (10, 8, 11), (10, 11, 10), (10, 9, 0))
-    for high, low, close in with_values:
+    invalid_bars = ((10, 9, 11), (10, 11, 10), (10, 9, 0), (10, 9, -1))
+    for high, low, close in invalid_bars:
         try:
             e.on_bar('2026-01-02', high, low, close)
             assert False, 'invalid OHLC bar was accepted'
