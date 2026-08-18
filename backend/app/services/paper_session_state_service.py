@@ -14,9 +14,12 @@ def load_paper_session_state(db: Session, user_id: int) -> dict[str, Any] | None
     if record is None:
         return None
     try:
-        return json.loads(record.state_json)
+        state = json.loads(record.state_json)
     except (TypeError, json.JSONDecodeError):
-        return None
+        raise RuntimeError("Persisted paper session state is corrupt")
+    if not isinstance(state, dict):
+        raise RuntimeError("Persisted paper session state is invalid")
+    return state
 
 
 def save_paper_session_state(db: Session, user_id: int, state: dict[str, Any]) -> PaperSessionState:
