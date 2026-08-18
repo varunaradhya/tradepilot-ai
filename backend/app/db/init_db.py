@@ -7,6 +7,7 @@ from app.models.ai_analysis_history import AIAnalysisHistory
 from app.models.alert import Alert
 from app.models.paper_trade import PaperTrade
 from app.models.strategy_paper_authorization import StrategyPaperAuthorization
+from app.models.paper_session_state import PaperSessionState
 
 from app.db.database import Base, engine
 from app.core.config import TRADEPILOT_AUTO_CREATE_SCHEMA
