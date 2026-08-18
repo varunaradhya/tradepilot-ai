@@ -14,9 +14,23 @@ def _robustness(**overrides):
 
 
 def _wf(**overrides):
-    summary = {"success_rate_percent": 70.0}
+    summary = {
+        "success_rate_percent": 70.0,
+        "max_drawdown_percent": 5.0,
+        "total_validation_trades": 50,
+        "minimum_validation_trades_in_window": 5,
+    }
     summary.update(overrides)
-    return {"windows": 10, "v2": {"summary": summary}}
+    windows = [
+        {
+            "window": index,
+            "trades": 5,
+            "return_percent": 1.0,
+            "max_drawdown_percent": 5.0,
+        }
+        for index in range(1, 11)
+    ]
+    return {"windows": 10, "v2": {"windows": windows, "summary": summary}}
 
 
 def test_qualifies_only_when_all_research_gates_pass():
@@ -35,7 +49,7 @@ def test_low_profit_factor_blocks_paper_candidate():
 def test_missing_walk_forward_blocks_by_default():
     result = qualify_strategy(_backtest(), _robustness(), None)
     assert result["status"] == "NOT_QUALIFIED"
-    assert any(check["name"] == "walk_forward" and not check["passed"] for check in result["checks"])
+    assert any(check["name"] == "walk_forward_available" and not check["passed"] for check in result["checks"])
 
 
 def test_policy_can_require_stricter_drawdown():
