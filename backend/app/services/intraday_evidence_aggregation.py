@@ -40,35 +40,47 @@ def _trade_day(trade: PaperTrade) -> str:
     return stamp.date().isoformat() if stamp is not None else "UNKNOWN"
 
 
-def aggregate_paper_performance(trades: Iterable[PaperTrade]) -> dict:
+def _trade_sort_key(trade: PaperTrade):
+    """Stable chronological key so drawdown/loss-streak evidence is not DB-order dependent."""
+    return trade.closed_at or trade.created_at
+
+
+def aggregate_paper_performance(trades: Iterable[PaperTrade], *, initial_capital: float = 100000.0) -> dict:
+    """Aggregate realized paper evidence using caller-supplied starting capital and chronological trade order."""
+    if initial_capital <= 0:
+        raise ValueError("initial_capital must be positive")
+
     rows = list(trades)
     closed = [trade for trade in rows if trade.status == "CLOSED"]
+    ordered_closed = sorted(closed, key=_trade_sort_key)
     by_symbol: dict[str, dict] = defaultdict(lambda: {"trades": 0, "closed_trades": 0, "pnl": 0.0, "wins": 0})
     by_reason: dict[str, int] = defaultdict(int)
     by_day: dict[str, float] = defaultdict(float)
-    pnls: list[float] = []
+
     for trade in rows:
         symbol = str(trade.symbol).upper()
         item = by_symbol[symbol]
         item["trades"] += 1
         if trade.status == "CLOSED":
             pnl = float(trade.pnl or 0.0)
-            pnls.append(pnl)
             item["closed_trades"] += 1
             item["pnl"] += pnl
             if pnl > 0:
                 item["wins"] += 1
             by_reason[str(trade.reason or "UNKNOWN").upper()] += 1
             by_day[_trade_day(trade)] += pnl
+
     for item in by_symbol.values():
         item["pnl"] = round(item["pnl"], 2)
         item["win_rate_percent"] = round(item["wins"] / item["closed_trades"] * 100, 2) if item["closed_trades"] else 0.0
+
+    pnls = [float(trade.pnl or 0.0) for trade in ordered_closed]
     realized = sum(pnls)
     wins = [p for p in pnls if p > 0]
     losses = [p for p in pnls if p < 0]
     gross_loss = abs(sum(losses))
-    initial_capital = 100000.0
-    equity = initial_capital
+
+    equity = float(initial_capital)
     peak = equity
     max_drawdown = 0.0
     consecutive = 0
@@ -83,10 +95,12 @@ def aggregate_paper_performance(trades: Iterable[PaperTrade]) -> dict:
             max_consecutive = max(max_consecutive, consecutive)
         else:
             consecutive = 0
+
     daily = [{"date": day, "pnl": round(pnl, 2)} for day, pnl in sorted(by_day.items())]
     profitable_days = sum(1 for item in daily if item["pnl"] > 0)
     return {
         "mode": "SIMULATION_ONLY",
+        "initial_capital": round(initial_capital, 2),
         "summary": {
             "trades": len(rows),
             "open_trades": len(rows) - len(closed),
