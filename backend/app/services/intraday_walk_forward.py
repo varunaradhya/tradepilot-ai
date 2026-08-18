@@ -10,9 +10,18 @@ from app.services.walk_forward_service import build_walk_forward_windows
 
 def _validation_summary(results: list[dict]) -> dict:
     if not results:
-        return {"windows": 0, "profitable_windows": 0, "success_rate_percent": 0.0, "average_return_percent": 0.0, "worst_return_percent": 0.0, "max_drawdown_percent": 0.0}
+        return {
+            "windows": 0,
+            "profitable_windows": 0,
+            "success_rate_percent": 0.0,
+            "average_return_percent": 0.0,
+            "worst_return_percent": 0.0,
+            "max_drawdown_percent": 0.0,
+            "total_validation_trades": 0,
+        }
     returns = [float(x["return_percent"]) for x in results]
     drawdowns = [float(x["max_drawdown_percent"]) for x in results]
+    trades = [int(x.get("trades", 0) or 0) for x in results]
     profitable = sum(value > 0 for value in returns)
     return {
         "windows": len(results),
@@ -21,6 +30,8 @@ def _validation_summary(results: list[dict]) -> dict:
         "average_return_percent": round(sum(returns) / len(returns), 4),
         "worst_return_percent": round(min(returns), 4),
         "max_drawdown_percent": round(max(drawdowns), 4),
+        "total_validation_trades": sum(trades),
+        "minimum_validation_trades_in_window": min(trades) if trades else 0,
     }
 
 
@@ -37,7 +48,16 @@ def run_fixed_parameter_walk_forward(
     the first research implementation honest: every validation window is evaluated
     using parameters supplied before the run, preventing hidden look-ahead tuning.
     """
+    if train_size <= 0 or validation_size <= 0:
+        raise ValueError("train_size and validation_size must be positive")
+    if step is not None and step <= 0:
+        raise ValueError("step must be positive")
+    if len(rows) < train_size + validation_size:
+        raise ValueError("Not enough rows for a complete train and validation window")
     windows = build_walk_forward_windows(len(rows), train_size, validation_size, step)
+    if not windows:
+        raise ValueError("No walk-forward windows can be constructed")
+
     v1_results: list[dict] = []
     v2_results: list[dict] = []
     comparisons: list[dict] = []
@@ -48,6 +68,10 @@ def run_fixed_parameter_walk_forward(
             initial_capital=config.initial_capital,
             brokerage_rate=config.brokerage_rate,
             slippage_rate=config.slippage_rate,
+            spread_bps=config.spread_bps,
+            market_impact_bps=config.market_impact_bps,
+            impact_reference_value=config.impact_reference_value,
+            max_volume_participation=config.max_volume_participation,
             max_daily_loss_percent=config.max_daily_loss_percent,
             max_trades_per_session=config.max_trades_per_session,
             strategy=IntradayConfig(**config.strategy.__dict__),
@@ -58,6 +82,7 @@ def run_fixed_parameter_walk_forward(
         v1_results.append({"window": number, "train_start": window.train_start, "train_end": window.train_end, "validation_start": window.validation_start, "validation_end": window.validation_end, **{k: v for k, v in v1.items() if k != "trades_detail"}})
         v2_results.append({"window": number, "train_start": window.train_start, "train_end": window.train_end, "validation_start": window.validation_start, "validation_end": window.validation_end, **{k: v for k, v in v2.items() if k != "trades_detail"}})
         comparisons.append({"window": number, "validation_start": window.validation_start, "validation_end": window.validation_end, "delta": comparison["delta"]})
+
     return {
         "method": "fixed_parameter_walk_forward",
         "parameter_selection": False,
