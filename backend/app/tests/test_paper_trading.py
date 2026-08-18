@@ -121,3 +121,81 @@ def test_paper_summary_separates_open_and_realized_pnl():
     assert result["open_trades"] == 1
     assert result["realized_pnl"] == 150.0
     assert result["pnl"] == 175.0
+
+
+def test_risk_config_rejects_non_finite_or_invalid_capital_and_risk():
+    import math
+
+    for config in (
+        PaperRiskConfig(initial_capital=0),
+        PaperRiskConfig(initial_capital=math.inf),
+        PaperRiskConfig(risk_per_trade=0),
+        PaperRiskConfig(risk_per_trade=1.1),
+        PaperRiskConfig(risk_per_trade=math.nan),
+    ):
+        try:
+            PaperTradingEngine(config)
+            assert False, 'invalid risk configuration was accepted'
+        except ValueError:
+            pass
+
+
+def test_engine_rejects_non_finite_trade_levels_without_mutating_position():
+    import math
+
+    e = PaperTradingEngine()
+    e.new_session('2026-01-02')
+    for levels in ((math.nan, 98, 104), (100, math.inf, 104), (100, 98, math.nan)):
+        try:
+            e.enter(*levels)
+            assert False, 'invalid trade level was accepted'
+        except ValueError:
+            pass
+    assert e.position is None
+
+
+def test_engine_rejects_invalid_tick_values():
+    import math
+
+    e = PaperTradingEngine()
+    e.new_session('2026-01-02')
+    for price in (0, -1, math.inf, math.nan):
+        try:
+            e.on_tick('2026-01-02', price)
+            assert False, 'invalid tick was accepted'
+        except ValueError:
+            pass
+
+
+def test_engine_rejects_invalid_bars_even_without_an_open_position():
+    e = PaperTradingEngine()
+    with_values = ((10, 9, 9.5), (10, 8, 11), (10, 11, 10), (10, 9, 0))
+    for high, low, close in with_values:
+        try:
+            e.on_bar('2026-01-02', high, low, close)
+            assert False, 'invalid OHLC bar was accepted'
+        except ValueError:
+            pass
+
+
+def test_engine_rejects_invalid_bar_after_position_without_incrementing_bars():
+    e = PaperTradingEngine(PaperRiskConfig(allocation_pct=.20))
+    e.new_session('2026-01-02')
+    assert e.enter(100, 95, 130)
+    before = e.position['bars_held']
+    try:
+        e.on_bar('2026-01-02', 105, 99, 108)
+        assert False, 'close outside candle range was accepted'
+    except ValueError:
+        pass
+    assert e.position['bars_held'] == before
+
+
+def test_session_requires_a_non_empty_identifier():
+    e = PaperTradingEngine()
+    for session in ('', '   ', None):
+        try:
+            e.new_session(session)
+            assert False, 'invalid session was accepted'
+        except (ValueError, TypeError):
+            pass
