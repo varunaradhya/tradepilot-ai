@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import math
 
 from sqlalchemy.orm import Session
 
@@ -7,7 +8,8 @@ from app.models.paper_trade import PaperTrade
 
 def open_paper_trade(db: Session, user_id: int, *, symbol: str, quantity: int, entry_price: float, stop_price: float, target_price: float, strategy_version: str = "V1") -> PaperTrade:
     symbol = symbol.strip().upper()
-    if not symbol or quantity <= 0 or entry_price <= 0 or stop_price <= 0 or target_price <= entry_price:
+    values = (float(quantity), float(entry_price), float(stop_price), float(target_price))
+    if not symbol or any(not math.isfinite(value) for value in values) or quantity <= 0 or entry_price <= 0 or stop_price <= 0 or target_price <= entry_price:
         raise ValueError("Invalid paper trade parameters")
     if stop_price >= entry_price:
         raise ValueError("Stop price must be below entry price for a long paper trade")
@@ -23,10 +25,12 @@ def open_paper_trade(db: Session, user_id: int, *, symbol: str, quantity: int, e
 def update_paper_trade(db: Session, trade: PaperTrade, market_price: float, *, market_high: float | None = None, market_low: float | None = None) -> PaperTrade:
     if trade.status != "OPEN":
         return trade
-    if market_price <= 0:
-        raise ValueError("Market price must be positive")
+    if not math.isfinite(market_price) or market_price <= 0:
+        raise ValueError("Market price must be positive and finite")
     high = market_price if market_high is None else market_high
     low = market_price if market_low is None else market_low
+    if not math.isfinite(high) or not math.isfinite(low) or high <= 0 or low <= 0 or low > high:
+        raise ValueError("Invalid market range")
     if low <= trade.stop_price:
         return close_paper_trade(db, trade, trade.stop_price, "STOP")
     if high >= trade.target_price:
@@ -40,8 +44,11 @@ def update_paper_trade(db: Session, trade: PaperTrade, market_price: float, *, m
 def close_paper_trade(db: Session, trade: PaperTrade, exit_price: float, reason: str = "MANUAL") -> PaperTrade:
     if trade.status != "OPEN":
         return trade
-    if exit_price <= 0:
-        raise ValueError("Exit price must be positive")
+    if not math.isfinite(exit_price) or exit_price <= 0:
+        raise ValueError("Exit price must be positive and finite")
+    reason = reason.strip().upper()
+    if not reason:
+        raise ValueError("Exit reason is required")
     trade.exit_price = exit_price
     trade.pnl = (exit_price - trade.entry_price) * trade.quantity
     trade.reason = reason
