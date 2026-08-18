@@ -3,11 +3,10 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-
-from app.db.database import get_db
 from app.dependencies.auth import get_current_user
+from app.db.database import get_db
 from app.models.user import User
-from app.services.paper_trading_service import close_paper_trade, list_paper_trades, open_paper_trade, paper_summary, update_paper_trade
+from app.services.paper_trading_service import close_paper_trade, list_paper_trades, paper_summary, update_paper_trade
 from app.models.paper_trade import PaperTrade
 from app.services.paper_trading_orchestrator import PaperOrchestratorConfig, PaperTradingOrchestrator
 from app.services.paper_market_service import PaperMarketCoordinator
@@ -83,10 +82,12 @@ def _server_research_readiness(symbol: str, symbols: str, interval: str, strateg
     readiness = build_strategy_readiness(qualification, evidence, paper_trades)
     return {"qualification": qualification, "cross_stock": evidence, "readiness": readiness}
 
-@router.post("/trades", status_code=status.HTTP_201_CREATED)
+@router.post("/trades", status_code=status.HTTP_405_METHOD_NOT_ALLOWED)
 def create_paper_trade(payload: PaperTradeCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    try: return open_paper_trade(db, current_user.id, **payload.model_dump())
-    except ValueError as exc: raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+    raise HTTPException(
+        status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
+        detail="Direct paper-trade creation is disabled; use the server-controlled paper session signal pipeline.",
+    )
 
 @router.get("/trades")
 def get_paper_trades(status_filter: str | None = Query(default=None, alias="status", pattern="^(OPEN|CLOSED)$"), strategy_version: str | None = Query(default=None, pattern="^(V1|V2)$"), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
