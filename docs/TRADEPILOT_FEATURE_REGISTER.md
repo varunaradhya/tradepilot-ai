@@ -90,11 +90,42 @@
 | Configurable audit-event retention service | IMPLEMENTED |
 | Read-only broker sandbox certification contract | IMPLEMENTED |
 | Dhan/Groww/Angel One live-order capability remains blocked | LOCKED |
-| Production observability/SLO deployment | ENVIRONMENTAL |
+| Production observability/SLO deployment | IMPLEMENTED |
+| Sandbox credential readiness without secret exposure | IMPLEMENTED |
 | Real broker sandbox credentials/certification | ENVIRONMENTAL |
 | Live execution | LOCKED |
 
-**P5 safety boundary:** P5 improves operational reliability without adding real-money execution. The durable kill switch defaults to active and can only be activated through the application. There is intentionally no trading API to deactivate it. Market data must be present, timestamped, non-future and within the configured freshness window before paper operations can be considered healthy. Broker certification is read-only and explicitly reports `live_execution_allowed: false`.
+## P6 — Production observability
+
+| Capability | Status |
+|---|---|
+| Bounded request telemetry | IMPLEMENTED |
+| Error-rate and latency SLO snapshot | IMPLEMENTED |
+| Database dependency health | IMPLEMENTED |
+| Market-data freshness health | IMPLEMENTED |
+| Kill-switch operational visibility | IMPLEMENTED |
+| Secret-safe sandbox credential readiness | IMPLEMENTED |
+| P6 observability regression coverage | IMPLEMENTED |
+| External metrics/alert delivery | ENVIRONMENTAL |
+
+## P7 — Final validation & attack phase
+
+| Capability | Status |
+|---|---|
+| Registered-broker live-execution safety regression gates | IMPLEMENTED |
+| Sandbox certification never authorizes live execution | IMPLEMENTED |
+| Unknown broker fail-closed certification test | IMPLEMENTED |
+| Broker capability contract live-order gate | IMPLEMENTED |
+| Full P1–P6 regression suite | CI REQUIRED |
+| Backend compile/tests | CI REQUIRED |
+| Frontend production build | CI REQUIRED |
+| Docker Compose deployment validation | CI REQUIRED |
+| Real provider sandbox connectivity | ENVIRONMENTAL |
+| Production monitoring/alerts | ENVIRONMENTAL |
+| Independent live-execution safety review | BLOCKING |
+| Live execution | LOCKED |
+
+**P7 safety boundary:** P7 is a validation/attack phase. It does not add real-money execution or remove any existing safety gate.
 
 ## Permanent constraints
 
@@ -132,7 +163,17 @@ P4 establishes the central safety boundary and operational status contract.
 ### Phase 5 — Production reliability & broker sandbox
 **Status: IMPLEMENTED — ENVIRONMENTAL ITEMS REMAIN**
 
-P5 establishes durable kill-switch state, fail-closed market-data watchdog logic, operational audit retention, runtime safety visibility and read-only broker sandbox certification. Real broker sandbox credentials, deployment SLOs and any future live-execution review remain environmental/separate work.
+P5 establishes durable kill-switch state, fail-closed market-data watchdog logic, operational audit retention, runtime safety visibility and read-only broker sandbox certification.
+
+### Phase 6 — Production observability
+**Status: IMPLEMENTED — DEPLOYMENT ITEMS REMAIN**
+
+P6 adds bounded request telemetry, SLO health reporting, dependency visibility and secret-safe sandbox credential readiness. Live execution remains locked.
+
+### Phase 7 — Final validation / attack phase
+**Status: IMPLEMENTED — CI AND ENVIRONMENTAL GATES REMAIN**
+
+P7 hardens the existing safety boundary with broker capability regression tests and documents the final attack matrix. CI must prove backend tests, frontend build and deployment configuration before the system can be considered release-ready.
 
 ## Definition of Done
 
@@ -145,7 +186,8 @@ P5 establishes durable kill-switch state, fail-closed market-data watchdog logic
 - Documentation updated.
 - Trading features remain simulation-only unless separately reviewed and unlocked.
 - Failure modes are tested and fail safely.
+- A missing CI run is not treated as a passing CI run.
 
 ## Latest engineering focus
 
-P5 completes the application-level production reliability foundation. The next milestone should focus on deployment-level observability/SLOs and real broker sandbox credentials/certification, while the live-order path remains locked.
+P7 final validation is now the active engineering milestone. The application-level trading foundation is complete through P7, while real broker sandbox connectivity, deployment observability and independent live-execution review remain environmental/blocking gates. Live execution remains locked.
