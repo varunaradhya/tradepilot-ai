@@ -88,8 +88,5 @@ class PaperMarketCoordinator:
 
     def reset(self) -> None:
         """Clear market history and reset the simulation without losing authorization."""
-        fingerprint = self.orchestrator.summary().get("strategy_fingerprint")
         self._states.clear()
-        self.orchestrator = PaperTradingOrchestrator(self.orchestrator.config)
-        if fingerprint:
-            self.orchestrator.authorize_strategy(fingerprint=fingerprint)
+        self.orchestrator.reset()
