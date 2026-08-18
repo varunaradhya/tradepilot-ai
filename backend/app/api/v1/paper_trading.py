@@ -15,6 +15,14 @@ from app.services.paper_dhan_service import run_dhan_paper_session
 from app.services.paper_live_dhan_service import mark_dhan_paper_position
 from app.services.intraday_evidence_aggregation import aggregate_paper_performance
 from app.services.strategy_readiness import build_strategy_readiness
+from app.services.strategy_qualification import QualificationPolicy, qualify_strategy
+from app.services.intraday_backtest import IntradayBacktestConfig, run_intraday_backtest
+from app.services.intraday_strategy import IntradayConfig
+from app.services.intraday_walk_forward import run_fixed_parameter_walk_forward
+from app.services.intraday_robustness import run_robustness_analysis
+from app.services.research_store import research_store
+from app.services.intraday_scorecard import build_intraday_scorecard, ScorecardConfig
+from app.services.intraday_evidence_aggregation import aggregate_scorecards
 
 router = APIRouter(prefix="/paper-trading", tags=["Paper Trading"])
 _sessions: dict[int, PaperTradingOrchestrator] = {}
@@ -46,6 +54,35 @@ def _orchestrator(user_id: int) -> PaperTradingOrchestrator:
 def _market_coordinator(user_id: int) -> PaperMarketCoordinator:
     return _market.setdefault(user_id, PaperMarketCoordinator())
 
+def _research_rows(symbol: str, interval: str) -> list[dict]:
+    dataset = f"nse/{symbol.strip().upper()}_intraday_{interval}m"
+    bars = research_store.load(dataset)
+    rows = []
+    for bar in bars:
+        row = bar.as_row(); row["session"] = row["timestamp"].date().isoformat(); rows.append(row)
+    return rows
+
+def _server_research_readiness(symbol: str, symbols: str, interval: str, strategy_version: str, paper_trades: list[PaperTrade]) -> dict:
+    rows = _research_rows(symbol, interval)
+    if not rows:
+        return {"qualification": {"status": "NOT_QUALIFIED", "paper_trading_allowed": False, "reason": "NO_RESEARCH_DATA"}, "cross_stock": {"summary": {"robust_percent": 0.0, "symbols_tested": 0}}}
+    strategy = IntradayConfig()
+    config = IntradayBacktestConfig(strategy=strategy, strategy_version=strategy_version)
+    backtest = run_intraday_backtest(rows, config)
+    robustness = run_robustness_analysis(rows, config, stress_costs=True)
+    try:
+        walk_forward = run_fixed_parameter_walk_forward(rows, 60, 20, None, config)
+    except ValueError:
+        walk_forward = {"windows": 0, "v2": {"windows": [], "summary": {}}}
+    qualification = qualify_strategy(backtest, robustness, walk_forward, QualificationPolicy())
+    requested = list(dict.fromkeys(item.strip().upper() for item in (symbols or symbol).split(",") if item.strip()))
+    datasets = {item: _research_rows(item, interval) for item in requested}
+    datasets = {item: data for item, data in datasets.items() if data}
+    scorecard = build_intraday_scorecard(datasets, ScorecardConfig(minimum_trades=30, slippage_rate=config.slippage_rate))
+    evidence = aggregate_scorecards(scorecard.get("ranked", []), interval=interval, requested_symbols=requested, missing_symbols=[item for item in requested if item not in datasets])
+    readiness = build_strategy_readiness(qualification, evidence, paper_trades)
+    return {"qualification": qualification, "cross_stock": evidence, "readiness": readiness}
+
 @router.post("/trades", status_code=status.HTTP_201_CREATED)
 def create_paper_trade(payload: PaperTradeCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     try: return open_paper_trade(db, current_user.id, **payload.model_dump())
@@ -67,11 +104,11 @@ def paper_dashboard(strategy_version: str | None = Query(default=None, pattern="
             "risk":{"trade_direction":"LONG_ONLY","broker_orders_enabled":False,"max_daily_loss_enforced":True,"strategy_version_filter":strategy_version or "ALL"}}
 
 @router.get("/readiness")
-def paper_readiness(qualification_status: str = Query(default="PAPER_CANDIDATE", pattern="^(PAPER_CANDIDATE|NOT_QUALIFIED)$"), robust_percent: float = Query(default=0.0, ge=0, le=100), symbols_tested: int = Query(default=0, ge=0), strategy_version: str | None = Query(default=None, pattern="^(V1|V2)$"), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict[str, Any]:
+def paper_readiness(symbol: str = Query(min_length=1, max_length=30), symbols: str = Query(default="", max_length=2000), strategy_version: str = Query(default="V1", pattern="^(V1|V2)$"), interval: str = Query(default="5", pattern="^(1|5|15|25|60)$"), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict[str, Any]:
     trades = list_paper_trades(db, current_user.id)
-    if strategy_version: trades = [trade for trade in trades if trade.strategy_version == strategy_version]
-    result = build_strategy_readiness({"status": qualification_status}, {"summary": {"symbols_tested": symbols_tested, "robust_percent": robust_percent}}, trades)
-    return {"mode":"SIMULATION_ONLY","strategy_version":strategy_version or "ALL",**result}
+    filtered = [trade for trade in trades if trade.strategy_version == strategy_version]
+    result = _server_research_readiness(symbol, symbols, interval, strategy_version, filtered)
+    return {"mode":"SIMULATION_ONLY","strategy_version":strategy_version,"symbol":symbol.strip().upper(),"interval":interval,**result}
 
 @router.get("/performance")
 def get_paper_performance(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
