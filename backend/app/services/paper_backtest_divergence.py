@@ -19,17 +19,16 @@ def compare_backtest_to_paper(
     max_drawdown_gap_percent: float = 10.0,
     min_paper_trades: int = 30,
 ) -> dict[str, Any]:
-    """Compare realized paper evidence with a previously generated backtest.
-
-    This is diagnostic evidence, not a promotion decision. A large divergence
-    produces a warning and never authorizes live execution.
-    """
+    """Compare realized paper evidence with a previously generated backtest."""
     if max_return_gap_percent < 0 or max_drawdown_gap_percent < 0:
         raise ValueError("divergence thresholds must be non-negative")
     if min_paper_trades < 1:
         raise ValueError("min_paper_trades must be positive")
 
-    backtest_metrics = backtest.get("metrics", backtest.get("summary", {}))
+    # Historical callers provide metrics in three shapes. Prefer the explicit
+    # nested containers, but retain compatibility with the canonical top-level
+    # backtest payload used by strategy-readiness evidence.
+    backtest_metrics = backtest.get("metrics") or backtest.get("summary") or backtest
     paper_metrics = paper.get("summary", paper)
     backtest_return = _pct(backtest_metrics.get("return_percent"))
     paper_return = _pct(paper_metrics.get("return_percent"))

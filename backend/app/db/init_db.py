@@ -9,6 +9,8 @@ from app.models.paper_trade import PaperTrade
 from app.models.strategy_paper_authorization import StrategyPaperAuthorization
 from app.models.paper_signal_request import PaperSignalRequest
 from app.models.paper_session_state import PaperSessionState
+from app.models.operational_kill_switch import OperationalKillSwitch
+from app.models.operational_audit_event import OperationalAuditEvent
 
 from app.db.database import Base, engine
 from app.core.config import TRADEPILOT_AUTO_CREATE_SCHEMA
