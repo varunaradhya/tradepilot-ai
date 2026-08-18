@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.database import Base
@@ -20,7 +20,8 @@ class PaperSignalReceipt(Base):
     strategy_version: Mapped[str] = mapped_column(String(10), nullable=False)
     interval: Mapped[str] = mapped_column(String(10), nullable=False)
     request_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
-    accepted: Mapped[bool] = mapped_column(nullable=False, default=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="PENDING")
+    accepted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     response_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
