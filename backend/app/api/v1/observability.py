@@ -12,6 +12,7 @@ from app.services.kill_switch_service import kill_switch_status
 from app.services.market_data_health import evaluate_market_data_freshness
 from app.services.observability import OBSERVABILITY, slo_snapshot
 from app.services.paper_session_state_service import load_paper_session_state
+from app.services.sandbox_credentials import sandbox_credential_status
 
 router = APIRouter(prefix="/observability", tags=["Observability"])
 
@@ -52,6 +53,14 @@ def slo(current_user: User = Depends(get_current_user), db: Session = Depends(ge
         kill_switch_active=switch["active"],
     )
     result["live_execution_config"] = bool(TRADEPILOT_LIVE_EXECUTION_ENABLED)
-    # A configuration flag can never unlock live execution in P6.
     result["live_execution_enabled"] = False
     return result
+
+
+@router.get("/broker-sandbox/{broker_name}")
+def broker_sandbox_readiness(
+    broker_name: str,
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Check only whether sandbox credentials are configured; never connects or trades."""
+    return sandbox_credential_status(broker_name)
