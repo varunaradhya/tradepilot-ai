@@ -15,6 +15,7 @@ from app.api.v1.trade_decision import router as trade_decision_router
 from app.api.v1.fno import router as fno_router
 from app.api.v1.paper_monitoring import router as paper_monitoring_router
 from app.api.v1.market_scheduler import router as market_scheduler_router
+from app.api.v1.operations import router as operations_router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
@@ -33,7 +34,7 @@ from app.core.config import TRADEPILOT_CORS_ORIGINS
 app=FastAPI(title="TradePilot AI",description="AI-powered Indian market research, F&O and paper-trading platform",version="0.1.0")
 app.add_middleware(CORSMiddleware,allow_origins=TRADEPILOT_CORS_ORIGINS,allow_credentials=False,allow_methods=["GET","POST","PUT","PATCH","DELETE","OPTIONS"],allow_headers=["*"])
 for router in [users_router,auth_router,portfolio_router,valuation_router,transactions_router,analytics_router,watchlist_router,brokers_router,market_router]: app.include_router(router,prefix="/api/v1")
-for router in [reconciliation_router,advanced_analytics_router,signals_router,intelligence_router,alerts_router,trading_general_router,algo_router,market_risk_router,research_router,intraday_router,strategy_builder_router,paper_trading_router,paper_evidence_router,trade_decision_router,fno_router,paper_monitoring_router,market_scheduler_router]: app.include_router(router,prefix="/api/v1")
+for router in [reconciliation_router,advanced_analytics_router,signals_router,intelligence_router,alerts_router,trading_general_router,algo_router,market_risk_router,research_router,intraday_router,strategy_builder_router,paper_trading_router,paper_evidence_router,trade_decision_router,fno_router,paper_monitoring_router,market_scheduler_router,operations_router]: app.include_router(router,prefix="/api/v1")
 @app.on_event("startup")
 def startup_event(): init_db()
 @app.get("/")
