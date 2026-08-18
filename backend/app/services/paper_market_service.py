@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from math import isfinite
 from typing import Any
 
 from app.services.intraday_strategy import IntradayConfig, generate_intraday_signal
@@ -16,6 +17,11 @@ class PaperMarketState:
     volumes: list[float] = field(default_factory=list)
 
     def append(self, open_price: float, high: float, low: float, close: float, volume: float) -> None:
+        values = (open_price, high, low, close, volume)
+        if not all(isfinite(float(value)) for value in values):
+            raise ValueError("OHLCV values must be finite")
+        if min(open_price, high, low, close) <= 0:
+            raise ValueError("OHLC prices must be positive")
         if not (low <= open_price <= high and low <= close <= high):
             raise ValueError("OHLC prices must be inside the candle range")
         if volume < 0:
@@ -55,32 +61,19 @@ class PaperMarketCoordinator:
 
         had_position = self.orchestrator.summary().get("open_position") is not None
         signal = generate_intraday_signal(
-            state.opens,
-            state.highs,
-            state.lows,
-            state.closes,
-            state.volumes,
-            opening_high=opening_high,
-            opening_low=opening_low,
-            config=self.strategy,
+            state.opens, state.highs, state.lows, state.closes, state.volumes,
+            opening_high=opening_high, opening_low=opening_low, config=self.strategy,
         )
 
         routed: dict[str, Any] | None = None
         if not had_position and signal.get("action") == "BUY":
-            routed = self.orchestrator.on_signal(
-                session,
-                {**signal, "symbol": symbol.upper()},
-            )
+            routed = self.orchestrator.on_signal(session, {**signal, "symbol": symbol.upper()})
         elif had_position:
             routed = self.orchestrator.on_bar(session, high, low, close)
 
         return {
-            "mode": "SIMULATION_ONLY",
-            "symbol": symbol.upper(),
-            "bars": len(state.closes),
-            "signal": signal,
-            "execution": routed,
-            "paper": self.orchestrator.summary(),
+            "mode": "SIMULATION_ONLY", "symbol": symbol.upper(), "bars": len(state.closes),
+            "signal": signal, "execution": routed, "paper": self.orchestrator.summary(),
         }
 
     def close_session(self, session: str, symbol: str, close: float) -> dict[str, Any]:
