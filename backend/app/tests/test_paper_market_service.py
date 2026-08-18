@@ -51,3 +51,33 @@ def test_market_bar_reset_clears_symbol_history():
     coordinator.reset()
     result = coordinator.on_bar("2026-08-15", "TCS", 10, 10.2, 9.8, 10, 100)
     assert result["bars"] == 1
+
+
+def test_market_bar_does_not_exit_position_for_different_symbol():
+    coordinator = _coordinator()
+    opened = coordinator.orchestrator.on_signal(
+        "2026-08-15",
+        {"action": "BUY", "symbol": "TCS", "entry": 100, "stop": 98, "target": 104},
+    )
+    assert opened["accepted"] is True
+
+    other = coordinator.on_bar("2026-08-15", "INFY", 100, 110, 90, 105, 1000)
+    assert other["execution"] is None
+    assert other["paper"]["open_position"]["symbol"] == "TCS"
+
+    same = coordinator.on_bar("2026-08-15", "TCS", 100, 105, 99, 104, 1000)
+    assert same["execution"]["last_event"] == "EXIT"
+    assert same["execution"]["trade"]["reason"] == "TARGET"
+
+
+def test_close_session_does_not_close_different_symbol_position():
+    coordinator = _coordinator()
+    opened = coordinator.orchestrator.on_signal(
+        "2026-08-15",
+        {"action": "BUY", "symbol": "TCS", "entry": 100, "stop": 98, "target": 104},
+    )
+    assert opened["accepted"] is True
+
+    result = coordinator.close_session("2026-08-15", "INFY", 105)
+    assert result["trade"] is None
+    assert result["open_position"]["symbol"] == "TCS"
