@@ -28,6 +28,7 @@ def test_historical_validation_splits_at_session_boundary():
         HistoricalValidationConfig(train_fraction=0.5, min_train_bars=1, min_test_bars=1),
     )
     item = result["ranked"][0]
+    assert item["sessions"] == 4
     assert item["train"]["bars"] == 6
     assert item["out_of_sample"]["bars"] == 6
 
@@ -40,6 +41,7 @@ def test_historical_validation_never_tunes_parameters():
     )
     assert result["assumptions"]["parameter_selection"] is False
     assert result["assumptions"]["cross_stock_optimization"] is False
+    assert result["assumptions"]["single_session_split"] is False
     assert "fixed parameters" in result["method"]
 
 
@@ -51,6 +53,35 @@ def test_historical_validation_reports_missing_trade_evidence():
     )
     assert "NO_OUT_OF_SAMPLE_TRADES" in result["ranked"][0]["reasons"]
     assert result["ranked"][0]["status"] == "REVIEW"
+
+
+def test_historical_validation_does_not_split_one_session_into_train_and_oos():
+    result = validate_historical_datasets(
+        {"TCS": _rows(1, 4)},
+        IntradayBacktestConfig(),
+        HistoricalValidationConfig(train_fraction=0.5, min_train_bars=1, min_test_bars=1),
+    )
+    item = result["ranked"][0]
+    assert item["sessions"] == 1
+    assert item["train"]["bars"] == 4
+    assert item["out_of_sample"]["bars"] == 0
+    assert "INSUFFICIENT_SESSIONS_FOR_OOS" in item["reasons"]
+    assert "INSUFFICIENT_OUT_OF_SAMPLE_BARS" in item["reasons"]
+    assert item["status"] == "REVIEW"
+
+
+def test_historical_validation_rejects_out_of_order_sessions():
+    rows = _rows()
+    rows[0], rows[-1] = rows[-1], rows[0]
+    with pytest.raises(ValueError, match="chronologically by session"):
+        validate_historical_datasets({"TCS": rows}, IntradayBacktestConfig())
+
+
+def test_historical_validation_rejects_out_of_order_bars_within_session():
+    rows = _rows()
+    rows[1], rows[2] = rows[2], rows[1]
+    with pytest.raises(ValueError, match="chronologically within each session"):
+        validate_historical_datasets({"TCS": rows}, IntradayBacktestConfig())
 
 
 def test_historical_validation_empty_input_is_safe():
