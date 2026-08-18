@@ -8,7 +8,8 @@ from app.dependencies.auth import get_current_user
 from app.models.user import User
 from app.models.paper_trade import PaperTrade
 from app.services.intraday_backtest import IntradayBacktestConfig, run_intraday_backtest
-from app.services.intraday_evidence_aggregation import aggregate_paper_performance
+from app.services.intraday_evidence_aggregation import aggregate_paper_performance, aggregate_scorecards
+from app.services.intraday_scorecard import ScorecardConfig, build_intraday_scorecard
 from app.services.intraday_strategy import IntradayConfig
 from app.services.paper_backtest_divergence import compare_backtest_to_paper
 from app.services.research_store import research_store
@@ -72,6 +73,7 @@ def paper_backtest_divergence(
 @router.get("/readiness")
 def strategy_readiness_review(
     symbol: str = Query(min_length=1, max_length=30),
+    symbols: str = Query(default="", max_length=2000),
     interval: str = Query(default="5", pattern="^(1|5|15|25|60)$"),
     strategy_version: str = Query(default="V1", pattern="^(V1|V2)$"),
     current_user: User = Depends(get_current_user),
@@ -79,13 +81,14 @@ def strategy_readiness_review(
 ):
     normalized = symbol.strip().upper()
     backtest, qualification, rows = _research_evidence(normalized, interval, strategy_version)
-    requested = [normalized]
-    datasets = {normalized: rows}
-    # Keep the P3 gate conservative: cross-stock evidence must come from the existing scorecard path.
-    from app.services.intraday_scorecard import ScorecardConfig, build_intraday_scorecard
-    from app.services.intraday_evidence_aggregation import aggregate_scorecards
-    scorecard = build_intraday_scorecard(datasets, ScorecardConfig(minimum_trades=30, slippage_rate=backtest.get("execution_model", {}).get("slippage_rate", 0.0005)))
-    cross_stock = aggregate_scorecards(scorecard.get("ranked", []), interval=interval, requested_symbols=requested, missing_symbols=[])
+    requested = list(dict.fromkeys(item.strip().upper() for item in (symbols or normalized).split(",") if item.strip()))
+    if normalized not in requested:
+        requested.insert(0, normalized)
+    datasets = {item: _research_rows(item, interval) for item in requested}
+    available = {item: data for item, data in datasets.items() if data}
+    missing = [item for item in requested if item not in available]
+    scorecard = build_intraday_scorecard(available, ScorecardConfig(minimum_trades=30, slippage_rate=backtest.get("execution_model", {}).get("slippage_rate", 0.0005)))
+    cross_stock = aggregate_scorecards(scorecard.get("ranked", []), interval=interval, requested_symbols=requested, missing_symbols=missing)
     authorization = get_active_authorization(db, current_user.id, symbol=normalized, interval=interval, strategy_version=strategy_version)
     trades = db.query(PaperTrade).filter(
         PaperTrade.user_id == current_user.id,
