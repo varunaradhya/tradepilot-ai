@@ -2,6 +2,7 @@ import pytest
 
 from app.services.intraday_strategy import IntradayConfig
 from app.services.paper_market_service import PaperMarketCoordinator
+from app.services.paper_trading_orchestrator import PaperOrchestratorConfig, PaperTradingOrchestrator
 
 
 def _coordinator() -> PaperMarketCoordinator:
@@ -16,7 +17,8 @@ def _coordinator() -> PaperMarketCoordinator:
         atr_stop_multiple=1.0,
         reward_multiple=2.0,
     )
-    return PaperMarketCoordinator(strategy=config)
+    orchestrator = PaperTradingOrchestrator(PaperOrchestratorConfig(qualification_required=False))
+    return PaperMarketCoordinator(orchestrator=orchestrator, strategy=config)
 
 
 def test_market_bar_builds_history_and_returns_neutral_until_ready():
