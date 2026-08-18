@@ -10,7 +10,7 @@ Any new feature, bug fix, research capability, UI workflow, safety control, brok
 
 ## Current status
 
-**V1 stabilization / paper-trading ready foundation**
+**V1 stabilization / paper-trading ready foundation — P5 production reliability foundation implemented**
 
 The project currently includes:
 
@@ -21,6 +21,10 @@ The project currently includes:
 - Deterministic long-first intraday signal engine
 - Position risk and sizing engine
 - Central execution safety gate
+- Durable fail-closed operational kill switch
+- Market-data freshness watchdog with stale/future timestamp rejection
+- Operational audit-event persistence and retention service
+- Read-only broker sandbox certification contract
 - Paper-risk controls for daily loss, trade count, loss streak and open positions
 - Auditable paper trade-decision endpoint and command center
 - Strategy qualification, robustness and walk-forward validation
@@ -44,6 +48,7 @@ The intended flow is:
 
 ```text
 Market data
+    -> freshness watchdog
     -> signal
     -> strategy readiness
     -> position sizing
@@ -51,9 +56,22 @@ Market data
     -> execution safety gate
     -> paper trade
     -> performance evidence
+    -> operational audit
 ```
 
-A strategy should demonstrate sufficient historical robustness and real paper performance before any future live-execution review.
+The durable kill switch defaults to active and has no trading-API deactivation path. Broker sandbox certification is read-only and always reports live execution as disabled.
+
+## Operations endpoints
+
+Authenticated operational endpoints include:
+
+- `GET /api/v1/operations/safety` — consolidated safety, session, market-data and paper-reconciliation status
+- `GET /api/v1/operations/kill-switch` — durable kill-switch state
+- `POST /api/v1/operations/kill-switch/activate` — activate the fail-safe kill switch
+- `GET /api/v1/operations/audit-events` — recent operational evidence
+- `GET /api/v1/operations/broker-sandbox/{broker}` — read-only adapter certification
+
+There is deliberately **no API endpoint that deactivates the kill switch**, and no endpoint can enable live trading.
 
 ## Local development
 
@@ -85,9 +103,9 @@ docker compose up --build
 
 The backend exposes `/health` for liveness and `/ready` for database readiness.
 
-## Verification baseline
+## Verification
 
-The latest GitHub Actions verification checkpoint is **371 backend tests passing**, with a successful Vite production build and successful Docker Compose configuration validation. Always rerun the local test/build commands after pulling changes.
+GitHub Actions is the source of truth for the backend test count, frontend build and deployment-config validation. Always rerun the local test/build commands after pulling changes.
 
 ## Project structure
 
