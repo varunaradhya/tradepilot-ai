@@ -20,9 +20,29 @@
 | P1 | Production market-data scheduler | ENVIRONMENTAL |
 | P1 | Strategy research dashboard | EXISTING / EXTEND |
 | P1 | Parameter sensitivity visualization | EXISTING / EXTEND |
-| P1 | Regime-performance dashboard | EXISTING / EXTEND |
+| P1 | Regime-performance visualization | EXISTING / EXTEND |
 
-P1 monitoring is deliberately read-only and cannot place, modify or cancel broker orders. Reconciliation failures surface `HALT_AND_RECONCILE` rather than silently repairing state. Reconciliation is independent of database retrieval order and invalid trade data fails closed.
+## P2 — Intraday paper-market validation
+
+| Capability | Status |
+|---|---|
+| NSE/IST session-aware paper lifecycle | IMPLEMENTED |
+| Server-controlled strategy qualification gate | IMPLEMENTED |
+| Immutable/idempotent signal request capture | IMPLEMENTED |
+| Signal → paper position lifecycle | IMPLEMENTED |
+| Risk-based position sizing | IMPLEMENTED |
+| Stop/target/trailing-stop/time exits | IMPLEMENTED |
+| Session-close position handling | IMPLEMENTED |
+| Realistic Indian transaction-cost simulation | IMPLEMENTED |
+| Net paper P&L | IMPLEMENTED |
+| Paper state persistence and restoration | IMPLEMENTED |
+| Paper monitoring + reconciliation | IMPLEMENTED |
+| Backtest-vs-paper divergence evidence | IMPLEMENTED |
+| Paper evidence API | IMPLEMENTED |
+| Adversarial regression coverage | IMPLEMENTED |
+| Production continuous scheduler | ENVIRONMENTAL |
+
+**P2 safety boundary:** all execution remains `SIMULATION_ONLY`; broker orders are disabled. Divergence evidence is diagnostic and can never authorize live trading.
 
 ## Permanent constraints
 
@@ -37,24 +57,20 @@ P1 monitoring is deliberately read-only and cannot place, modify or cancel broke
 
 ## Agile lifecycle
 
-### Phase 2 — Paper-market validation
-**Status: NEXT / ACTIVE**
+### Phase 1 — Research / historical validation
+**Status: EXISTING FOUNDATION**
 
-Required:
-- reliable market-data runtime
-- NSE session handling
-- immutable signal capture
-- complete paper trade lifecycle
-- realistic simulated execution
-- order/position/exit reconciliation
-- net P&L reconciliation
-- backtest-vs-paper divergence analysis
-- adversarial paper-trading QA
+Research data, intraday strategy, backtesting, robustness and walk-forward qualification already exist and remain evidence-gated.
+
+### Phase 2 — Paper-market validation
+**Status: IMPLEMENTED — CI GATE**
+
+P2 now covers the end-to-end simulation boundary: qualified signal capture → risk checks → simulated execution → position lifecycle → net P&L → persistence/reconciliation → evidence comparison.
 
 ### Phase 3 — Strategy readiness
-**Status: EVIDENCE GATED**
+**Status: EVIDENCE GATED / NEXT**
 
-Historical evidence and paper evidence must pass their respective gates before promotion.
+A strategy must pass historical qualification **and** sustained paper-performance gates before readiness review. Positive return alone is insufficient.
 
 ### Phase 4 — Live execution
 **Status: LOCKED**
@@ -75,4 +91,4 @@ Live order placement remains disabled until production safeguards, broker integr
 
 ## Latest engineering focus
 
-P1 stabilization is tightening the paper monitoring boundary before Phase 2. The canonical monitoring service owns operational health snapshots; reconciliation is deterministic and fail-closed. Phase 2 must extend evidence collection rather than bypassing the paper gate.
+P2 completes the controlled intraday paper-market evidence boundary. The next attack is Phase 3 strategy-readiness hardening: sustained paper-performance gates, statistical confidence, regime stability, drawdown/loss-streak limits, parameter drift detection, and fail-closed promotion from PAPER to READINESS.
