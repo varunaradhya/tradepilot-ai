@@ -2,6 +2,12 @@
 
 TradePilot AI is a risk-first stock research, strategy validation and paper-trading platform built for disciplined intraday experimentation.
 
+## Project source of truth
+
+Before starting feature development, read **[`docs/TRADEPILOT_FEATURE_REGISTER.md`](docs/TRADEPILOT_FEATURE_REGISTER.md)**. It is the project-wide feature and development register: implemented capabilities, intentional locks, environmental dependencies, backlog, architecture boundaries, definition of done, and change history.
+
+Any new feature, bug fix, research capability, UI workflow, safety control, broker capability, or deployment capability should update that register in the same change whenever practical. This prevents rebuilding functionality that already exists elsewhere in the repository.
+
 ## Current status
 
 **V1 stabilization / paper-trading ready foundation**
@@ -55,7 +61,7 @@ A strategy should demonstrate sufficient historical robustness and real paper pe
 
 ```powershell
 cd backend
-.\.venv\Scripts\python.exe -m pytest
+.\\.venv\\Scripts\\python.exe -m pytest
 ```
 
 ### Frontend
@@ -89,7 +95,7 @@ The latest GitHub Actions verification checkpoint is **371 backend tests passing
 tradepilot-ai/
 ├── backend/           FastAPI application, domain services and tests
 ├── frontend/          React/TypeScript application
-├── docs/              Architecture and operational documentation
+├── docs/              Architecture, feature register and operational documentation
 ├── scripts/            Development/operations helpers
 ├── docker-compose.yml Local production-like stack
 └── .github/workflows/ CI
