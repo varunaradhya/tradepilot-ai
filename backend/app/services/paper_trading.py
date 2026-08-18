@@ -66,6 +66,9 @@ class PaperTradingEngine:
     def new_session(self, session: str):
         if not isinstance(session, str) or not session.strip():
             raise ValueError("session is required")
+        session = session.strip()
+        if self.day is not None and session < self.day:
+            raise ValueError("session cannot move backwards")
         if self.day != session:
             if self.position is not None:
                 self.close(self.position["last_price"], "SESSION_CLOSE")
