@@ -28,11 +28,7 @@ class PaperMarketState:
 
 
 class PaperMarketCoordinator:
-    """Feeds normalized market bars into the long-only strategy and paper engine.
-
-    This component is deliberately broker-neutral. A real market-data adapter can
-    call on_bar() later; it cannot place an order through this coordinator.
-    """
+    """Feeds normalized market bars into the long-only strategy and paper engine."""
 
     def __init__(self, orchestrator: PaperTradingOrchestrator | None = None, strategy: IntradayConfig | None = None):
         self.orchestrator = orchestrator or PaperTradingOrchestrator()
@@ -57,8 +53,6 @@ class PaperMarketCoordinator:
         state = self._states.setdefault(key, PaperMarketState())
         state.append(open_price, high, low, close, volume)
 
-        # Position state belongs to the orchestrator. Use its actual open_position
-        # field rather than the legacy/nonexistent `position` key.
         had_position = self.orchestrator.summary().get("open_position") is not None
         signal = generate_intraday_signal(
             state.opens,
@@ -71,8 +65,6 @@ class PaperMarketCoordinator:
             config=self.strategy,
         )
 
-        # A signal is generated from the completed candle. Do not immediately
-        # re-use that same candle to hit its newly-created stop/target.
         routed: dict[str, Any] | None = None
         if not had_position and signal.get("action") == "BUY":
             routed = self.orchestrator.on_signal(
@@ -95,7 +87,9 @@ class PaperMarketCoordinator:
         return self.orchestrator.close_session(session, close)
 
     def reset(self) -> None:
+        """Clear market history and reset the simulation without losing authorization."""
+        fingerprint = self.orchestrator.summary().get("strategy_fingerprint")
         self._states.clear()
-        self.orchestrator = PaperTradingOrchestrator(
-            self.orchestrator.config
-        )
+        self.orchestrator = PaperTradingOrchestrator(self.orchestrator.config)
+        if fingerprint:
+            self.orchestrator.authorize_strategy(fingerprint=fingerprint)
