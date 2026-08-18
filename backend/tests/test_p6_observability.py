@@ -1,5 +1,3 @@
-import os
-
 from app.services.observability import RequestObservability, slo_snapshot
 from app.services.sandbox_credentials import sandbox_credential_status
 
