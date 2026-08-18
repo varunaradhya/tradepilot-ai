@@ -36,7 +36,7 @@ class PaperMarkRequest(BaseModel):
 class PaperCloseRequest(BaseModel):
     exit_price: float = Field(gt=0); reason: str = Field(default="MANUAL", min_length=1, max_length=40)
 class PaperSignalRequest(BaseModel):
-    session: str = Field(min_length=1, max_length=40); action: str = Field(min_length=1, max_length=20); entry: float = Field(gt=0); stop: float = Field(gt=0); target: float = Field(gt=0); symbol: str = Field(min_length=1, max_length=30); interval: str = Field(default="5", pattern="^(1|5|15|25|60)$"); lot_size: int = Field(default=1, gt=0, le=100000)
+    session: str = Field(min_length=1, max_length=40); action: str = Field(min_length=1, max_length=20); entry: float = Field(gt=0); stop: float = Field(gt=0); target: float = Field(gt=0); symbol: str = Field(min_length=1, max_length=30); interval: str = Field(default="5", pattern="^(1|5|15|25|60)$"); strategy_version: str = Field(default="V1", pattern="^(V1|V2)$"); lot_size: int = Field(default=1, gt=0, le=100000)
 class PaperBarRequest(BaseModel):
     session: str = Field(min_length=1, max_length=40); high: float = Field(gt=0); low: float = Field(gt=0); close: float = Field(gt=0)
 class MarketBarRequest(BaseModel):
@@ -168,7 +168,7 @@ def paper_session_summary(current_user: User = Depends(get_current_user)) -> dic
 
 @router.post("/session/signal")
 def paper_session_signal(payload: PaperSignalRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict[str, Any]:
-    if not _load_authorization(db, current_user.id, payload.symbol, payload.interval, "V1"):
+    if not _load_authorization(db, current_user.id, payload.symbol, payload.interval, payload.strategy_version):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No active qualified strategy authorization for this symbol and interval")
     return {"mode":"SIMULATION_ONLY",**_orchestrator(current_user.id).on_signal(payload.session,payload.model_dump())}
 
