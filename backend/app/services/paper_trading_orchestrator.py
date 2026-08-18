@@ -22,28 +22,38 @@ class PaperOrchestratorConfig:
 
 
 class PaperTradingOrchestrator:
-    """Simulation-only signal-to-position coordinator. It never talks to a broker.
-
-    A caller-provided signal cannot open a paper position unless the orchestrator
-    has been explicitly enabled by the server after strategy qualification.
-    """
+    """Simulation-only signal-to-position coordinator. It never talks to a broker."""
 
     def __init__(self, config: PaperOrchestratorConfig = PaperOrchestratorConfig()):
         if config.max_trades_per_session < 1:
             raise ValueError("max_trades_per_session must be positive")
         self.config = config
-        self.engine = PaperTradingEngine(PaperRiskConfig(
-            initial_capital=config.initial_capital, risk_per_trade=config.risk_per_trade,
-            max_daily_loss=config.max_daily_loss, trade_direction="LONG_ONLY",
-            allocation_pct=config.allocation_pct, lot_size=config.lot_size,
-            trailing_stop_pct=config.trailing_stop_pct, trailing_activation_pct=config.trailing_activation_pct,
-            max_holding_bars=config.max_holding_bars,
-        ))
-        self.session_trades = 0
-        self.last_signal: dict[str, Any] | None = None
-        self._session: str | None = None
         self._strategy_ready = not config.qualification_required
         self._strategy_fingerprint: str | None = None
+        self.last_signal: dict[str, Any] | None = None
+        self._session: str | None = None
+        self.session_trades = 0
+        self.engine = self._new_engine()
+
+    def _new_engine(self) -> PaperTradingEngine:
+        return PaperTradingEngine(PaperRiskConfig(
+            initial_capital=self.config.initial_capital,
+            risk_per_trade=self.config.risk_per_trade,
+            max_daily_loss=self.config.max_daily_loss,
+            trade_direction="LONG_ONLY",
+            allocation_pct=self.config.allocation_pct,
+            lot_size=self.config.lot_size,
+            trailing_stop_pct=self.config.trailing_stop_pct,
+            trailing_activation_pct=self.config.trailing_activation_pct,
+            max_holding_bars=self.config.max_holding_bars,
+        ))
+
+    def reset(self) -> None:
+        """Reset simulation state while retaining the server-granted authorization."""
+        self.engine = self._new_engine()
+        self.session_trades = 0
+        self.last_signal = None
+        self._session = None
 
     def authorize_strategy(self, *, fingerprint: str) -> None:
         if not fingerprint or len(fingerprint) < 8:
