@@ -5,6 +5,7 @@ from math import floor
 from typing import Any
 
 from app.services.indian_costs import IndianEquityCostModel, IndianFnoOptionCostModel
+from app.services.paper_pnl import calculate_mark_to_market, calculate_trade_net_pnl
 
 
 @dataclass(frozen=True)
@@ -23,12 +24,7 @@ class PaperRiskConfig:
 
 
 class PaperTradingEngine:
-    """Deterministic simulation-only ledger. It never sends broker orders.
-
-    Equity paper trading uses the equity cost model by default. F&O callers can
-    explicitly pass IndianFnoOptionCostModel through PaperRiskConfig; an options
-    fee schedule must never silently contaminate equity P&L.
-    """
+    """Deterministic simulation-only ledger. It never sends broker orders."""
 
     def __init__(self, config: PaperRiskConfig = PaperRiskConfig()):
         if config.trade_direction not in {"LONG_ONLY", "LONG_SHORT"}: raise ValueError("trade_direction must be LONG_ONLY or LONG_SHORT")
@@ -78,16 +74,16 @@ class PaperTradingEngine:
     def close(self, price: float, reason: str):
         if self.position is None: return None
         p = self.position; price = float(price); proceeds = p["quantity"] * price
-        exit_costs = self.cost_model.estimate_order(proceeds, side="SELL", include_stt=True); gross_pnl = proceeds - p["quantity"] * p["entry"]
-        total_costs = p["entry_costs"]["total"] + exit_costs["total"]; net_pnl = gross_pnl - total_costs
-        self.cash += proceeds - exit_costs["total"]; self.realized_pnl += net_pnl; self.day_pnl += net_pnl
+        exit_costs = self.cost_model.estimate_order(proceeds, side="SELL", include_stt=True)
+        pnl = calculate_trade_net_pnl(p["entry"], price, p["quantity"], p["entry_costs"], exit_costs)
+        self.cash += proceeds - exit_costs["total"]; self.realized_pnl += pnl["net_pnl"]; self.day_pnl += pnl["net_pnl"]
         trade = {"symbol": p.get("symbol"), "entry": p["entry"], "exit": price, "quantity": p["quantity"], "lots": p["lots"], "lot_size": p["lot_size"],
-                 "stop": p["initial_stop"], "final_stop": p["stop"], "target": p["target"], "gross_pnl": gross_pnl,
+                 "stop": p["initial_stop"], "final_stop": p["stop"], "target": p["target"], "gross_pnl": pnl["gross_pnl"],
                  "brokerage": p["entry_costs"]["brokerage"] + exit_costs["brokerage"], "stt": p["entry_costs"].get("stt", 0.0) + exit_costs.get("stt", 0.0),
                  "exchange_charges": p["entry_costs"]["exchange_charges"] + exit_costs["exchange_charges"], "sebi_charges": p["entry_costs"]["sebi_charges"] + exit_costs["sebi_charges"],
                  "stamp_duty": p["entry_costs"]["stamp_duty"] + exit_costs["stamp_duty"], "ipft": p["entry_costs"]["ipft"] + exit_costs["ipft"],
                  "gst": p["entry_costs"]["gst"] + exit_costs["gst"], "slippage": p["entry_costs"].get("slippage", 0.0) + exit_costs.get("slippage", 0.0),
-                 "total_charges": total_costs, "net_pnl": net_pnl, "pnl": net_pnl,
+                 "total_charges": pnl["total_charges"], "net_pnl": pnl["net_pnl"], "pnl": pnl["net_pnl"],
                  "reason": reason, "exit_reason": "STOP_LOSS" if reason == "STOP" else reason, "direction": p["direction"], "bars_held": p["bars_held"]}
         self.trades.append(trade); self.position = None
         if self.day_pnl <= -(self.day_start_equity * self.config.max_daily_loss): self.halted = True
@@ -130,10 +126,12 @@ class PaperTradingEngine:
 
     def snapshot(self):
         unrealized_gross = 0.0; unrealized_net = 0.0
+        mark_components: dict[str, float] = {"unrealized_gross_pnl": 0.0, "projected_exit_charges": 0.0, "unrealized_net_pnl": 0.0}
         if self.position is not None:
-            p = self.position; market_value = p["quantity"] * p["last_price"]; entry_value = p["quantity"] * p["entry"]
-            unrealized_gross = market_value - entry_value; exit_costs = self.cost_model.estimate_order(market_value, side="SELL", include_stt=True)
-            unrealized_net = unrealized_gross - p["entry_costs"]["total"] - exit_costs["total"]
+            p = self.position; market_value = p["quantity"] * p["last_price"]
+            exit_costs = self.cost_model.estimate_order(market_value, side="SELL", include_stt=True)
+            mark_components = calculate_mark_to_market(p["entry"], p["last_price"], p["quantity"], p["entry_costs"], exit_costs)
+            unrealized_gross = mark_components["unrealized_gross_pnl"]; unrealized_net = mark_components["unrealized_net_pnl"]
         return {"mode": "SIMULATION_ONLY", "trade_direction": self.config.trade_direction, "cash": round(self.cash, 2), "realized_pnl": round(self.realized_pnl, 2),
                 "unrealized_gross_pnl": round(unrealized_gross, 2), "unrealized_net_pnl": round(unrealized_net, 2), "total_pnl": round(self.realized_pnl + unrealized_net, 2),
                 "day_pnl": round(self.day_pnl + unrealized_net, 2), "halted": self.halted, "open_position": self.position, "trades": len(self.trades)}
