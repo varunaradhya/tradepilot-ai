@@ -67,7 +67,8 @@ def aggregate_paper_performance(trades: Iterable[PaperTrade]) -> dict:
     wins = [p for p in pnls if p > 0]
     losses = [p for p in pnls if p < 0]
     gross_loss = abs(sum(losses))
-    equity = 100000.0
+    initial_capital = 100000.0
+    equity = initial_capital
     peak = equity
     max_drawdown = 0.0
     consecutive = 0
