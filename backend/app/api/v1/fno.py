@@ -15,7 +15,7 @@ from app.services.fno_algo_engine import build_autonomous_option_decision
 from app.services.fno_execution import execute_fno_decision
 from app.services.fno_strategy import FNOConfig, build_fno_decision, select_option_contracts
 from app.services.fno_instrument_service import fno_instrument_master
-from app.services.paper_trading_service import close_paper_trade, list_paper_trades, open_paper_trade, update_paper_trade
+from app.services.paper_trading_service import close_paper_trade, list_paper_trades, open_paper_trade, paper_trade_costs, update_paper_trade
 
 router = APIRouter(prefix="/fno", tags=["F&O"])
 
@@ -167,16 +167,19 @@ def option_paper_positions(current_user: User = Depends(get_current_user), db=De
     for trade in trades:
         ltp=_ltp_from_response(quotes,str(trade.security_id))
         if ltp is not None: trade=update_paper_trade(db,trade,ltp)
-        positions.append({"id":trade.id,"symbol":trade.symbol,"underlying":trade.underlying,"expiry":trade.expiry,"strike":trade.strike,"option_type":trade.option_type,"security_id":trade.security_id,"quantity":trade.quantity,"entry_price":trade.entry_price,"last_price":ltp,"stop_price":trade.stop_price,"target_price":trade.target_price,"pnl":trade.pnl,"status":trade.status,"reason":trade.reason})
+        costs=paper_trade_costs(trade,ltp if ltp is not None else trade.entry_price)
+        positions.append({"id":trade.id,"symbol":trade.symbol,"underlying":trade.underlying,"expiry":trade.expiry,"strike":trade.strike,"option_type":trade.option_type,"security_id":trade.security_id,"quantity":trade.quantity,"entry_price":trade.entry_price,"last_price":ltp,"stop_price":trade.stop_price,"target_price":trade.target_price,"pnl":trade.pnl,"estimated_round_trip_costs":costs,"status":trade.status,"reason":trade.reason})
     return {"mode":"PAPER_ONLY","market_connected":True,"positions":positions}
 
 @router.post("/paper/positions/{trade_id}/close")
 def close_option_paper_trade(trade_id:int,exit_price:float=Query(gt=0),current_user:User=Depends(get_current_user),db=Depends(get_db)):
     trade=db.query(PaperTrade).filter(PaperTrade.id==trade_id,PaperTrade.user_id==current_user.id,PaperTrade.asset_type=="OPTION").first()
     if trade is None: raise HTTPException(status_code=404,detail="Option paper position not found")
-    try: trade=close_paper_trade(db,trade,exit_price,"MANUAL")
+    try:
+        costs=paper_trade_costs(trade,exit_price)
+        trade=close_paper_trade(db,trade,exit_price,"MANUAL")
     except ValueError as exc: raise HTTPException(status_code=422,detail=str(exc)) from exc
-    return {"mode":"PAPER_ONLY","position":{"id":trade.id,"status":trade.status,"exit_price":trade.exit_price,"pnl":trade.pnl,"reason":trade.reason}}
+    return {"mode":"PAPER_ONLY","position":{"id":trade.id,"status":trade.status,"exit_price":trade.exit_price,"pnl":trade.pnl,"estimated_round_trip_costs":costs,"reason":trade.reason}}
 
 @router.post("/execute")
 def execute(data:FNOExecuteRequest,current_user:User=Depends(get_current_user),db=Depends(get_db)):
