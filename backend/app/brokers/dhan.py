@@ -6,7 +6,9 @@ import httpx
 
 
 class DhanAPIError(Exception):
-    pass
+    def __init__(self, message: str, status_code: int | None = None):
+        super().__init__(message)
+        self.status_code = status_code
 
 
 class DhanClient:
@@ -35,7 +37,7 @@ class DhanClient:
                 if attempt >= self.max_retries:
                     try: p = r.json()
                     except Exception: p = r.text
-                    raise DhanAPIError(f"Dhan API returned {r.status_code} after {attempt + 1} attempts: {p}")
+                    raise DhanAPIError(f"Dhan API returned {r.status_code} after {attempt + 1} attempts: {p}", r.status_code)
                 retry_after = r.headers.get("Retry-After")
                 try: delay = float(retry_after) if retry_after else min(20.0, 1.5 * (2 ** attempt))
                 except ValueError: delay = min(20.0, 1.5 * (2 ** attempt))
@@ -46,7 +48,9 @@ class DhanClient:
             if r.status_code >= 400:
                 try: p = r.json()
                 except Exception: p = r.text
-                raise DhanAPIError(f"Dhan API returned {r.status_code}: {p}")
+                if r.status_code == 401:
+                    raise DhanAPIError("Dhan authentication failed (401). The saved access token is invalid or expired. Reconnect Dhan with a fresh access token.", 401)
+                raise DhanAPIError(f"Dhan API returned {r.status_code}: {p}", r.status_code)
             try: return r.json()
             except Exception as exc: raise DhanAPIError("Dhan returned invalid JSON.") from exc
         raise DhanAPIError("Dhan request failed unexpectedly.")
