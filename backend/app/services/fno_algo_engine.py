@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from math import isfinite
 from typing import Any, Sequence
 
+from app.services.fno_cost_service import FNOCostConfig, estimate_net_pnl
 from app.services.fno_strategy import FNOConfig, select_option_contracts
 
 
@@ -161,9 +162,6 @@ def build_autonomous_option_decision(
     if entry <= 0 or delta <= 0 or direction.atr <= 0:
         return {"decision": "NO_TRADE", "reason": "INVALID_OPTION_RISK_INPUT", "contract": best, **base}
 
-    # Use the underlying's measured volatility and the option's live delta to
-    # translate an underlying move into a premium-risk estimate. This avoids
-    # the previous fixed 25% stop / 50% target assumption.
     expected_premium_move = max(delta * direction.atr, entry * 0.08)
     risk_per_unit = max(expected_premium_move * 0.75, entry * 0.06)
     stop = entry - risk_per_unit
@@ -171,21 +169,33 @@ def build_autonomous_option_decision(
     if stop <= 0 or stop >= entry:
         return {"decision": "NO_TRADE", "reason": "INVALID_DYNAMIC_STOP", "contract": best, **base}
 
-    risk_budget = _num(underlying.get("capital")) * config.risk_per_trade
-    max_capital = _num(underlying.get("capital")) * config.max_capital_percent
-    quantity_by_risk = int(risk_budget // (entry - stop))
-    quantity_by_capital = int(max_capital // entry)
-    quantity = min(quantity_by_risk, quantity_by_capital)
-    quantity = (quantity // lot_size) * lot_size
+    capital = _num(underlying.get("capital"))
+    risk_budget = capital * config.risk_per_trade
+    max_capital = capital * config.max_capital_percent
+    cost_config = FNOCostConfig()
+
+    # Size by the actual net loss at the stop, including the round-trip
+    # trading costs. Brokerage is per order, so sizing must be done in whole
+    # lots and rechecked after the lot rounding.
+    quantity = (int(max_capital // entry) // lot_size) * lot_size
+    while quantity > 0:
+        net_stop_pnl, stop_costs = estimate_net_pnl(entry, stop, quantity, cost_config)
+        risk = abs(net_stop_pnl)
+        if risk <= risk_budget:
+            break
+        quantity -= lot_size
+
     lots = quantity // lot_size
     if quantity <= 0:
         return {"decision": "NO_TRADE", "reason": "RISK_BUDGET_TOO_SMALL_FOR_ONE_LOT", "contract": best, "lot_size": lot_size, "risk_budget": round(risk_budget, 2), **base}
 
-    risk = (entry - stop) * quantity
-    reward = (target - entry) * quantity
+    net_stop_pnl, stop_costs = estimate_net_pnl(entry, stop, quantity, cost_config)
+    net_target_pnl, target_costs = estimate_net_pnl(entry, target, quantity, cost_config)
+    risk = abs(net_stop_pnl)
+    reward = max(0.0, net_target_pnl)
     risk_reward = reward / risk if risk > 0 else 0.0
     if risk_reward < 1.8:
-        return {"decision": "NO_TRADE", "reason": "RISK_REWARD_TOO_LOW", "contract": best, "risk_reward": round(risk_reward, 2), **base}
+        return {"decision": "NO_TRADE", "reason": "RISK_REWARD_TOO_LOW_AFTER_COSTS", "contract": best, "risk_reward": round(risk_reward, 2), "stop_costs": stop_costs, "target_costs": target_costs, **base}
 
     return {
         "decision": "QUALIFIED",
@@ -204,5 +214,7 @@ def build_autonomous_option_decision(
         "risk_reward": round(risk_reward, 2),
         "expected_premium_move": round(expected_premium_move, 4),
         "position_capital": round(entry * quantity, 2),
+        "estimated_stop_costs": stop_costs,
+        "estimated_target_costs": target_costs,
         "paper_only": True,
     }
