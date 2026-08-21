@@ -1,4 +1,4 @@
-﻿from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.brokers.dhan import DhanAPIError, DhanClient
@@ -37,31 +37,26 @@ def connect_broker(
     ),
     db: Session = Depends(get_db),
 ):
-
-    broker_name = (
-        data.broker_name
-        .strip()
-        .upper()
-    )
+    broker_name = data.broker_name.strip().upper()
+    client_id = data.client_id.strip()
+    access_token = data.access_token.strip()
 
     if broker_name != "DHAN":
-
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Only DHAN is supported in this batch.",
         )
 
-    client = DhanClient(
-        client_id=data.client_id,
-        access_token=data.access_token,
-    )
-
+    client = DhanClient(client_id=client_id, access_token=access_token)
     try:
-
-        client.profile()
-
+        profile = client.profile()
+        profile_client_id = str(profile.get("dhanClientId", "")).strip() if isinstance(profile, dict) else ""
+        if profile_client_id and profile_client_id != client_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Dhan Client ID does not match the Client ID associated with this access token.",
+            )
     except DhanAPIError as exc:
-
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
@@ -71,8 +66,8 @@ def connect_broker(
         db=db,
         user_id=current_user.id,
         broker_name=broker_name,
-        client_id=data.client_id,
-        access_token=data.access_token,
+        client_id=client_id,
+        access_token=access_token,
         token_expires_at=data.token_expires_at,
     )
 
@@ -82,25 +77,15 @@ def connect_broker(
     response_model=list[BrokerConnectionResponse],
 )
 def list_brokers(
-    current_user: User = Depends(
-        get_current_user
-    ),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-
-    from app.models.broker_connection import (
-        BrokerConnection,
-    )
+    from app.models.broker_connection import BrokerConnection
 
     return (
         db.query(BrokerConnection)
-        .filter(
-            BrokerConnection.user_id
-            == current_user.id
-        )
-        .order_by(
-            BrokerConnection.broker_name.asc()
-        )
+        .filter(BrokerConnection.user_id == current_user.id)
+        .order_by(BrokerConnection.broker_name.asc())
         .all()
     )
 
@@ -110,34 +95,18 @@ def list_brokers(
     response_model=BrokerSyncResponse,
 )
 def sync_dhan(
-    current_user: User = Depends(
-        get_current_user
-    ),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-
-    connection = get_user_broker(
-        db,
-        current_user.id,
-        "DHAN",
-    )
-
+    connection = get_user_broker(db, current_user.id, "DHAN")
     if connection is None:
-
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Dhan is not connected.",
         )
-
     try:
-
-        return sync_dhan_portfolio(
-            db,
-            connection,
-        )
-
+        return sync_dhan_portfolio(db, connection)
     except DhanAPIError as exc:
-
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(exc),
