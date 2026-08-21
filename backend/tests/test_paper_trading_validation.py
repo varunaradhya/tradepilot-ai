@@ -26,7 +26,7 @@ def test_update_paper_trade_rejects_invalid_market_range():
 
 
 def test_close_paper_trade_normalizes_reason():
-    trade = type("Trade", (), {"status": "OPEN", "entry_price": 100, "quantity": 2})()
+    trade = type("Trade", (), {"status": "OPEN", "entry_price": 100, "quantity": 2, "asset_type": "EQUITY"})()
     result = close_paper_trade(FakeDB(), trade, 110, " manual ")
     assert result.reason == "MANUAL"
     assert result.pnl == 20
