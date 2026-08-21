@@ -25,10 +25,10 @@ function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
-async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
+async function request<T>(url: string, options: RequestInit = {}, timeoutMs = REQUEST_TIMEOUT_MS): Promise<T> {
   const token = localStorage.getItem("access_token");
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetch(url, {
@@ -73,27 +73,27 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
   }
 }
 
-async function get<T>(url: string): Promise<T> {
-  return request<T>(url);
+async function get<T>(url: string, timeoutMs = REQUEST_TIMEOUT_MS): Promise<T> {
+  return request<T>(url, {}, timeoutMs);
 }
 
-export async function apiRequest<T>(path: string): Promise<T> {
-  return get<T>(`${apiUrl}${path}`);
+export async function apiRequest<T>(path: string, timeoutMs = REQUEST_TIMEOUT_MS): Promise<T> {
+  return get<T>(`${apiUrl}${path}`, timeoutMs);
 }
 
 export const api = {
   getHealth: () => get<HealthStatus>(healthUrl),
   getUsers: () => get<User[]>(`${apiUrl}/users/`),
-  get: apiRequest,
-  post: <T>(path: string, body?: unknown) =>
+  get: <T>(path: string, timeoutMs = REQUEST_TIMEOUT_MS) => apiRequest<T>(path, timeoutMs),
+  post: <T>(path: string, body?: unknown, timeoutMs = REQUEST_TIMEOUT_MS) =>
     request<T>(`${apiUrl}${path}`, {
       method: "POST",
       body: body === undefined ? undefined : JSON.stringify(body),
-    }),
-  put: <T>(path: string, body?: unknown) =>
+    }, timeoutMs),
+  put: <T>(path: string, body?: unknown, timeoutMs = REQUEST_TIMEOUT_MS) =>
     request<T>(`${apiUrl}${path}`, {
       method: "PUT",
       body: body === undefined ? undefined : JSON.stringify(body),
-    }),
-  delete: <T>(path: string) => request<T>(`${apiUrl}${path}`, { method: "DELETE" }),
+    }, timeoutMs),
+  delete: <T>(path: string, timeoutMs = REQUEST_TIMEOUT_MS) => request<T>(`${apiUrl}${path}`, { method: "DELETE" }, timeoutMs),
 };
