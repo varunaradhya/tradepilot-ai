@@ -4,6 +4,7 @@ import math
 from sqlalchemy.orm import Session
 
 from app.models.paper_trade import PaperTrade
+from app.services.fno_cost_service import FNOCostConfig, estimate_fno_option_costs, estimate_net_pnl
 
 
 def open_paper_trade(db: Session, user_id: int, *, symbol: str, quantity: int, entry_price: float, stop_price: float, target_price: float, strategy_version: str = "V1", asset_type: str = "EQUITY", security_id: str | None = None, exchange_segment: str | None = None, underlying: str | None = None, expiry: str | None = None, strike: float | None = None, option_type: str | None = None, lot_size: int | None = None) -> PaperTrade:
@@ -41,7 +42,10 @@ def update_paper_trade(db: Session, trade: PaperTrade, market_price: float, *, m
         return close_paper_trade(db, trade, trade.stop_price, "STOP")
     if high >= trade.target_price:
         return close_paper_trade(db, trade, trade.target_price, "TARGET")
-    trade.pnl = (market_price - trade.entry_price) * trade.quantity
+    if trade.asset_type == "OPTION":
+        trade.pnl, _ = estimate_net_pnl(trade.entry_price, market_price, trade.quantity, FNOCostConfig())
+    else:
+        trade.pnl = (market_price - trade.entry_price) * trade.quantity
     db.commit()
     db.refresh(trade)
     return trade
@@ -56,13 +60,24 @@ def close_paper_trade(db: Session, trade: PaperTrade, exit_price: float, reason:
     if not reason:
         raise ValueError("Exit reason is required")
     trade.exit_price = exit_price
-    trade.pnl = (exit_price - trade.entry_price) * trade.quantity
+    if trade.asset_type == "OPTION":
+        trade.pnl, _ = estimate_net_pnl(trade.entry_price, exit_price, trade.quantity, FNOCostConfig())
+    else:
+        trade.pnl = (exit_price - trade.entry_price) * trade.quantity
     trade.reason = reason
     trade.status = "CLOSED"
     trade.closed_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(trade)
     return trade
+
+
+def paper_trade_costs(trade: PaperTrade, exit_price: float | None = None) -> dict[str, float]:
+    """Return estimated round-trip costs without changing persisted trade state."""
+    if trade.asset_type != "OPTION":
+        return {"total": 0.0}
+    price = exit_price if exit_price is not None else trade.entry_price
+    return estimate_fno_option_costs(trade.entry_price, price, trade.quantity, FNOCostConfig())
 
 
 def list_paper_trades(db: Session, user_id: int, status: str | None = None) -> list[PaperTrade]:
