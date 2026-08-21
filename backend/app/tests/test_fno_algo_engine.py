@@ -59,3 +59,14 @@ def test_autonomous_decision_sizes_in_exchange_lots():
         assert result["lots"] >= 1
         assert result["risk_reward"] >= 1.8
         assert result["stop"] < result["entry"] < result["target"]
+
+
+def test_autonomous_decision_rejects_capital_that_cannot_fund_one_lot():
+    result = build_autonomous_option_decision(
+        underlying={"symbol": "NIFTY", "capital": 1000},
+        bars=_bars("up"),
+        option_chain=_chain(),
+        lot_size=75,
+    )
+    assert result["decision"] == "NO_TRADE"
+    assert result["reason"] in {"RISK_BUDGET_TOO_SMALL_FOR_ONE_LOT", "NO_OPTION_CONTRACT_PASSED_FILTERS"}
