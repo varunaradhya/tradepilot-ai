@@ -10,6 +10,12 @@ export type User = {
   updated_at: string;
 };
 
+type TokenResponse = {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+};
+
 export class ApiError extends Error {
   constructor(public readonly status: number, message: string) {
     super(message);
@@ -20,13 +26,49 @@ export class ApiError extends Error {
 const apiUrl = (import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1").replace(/\/$/, "");
 const healthUrl = new URL("/health", apiUrl).toString();
 const REQUEST_TIMEOUT_MS = 15_000;
+const ACCESS_TOKEN_KEY = "access_token";
+const REFRESH_TOKEN_KEY = "refresh_token";
+let refreshPromise: Promise<boolean> | null = null;
 
 function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
-async function request<T>(url: string, options: RequestInit = {}, timeoutMs = REQUEST_TIMEOUT_MS): Promise<T> {
-  const token = localStorage.getItem("access_token");
+async function refreshAccessToken(): Promise<boolean> {
+  const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+  if (!refreshToken) return false;
+
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = (async () => {
+    try {
+      const response = await fetch(`${apiUrl}/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+      if (!response.ok) return false;
+      const payload = (await response.json()) as TokenResponse;
+      if (!payload.access_token || !payload.refresh_token) return false;
+      localStorage.setItem(ACCESS_TOKEN_KEY, payload.access_token);
+      localStorage.setItem(REFRESH_TOKEN_KEY, payload.refresh_token);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+  return refreshPromise;
+}
+
+function clearAuthentication(): void {
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  window.dispatchEvent(new Event("tradepilot:logout"));
+}
+
+async function request<T>(url: string, options: RequestInit = {}, timeoutMs = REQUEST_TIMEOUT_MS, allowRefresh = true): Promise<T> {
+  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
 
@@ -41,6 +83,12 @@ async function request<T>(url: string, options: RequestInit = {}, timeoutMs = RE
       },
     });
 
+    if (response.status === 401 && allowRefresh && !url.endsWith("/auth/login") && !url.endsWith("/auth/refresh")) {
+      const refreshed = await refreshAccessToken();
+      if (refreshed) return request<T>(url, options, timeoutMs, false);
+      clearAuthentication();
+    }
+
     if (!response.ok) {
       let message = `Request failed with status ${response.status}`;
       try {
@@ -49,11 +97,6 @@ async function request<T>(url: string, options: RequestInit = {}, timeoutMs = RE
         else if (payload.detail?.message) message = payload.detail.message;
       } catch {
         // Keep the status-based fallback when the server does not return JSON.
-      }
-
-      if (response.status === 401) {
-        localStorage.removeItem("access_token");
-        window.dispatchEvent(new Event("tradepilot:logout"));
       }
       throw new ApiError(response.status, message);
     }
