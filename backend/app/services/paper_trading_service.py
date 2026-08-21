@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.models.paper_trade import PaperTrade
 
 
-def open_paper_trade(db: Session, user_id: int, *, symbol: str, quantity: int, entry_price: float, stop_price: float, target_price: float, strategy_version: str = "V1") -> PaperTrade:
+def open_paper_trade(db: Session, user_id: int, *, symbol: str, quantity: int, entry_price: float, stop_price: float, target_price: float, strategy_version: str = "V1", asset_type: str = "EQUITY", security_id: str | None = None, exchange_segment: str | None = None, underlying: str | None = None, expiry: str | None = None, strike: float | None = None, option_type: str | None = None, lot_size: int | None = None) -> PaperTrade:
     symbol = symbol.strip().upper()
     values = (float(quantity), float(entry_price), float(stop_price), float(target_price))
     if not symbol or any(not math.isfinite(value) for value in values) or quantity <= 0 or entry_price <= 0 or stop_price <= 0 or target_price <= entry_price:
@@ -15,7 +15,13 @@ def open_paper_trade(db: Session, user_id: int, *, symbol: str, quantity: int, e
         raise ValueError("Stop price must be below entry price for a long paper trade")
     if strategy_version not in {"V1", "V2"}:
         raise ValueError("strategy_version must be V1 or V2")
-    trade = PaperTrade(user_id=user_id, symbol=symbol, side="BUY", status="OPEN", quantity=quantity, entry_price=entry_price, stop_price=stop_price, target_price=target_price, strategy_version=strategy_version)
+    asset_type = asset_type.strip().upper()
+    if asset_type not in {"EQUITY", "OPTION"}:
+        raise ValueError("asset_type must be EQUITY or OPTION")
+    if asset_type == "OPTION":
+        if not security_id or exchange_segment != "NSE_FNO" or not underlying or not expiry or option_type not in {"CE", "PE"} or not lot_size or lot_size <= 0 or quantity % lot_size:
+            raise ValueError("Invalid option contract metadata or lot-size alignment")
+    trade = PaperTrade(user_id=user_id, symbol=symbol, side="BUY", status="OPEN", quantity=quantity, entry_price=entry_price, stop_price=stop_price, target_price=target_price, strategy_version=strategy_version, asset_type=asset_type, security_id=str(security_id) if security_id else None, exchange_segment=exchange_segment, underlying=underlying.strip().upper() if underlying else None, expiry=expiry, strike=float(strike) if strike is not None else None, option_type=option_type, lot_size=lot_size)
     db.add(trade)
     db.commit()
     db.refresh(trade)
