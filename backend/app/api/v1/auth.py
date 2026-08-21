@@ -4,19 +4,29 @@ from sqlalchemy.orm import Session
 from app.core.config import TRADEPILOT_RESET_DEBUG
 from app.core.security import hash_password
 from app.db.database import get_db
-from app.schemas.auth import ForgotPasswordRequest, LoginRequest, ResetPasswordRequest, TokenResponse, UserCreate
+from app.schemas.auth import ForgotPasswordRequest, LoginRequest, RefreshRequest, ResetPasswordRequest, TokenResponse, UserCreate
 from app.schemas.user import UserResponse
 from app.services.auth_service import (
     authenticate_user,
     create_access_token,
     create_password_reset_token,
+    create_refresh_token,
     create_user,
     decode_password_reset_token,
+    decode_refresh_token,
     get_user_by_email,
     get_user_by_id,
 )
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+def _tokens(user_id: int) -> dict[str, str]:
+    return {
+        "access_token": create_access_token(user_id=user_id),
+        "refresh_token": create_refresh_token(user_id=user_id),
+        "token_type": "bearer",
+    }
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -31,7 +41,19 @@ def login(credentials: LoginRequest, db: Session = Depends(get_db)):
     user = authenticate_user(db, credentials.email, credentials.password)
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password", headers={"WWW-Authenticate": "Bearer"})
-    return {"access_token": create_access_token(user_id=user.id), "token_type": "bearer"}
+    return _tokens(user.id)
+
+
+@router.post("/refresh", response_model=TokenResponse)
+def refresh(payload: RefreshRequest, db: Session = Depends(get_db)):
+    try:
+        user_id = decode_refresh_token(payload.refresh_token)
+    except (ValueError, KeyError, TypeError, Exception):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired refresh token", headers={"WWW-Authenticate": "Bearer"})
+    user = get_user_by_id(db, user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired refresh token", headers={"WWW-Authenticate": "Bearer"})
+    return _tokens(user.id)
 
 
 @router.post("/forgot-password", status_code=status.HTTP_202_ACCEPTED)
