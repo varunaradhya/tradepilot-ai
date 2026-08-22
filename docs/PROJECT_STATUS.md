@@ -38,11 +38,15 @@ Status: **IN PROGRESS**
 - Added `backend/app/tests/test_fno_backtest_service.py`.
 - Uses the autonomous replay engine rather than a separate strategy implementation.
 - Enforces next-bar entry after a qualified signal.
+- Resolves the selected contract from the **entry-bar snapshot**, never from the signal-time contract.
 - Uses ask-side entry and bid-side exit when available.
+- Refuses to substitute stale quotes when the required historical contract/quote is missing.
+- End-of-test liquidation uses the final available contract snapshot rather than the entry snapshot.
 - Applies configurable slippage and the existing F&O cost model.
 - Enforces lot-size, capital-allocation and risk-budget gates.
 - Simulates stop/target exits conservatively.
 - Produces trade ledger, equity curve, return, win rate, profit factor, expectancy and max drawdown metrics.
+- Added regression coverage for next-bar execution, missing-contract safety, input alignment and risk-compatible test sizing.
 
 ### Important limitation
 
@@ -94,7 +98,8 @@ Do not re-implement or re-test as a new feature without first checking the QA pl
 - persistent paper-trade lifecycle basics;
 - Dhan authentication/refresh foundation;
 - CI backend/frontend/deployment release gates;
-- replay anti-look-ahead foundation.
+- replay anti-look-ahead foundation;
+- next-bar F&O fill and historical contract-resolution fix.
 
 ## Live trading status
 
@@ -106,6 +111,8 @@ Never mark a milestone green merely because code was committed. A milestone beco
 
 ## Latest implementation commits
 
+- Historical backtest fill-integrity fix: `614a44d110853ab37bcc7c5cc48f663e8f9e19dd`
+- Historical backtest regression tests: `3e017402dfe1680fac87327d6b039db600cb8613`
 - F&O backtest engine: `9bf31e1f5650bb112c8a624c1e0f6a1639eafbdb`
 - F&O backtest tests: `37feee987f1fd025abebcaa10ef16928492a639c`
 - QA plan checkpoint: `5bd9fcc7ec316fb990fe5aed41250701404c7a91`
