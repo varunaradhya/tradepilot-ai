@@ -8,7 +8,7 @@ This is the handoff/checkpoint for future TradePilot sessions. Before starting n
 
 ## Current milestone
 
-**Milestone: F&O strategy qualification — frozen walk-forward / out-of-sample gates**
+**Milestone: F&O strategy qualification — real historical evidence layer**
 
 Status: **IN PROGRESS — QUALIFICATION EVIDENCE REQUIRED**
 
@@ -20,31 +20,26 @@ Status: **IN PROGRESS — QUALIFICATION EVIDENCE REQUIRED**
 - Autonomous F&O direction/CE/PE/strike/lot selection and cost-aware risk/reward gates are implemented.
 - Historical replay is anti-look-ahead by construction: decisions use only bars through the current index and the option-chain snapshot at that index.
 - Historical backtest uses next-bar contract resolution, ask-side entry and bid-side exit and refuses stale quote substitution.
+- Qualification service evaluates frozen IS/OOS results and does not tune strategy parameters.
 
-### Historical backtest milestone implemented
+### New historical evidence layer
 
-- Added `backend/app/services/fno_backtest_service.py`.
-- Added `backend/app/tests/test_fno_backtest_service.py`.
-- Produces trade ledger, equity curve, return, win rate, profit factor, expectancy and max drawdown.
-- Applies slippage, transaction costs, capital/risk/lot-size gates and conservative stop/target handling.
-- Regression fixture was corrected to model a real next-bar entry and later-bar exit under the configured risk gate.
-
-### New qualification milestone
-
-- Added `backend/app/services/fno_qualification_service.py`.
-- Added `backend/app/tests/test_fno_qualification_service.py`.
-- Qualification is deliberately evaluation-only: it does not optimize strategy parameters.
-- Separates in-sample and out-of-sample trade results.
-- Requires minimum trade counts, positive expectancy, minimum profit factor and bounded drawdown in both samples.
-- Explicitly fails qualification when OOS evidence is absent.
+- Added `backend/app/services/fno_historical_data_service.py`.
+- Added `backend/app/tests/test_fno_historical_data_service.py`.
+- Historical option snapshots must be timestamped.
+- Future quotes relative to the decision timestamp are rejected.
+- Execution-grade snapshots require valid bid/ask pairs.
+- Empty option chains are rejected.
+- Underlying bars and option snapshots must be aligned and chronologically ordered.
+- Validation reports invalid rows instead of silently repairing evidence.
 
 ## Critical limitation
 
-We still do **not** have evidence that the strategy is profitable. The qualification service is only a gate over supplied results. We must obtain sufficiently large, timestamp-aligned historical expired-option datasets with realistic bid/ask evolution before calling the strategy qualified. Synthetic fixtures are for software tests only and must never be presented as performance evidence.
+We still do **not** have evidence that the strategy is profitable. The historical evidence service is a validation boundary; it does not create historical data. We must ingest sufficiently large, timestamp-aligned historical expired-option datasets with realistic bid/ask evolution before calling the strategy qualified. Synthetic fixtures are for software tests only and must never be presented as performance evidence.
 
 ## Current priority queue
 
-1. **Obtain/ingest real historical F&O evidence**
+1. **Ingest real historical F&O evidence**
    - expired NIFTY option contracts;
    - historical option-chain snapshots;
    - timestamp-aligned bid/ask evolution;
@@ -95,7 +90,9 @@ Do not re-implement or re-test as a new feature without first checking this file
 - replay anti-look-ahead foundation;
 - next-bar F&O fill and historical contract-resolution fix;
 - corrected next-bar/later-bar backtest regression fixture;
-- deterministic IST clock handling in historical-candle tests.
+- deterministic IST clock handling in historical-candle tests;
+- frozen IS/OOS qualification gate;
+- historical snapshot validation boundary.
 
 ## Live trading status
 
@@ -107,6 +104,8 @@ Never mark a milestone green merely because code was committed. A milestone beco
 
 ## Latest implementation commits
 
+- Historical evidence validation service: `493d1ad08e03c56953bb1948b23e8a29dc20bff0`
+- Historical evidence validation tests: `6b97e40c18328f85583a14825927096ec8e35209`
 - Walk-forward qualification service: `725b8478abcdd6260cda60b696ad8c85ca77e9c8`
 - Walk-forward qualification tests: `ec0a8e097b1cc17f6043078ac52b74e4dfbe717a`
 - Deterministic historical-candle test fix: `3e9e6d0c7b1acfb6ff4d851e425e8957ad728a34`
