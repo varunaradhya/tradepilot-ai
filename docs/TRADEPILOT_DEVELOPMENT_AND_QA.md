@@ -81,6 +81,7 @@ No manual strike or lot selection is part of the intended autonomous path.
 - Completed-bar filtering, OHLC validation, timestamp deduplication and chronological ordering.
 - Replay foundation using only the information set available at each completed bar.
 - Future-bar mutation guard for anti-look-ahead regression testing.
+- Initial autonomous F&O historical backtest engine with next-bar entry, bid/ask-aware fills, cost-aware P&L and performance metrics.
 
 ## Current QA gates
 
@@ -122,6 +123,7 @@ No manual strike or lot selection is part of the intended autonomous path.
 - [x] Automatic virtual position opening only after QUALIFIED.
 - [x] Continuous session waits instead of forcing a trade.
 - [x] Executable bid used for long-option paper marking/exit decisions.
+- [x] Historical backtest uses next-bar entry and conservative stop/target ordering.
 - [ ] Explicit paper order idempotency key for autonomous session retries.
 - [ ] Reconciliation test after backend restart.
 - [ ] Duplicate-candle/duplicate-scan test at session level.
@@ -146,6 +148,7 @@ No manual strike or lot selection is part of the intended autonomous path.
 - [x] Liquidity-aware contract selection foundation.
 - [x] Exchange lot-size resolution.
 - [x] Bid/ask-aware paper marking.
+- [x] Historical next-bar option quote execution foundation.
 - [ ] Spread-width gate with configurable maximum.
 - [ ] Minimum bid/ask quantity gate.
 - [ ] Circuit/price-band handling.
@@ -158,10 +161,9 @@ No manual strike or lot selection is part of the intended autonomous path.
 - [x] Walk-forward foundations.
 - [x] Qualification/readiness foundations.
 - [x] Anti-look-ahead replay foundation.
-- [ ] Full intraday options historical replay.
-- [ ] Expired-options data integration for unbiased historical option testing.
-- [ ] Historical bid/ask/fill simulation.
-- [ ] Trade ledger/equity curve/drawdown statistics.
+- [x] Initial autonomous F&O historical backtest engine and metrics.
+- [ ] Historical expired-options dataset integration for unbiased option testing.
+- [ ] Full intraday options historical replay using real option snapshots.
 - [ ] Survivorship/universe bias audit.
 - [ ] Corporate-action/universe audit where applicable.
 - [ ] Out-of-sample qualification report.
@@ -181,50 +183,27 @@ No manual strike or lot selection is part of the intended autonomous path.
 ## Current known limitations
 
 1. A green CI run proves code/tests pass; it does not prove that the strategy has predictive edge.
-2. The replay foundation is currently a deterministic anti-look-ahead harness, not a full historical options backtest.
-3. Expired-options historical snapshots with realistic historical bid/ask data are still required for unbiased options replay.
-4. Dhan live market data is required for forward paper trading.
-5. Dhan access tokens are time-limited; credential refresh must remain user-controlled and secret.
-6. Live order placement remains intentionally unavailable to the paper workflow.
-7. The autonomous F&O direction model is a strategy candidate, not yet a production-qualified trading edge.
-8. Paper trading must be run for an adequate forward sample before any real-money decision.
+2. The new F&O backtest engine is a framework; real expired-option historical snapshots are still required for meaningful option-strategy qualification.
+3. Dhan live market data is required for forward paper trading.
+4. Dhan access tokens are time-limited; credential refresh must remain user-controlled and secret.
+5. Live order placement remains intentionally unavailable to the paper workflow.
+6. The autonomous F&O direction model is a strategy candidate, not yet a production-qualified trading edge.
+7. Paper trading must be run for an adequate forward sample before any real-money decision.
 
 ## Definition of paper-trading success
 
-A session is successful when TradePilot can repeatedly demonstrate that it:
+A session is successful when TradePilot can repeatedly demonstrate that it uses only completed valid data, waits when evidence is insufficient, chooses a complete option trade without manual strike/lot selection, sizes within risk, models costs and executable prices, prevents duplicates, survives authentication/data/restart failures, produces an auditable record, and never sends a broker order in paper mode.
 
-1. uses only completed, valid market data;
-2. waits when evidence is insufficient;
-3. chooses a complete option trade without manual strike/lot selection;
-4. sizes within the configured risk budget;
-5. models realistic transaction costs and executable-side prices;
-6. prevents duplicate trades;
-7. survives authentication refresh, network/data failures and restarts safely;
-8. produces a complete auditable decision record; and
-9. never sends a broker order in paper mode.
-
-Profit on one day is **not** a qualification criterion by itself.
+Profit on one day is not a qualification criterion by itself.
 
 ## Real-money readiness gate
 
-Live trading remains locked until all of the following are independently evidenced:
-
-- robust historical backtest;
-- no-look-ahead candle replay;
-- walk-forward and out-of-sample validation;
-- realistic options execution/cost model;
-- statistically meaningful paper-trading sample;
-- acceptable drawdown and expectancy;
-- failure/recovery testing;
-- security and credential audit;
-- reconciliation and idempotency audit;
-- production monitoring/alerting;
-- explicit owner approval.
+Live trading remains locked until robust historical backtest, no-look-ahead replay, walk-forward/OOS validation, realistic options execution/cost model, statistically meaningful paper trading, acceptable drawdown/expectancy, failure/recovery testing, security audit, reconciliation/idempotency audit, production monitoring/alerting, and explicit owner approval are all evidenced.
 
 ## Next highest-priority attacks
 
-1. **Finish the historical options replay/backtest engine** — expired option-chain snapshots, bid/ask fills, slippage, stop/target ordering, expiry-day behavior and portfolio statistics.
-2. Run parameter-contamination, validation-reuse, regime-stability and parameter-sensitivity tests.
-3. Complete paper execution idempotency/reconciliation/outage recovery.
-4. Add daily-loss, concentration, consecutive-loss and emergency kill-switch controls.
-5. Only after these gates pass, run extended forward paper trading and strategy qualification.
+1. Add real expired-option historical snapshot ingestion/replay so the F&O backtest represents actual historical contracts rather than synthetic fixtures.
+2. Add option spread/liquidity/price-band and slippage stress gates.
+3. Add daily-loss, kill-switch, restart reconciliation and session-level idempotency tests.
+4. Run parameter sensitivity, regime stability, validation-reuse and out-of-sample qualification.
+5. Only after those gates pass, continue extended forward paper trading.
