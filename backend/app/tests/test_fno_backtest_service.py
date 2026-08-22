@@ -27,7 +27,7 @@ def _decision():
         "direction": "BULLISH",
         "quantity": 75,
         "entry": 100,
-        "stop": 90,
+        "stop": 95,
         "target": 120,
         "contract": {"strike": 25000, "option_type": "CE", "ask": 100, "bid": 100, "last_price": 100},
     }
