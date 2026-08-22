@@ -1,7 +1,7 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from app.api.v1.fno import _historical_rows
+from app.api.v1.fno import _historical_rows, _quote_from_response
 from app.services.fno_algo_engine import build_autonomous_option_decision, infer_direction
 
 
@@ -75,6 +75,12 @@ def test_autonomous_decision_rejects_capital_that_cannot_fund_one_lot():
     )
     assert result["decision"] == "NO_TRADE"
     assert result["reason"] == "RISK_BUDGET_TOO_SMALL_FOR_ONE_LOT"
+
+
+def test_quote_parser_prefers_best_bid_for_executable_long_exit():
+    response = {"data": {"NSE_FNO": {"123": {"last_price": 105.0, "depth": {"buy": [{"price": 103.5, "quantity": 100}], "sell": [{"price": 106.0, "quantity": 100}]}}}}}
+    quote = _quote_from_response(response, "123")
+    assert quote == {"bid": 103.5, "ask": 106.0, "ltp": 105.0}
 
 
 class _HistoricalClient:
