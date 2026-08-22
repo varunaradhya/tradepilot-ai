@@ -1,8 +1,24 @@
 from app.services import fno_backtest_service as service
 
 
-def _chain(price=100.0, low=100.0, high=100.0):
-    return {"oc": {"25000": {"ce": {"strike": 25000, "option_type": "CE", "ask": price, "bid": price, "last_price": price, "low": low, "high": high}}}}
+def _chain(price=100.0, low=None, high=None):
+    low = price if low is None else low
+    high = price if high is None else high
+    return {
+        "oc": {
+            "25000": {
+                "ce": {
+                    "strike": 25000,
+                    "option_type": "CE",
+                    "ask": price,
+                    "bid": price,
+                    "last_price": price,
+                    "low": low,
+                    "high": high,
+                }
+            }
+        }
+    }
 
 
 def _decision():
@@ -11,7 +27,7 @@ def _decision():
         "direction": "BULLISH",
         "quantity": 75,
         "entry": 100,
-        "stop": 90,
+        "stop": 105,
         "target": 120,
         "contract": {"strike": 25000, "option_type": "CE", "ask": 100, "bid": 100, "last_price": 100},
     }
@@ -32,9 +48,28 @@ def test_fno_backtest_uses_next_bar_for_entry_and_target(monkeypatch):
     )
 
     assert result["trades"] == 1
-    assert result["trades_detail"][0]["entry_bar_index"] == 61
-    assert result["trades_detail"][0]["reason"] == "TARGET"
-    assert result["trades_detail"][0]["pnl"] > 0
+    trade = result["trades_detail"][0]
+    assert trade["entry_bar_index"] == 61
+    assert trade["entry"] == 125
+    assert trade["reason"] == "TARGET"
+    assert trade["pnl"] > 0
+
+
+def test_fno_backtest_never_reuses_signal_contract_when_entry_snapshot_missing(monkeypatch):
+    bars = [{"open": 100, "high": 101, "low": 99, "close": 100, "timestamp": i} for i in range(62)]
+    chains = [_chain() for _ in bars]
+    chains[61] = {"oc": {}}
+    decisions = [{"bar_index": 60, "timestamp": 60, "decision": _decision()}]
+    monkeypatch.setattr(service, "replay_autonomous_option_decisions", lambda **kwargs: decisions)
+
+    result = service.run_fno_backtest(
+        underlying={"symbol": "NIFTY"},
+        bars=bars,
+        option_chain_snapshots=chains,
+        lot_size=75,
+    )
+
+    assert result["trades"] == 0
 
 
 def test_fno_backtest_rejects_invalid_lot_size():
@@ -44,6 +79,21 @@ def test_fno_backtest_rejects_invalid_lot_size():
         assert "lot_size" in str(exc)
     else:
         raise AssertionError("expected invalid lot size to fail")
+
+
+def test_fno_backtest_rejects_misaligned_inputs(monkeypatch):
+    monkeypatch.setattr(service, "replay_autonomous_option_decisions", lambda **kwargs: [])
+    try:
+        service.run_fno_backtest(
+            underlying={"symbol": "NIFTY"},
+            bars=[{"close": 100}],
+            option_chain_snapshots=[],
+            lot_size=75,
+        )
+    except ValueError as exc:
+        assert "same length" in str(exc)
+    else:
+        raise AssertionError("expected input alignment to fail")
 
 
 def test_fno_backtest_reports_no_trades_without_qualified_decisions(monkeypatch):
