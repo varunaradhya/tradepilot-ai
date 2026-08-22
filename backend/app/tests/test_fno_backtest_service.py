@@ -27,17 +27,26 @@ def _decision():
         "direction": "BULLISH",
         "quantity": 75,
         "entry": 100,
-        "stop": 105,
+        "stop": 90,
         "target": 120,
         "contract": {"strike": 25000, "option_type": "CE", "ask": 100, "bid": 100, "last_price": 100},
     }
 
 
-def test_fno_backtest_uses_next_bar_for_entry_and_target(monkeypatch):
-    bars = [{"open": 100, "high": 101, "low": 99, "close": 100, "timestamp": i} for i in range(62)]
+def _no_trade(index):
+    return {"bar_index": index, "timestamp": index, "decision": {"decision": "NO_TRADE"}}
+
+
+def test_fno_backtest_uses_next_bar_for_entry_and_later_bar_for_target(monkeypatch):
+    bars = [{"open": 100, "high": 101, "low": 99, "close": 100, "timestamp": i} for i in range(63)]
     chains = [_chain() for _ in bars]
-    chains[61] = _chain(price=125, low=100, high=125)
-    decisions = [{"bar_index": 60, "timestamp": 60, "decision": _decision()}]
+    chains[61] = _chain(price=100)
+    chains[62] = _chain(price=125, low=100, high=125)
+    decisions = [
+        {"bar_index": 60, "timestamp": 60, "decision": _decision()},
+        _no_trade(61),
+        _no_trade(62),
+    ]
     monkeypatch.setattr(service, "replay_autonomous_option_decisions", lambda **kwargs: decisions)
 
     result = service.run_fno_backtest(
@@ -50,7 +59,8 @@ def test_fno_backtest_uses_next_bar_for_entry_and_target(monkeypatch):
     assert result["trades"] == 1
     trade = result["trades_detail"][0]
     assert trade["entry_bar_index"] == 61
-    assert trade["entry"] == 125
+    assert trade["entry"] == 100
+    assert trade["exit_bar_index"] == 62
     assert trade["reason"] == "TARGET"
     assert trade["pnl"] > 0
 
