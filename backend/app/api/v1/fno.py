@@ -84,21 +84,63 @@ def _expiry_dates(payload: Any) -> list[str]:
     return sorted(set(values))
 
 def _historical_rows(client: DhanClient, security_id: int, segment: str, interval: str) -> list[dict[str, Any]]:
-    ist = ZoneInfo("Asia/Kolkata"); now = datetime.now(ist); session_start = now.replace(hour=9, minute=15, second=0, microsecond=0)
-    if now < session_start: return []
-    response = client.historical_intraday(str(security_id), segment, "INDEX", interval, session_start.date().isoformat(), (now + timedelta(days=1)).date().isoformat())
+    """Fetch and normalize today's completed underlying candles.
+
+    Dhan v2 accepts IST timestamps for intraday historical requests. Using the
+    exact session start/end instead of date-only values avoids ambiguous server
+    ranges and makes the completed-candle boundary deterministic.
+    """
+    ist = ZoneInfo("Asia/Kolkata")
+    now = datetime.now(ist)
+    session_start = now.replace(hour=9, minute=15, second=0, microsecond=0)
+    if now < session_start:
+        return []
+
+    # Do not ask for tomorrow's date. The API's toDate is non-inclusive and
+    # precise IST timestamps give us exactly the current session window.
+    from_date = session_start.strftime("%Y-%m-%d %H:%M:%S")
+    to_date = now.strftime("%Y-%m-%d %H:%M:%S")
+    response = client.historical_intraday(
+        str(security_id), segment, "INDEX", interval, from_date, to_date
+    )
     data = response.get("data") if isinstance(response, dict) else None
-    if not isinstance(data, dict): return []
-    opens, highs, lows, closes = data.get("open") or [], data.get("high") or [], data.get("low") or [], data.get("close") or []
-    volumes, timestamps = data.get("volume") or [0] * len(closes), data.get("timestamp") or data.get("time") or []
-    rows=[]; bar_seconds=int(interval)*60
+    if not isinstance(data, dict):
+        return []
+
+    opens = data.get("open") or []
+    highs = data.get("high") or []
+    lows = data.get("low") or []
+    closes = data.get("close") or []
+    volumes = data.get("volume") or [0] * len(closes)
+    timestamps = data.get("timestamp") or data.get("time") or []
+    bar_seconds = int(interval) * 60
+
+    rows_by_timestamp: dict[int, dict[str, Any]] = {}
     for index, close in enumerate(closes):
         try:
-            timestamp=float(timestamps[index]); timestamp=timestamp/1000.0 if timestamp>10_000_000_000 else timestamp
-            if timestamp+bar_seconds>now.timestamp(): continue
-            rows.append({"open":float(opens[index]),"high":float(highs[index]),"low":float(lows[index]),"close":float(close),"volume":float(volumes[index]) if index<len(volumes) else 0.0,"timestamp":timestamp})
-        except (IndexError, TypeError, ValueError): continue
-    return rows
+            timestamp = float(timestamps[index])
+            timestamp = timestamp / 1000.0 if timestamp > 10_000_000_000 else timestamp
+            # Dhan timestamps represent the candle start. Only include a bar
+            # once its full interval has elapsed in IST/current epoch time.
+            if timestamp + bar_seconds > now.timestamp():
+                continue
+            row = {
+                "open": float(opens[index]),
+                "high": float(highs[index]),
+                "low": float(lows[index]),
+                "close": float(close),
+                "volume": float(volumes[index]) if index < len(volumes) else 0.0,
+                "timestamp": timestamp,
+            }
+            if not all(value > 0 for value in (row["open"], row["high"], row["low"], row["close"])):
+                continue
+            if row["high"] < max(row["open"], row["close"]) or row["low"] > min(row["open"], row["close"]):
+                continue
+            rows_by_timestamp[int(timestamp)] = row
+        except (IndexError, TypeError, ValueError):
+            continue
+
+    return [rows_by_timestamp[key] for key in sorted(rows_by_timestamp)]
 
 @router.get("/underlyings")
 def underlyings(q: str = Query(default="", max_length=50), current_user: User = Depends(get_current_user)):
@@ -130,6 +172,10 @@ def autonomous_scan(data: FNOAutoScanRequest, current_user: User = Depends(get_c
         contract=preliminary.get("contract") or {}
         lot_size=fno_instrument_master.option_lot_size(data.symbol,selected_expiry,float(contract.get("strike",0)),str(contract.get("option_type","")),contract.get("security_id")) if contract else 0
         decision=build_autonomous_option_decision(underlying=underlying,bars=bars,option_chain=chain,lot_size=lot_size,config=FNOConfig())
+        # Surface the data-quality state inside the decision as well as at the
+        # response envelope so the UI cannot display a misleading blank bar count.
+        decision["completed_bars"] = len(bars)
+        decision["data_status"] = "READY" if len(bars) >= 60 else "WAITING_FOR_COMPLETED_BARS"
         return {"mode":"PAPER_ONLY","symbol":data.symbol.strip().upper(),"interval":data.interval,"expiry":selected_expiry,"completed_bars":len(bars),"decision":decision}
     except DhanAPIError as exc: raise HTTPException(status_code=502, detail=str(exc)) from exc
     except HTTPException: raise
