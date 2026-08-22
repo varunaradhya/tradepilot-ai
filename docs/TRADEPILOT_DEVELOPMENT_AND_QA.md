@@ -2,6 +2,8 @@
 
 Last updated: 2026-08-22
 
+> **Persistent handoff:** Read `docs/PROJECT_STATUS.md` before starting new work. It records the current milestone, completed foundations and priority queue so work is not repeated across sessions.
+
 ## Product rule
 
 TradePilot is an Indian-market trading/research platform. It must fail closed and must not place live broker orders until the required production safeguards are independently validated and the owner explicitly approves live trading.
@@ -75,6 +77,10 @@ No manual strike or lot selection is part of the intended autonomous path.
 - Cost-aware F&O paper P&L.
 - Continuous autonomous paper-session waiting behavior.
 - CI gates for backend, frontend, deployment configuration and release gate.
+- Precise IST Dhan intraday session-window retrieval.
+- Completed-bar filtering, OHLC validation, timestamp deduplication and chronological ordering.
+- Replay foundation using only the information set available at each completed bar.
+- Future-bar mutation guard for anti-look-ahead regression testing.
 
 ## Current QA gates
 
@@ -88,7 +94,7 @@ No manual strike or lot selection is part of the intended autonomous path.
 - [x] Use precise IST timestamps for Dhan intraday requests.
 - [ ] Verify live NIFTY response contains the expected completed-bar count during a real NSE session.
 - [ ] Verify stale-data detection under an actual data interruption.
-- [ ] Verify out-of-order data rejection against a live/replay fixture.
+- [ ] Verify out-of-order data rejection against an actual replay/live fixture.
 
 ### P0 — Autonomous strategy integrity
 
@@ -99,7 +105,9 @@ No manual strike or lot selection is part of the intended autonomous path.
 - [x] Autonomous strike selection.
 - [x] Autonomous lot sizing.
 - [x] Cost-aware R:R gate.
-- [ ] Full historical candle-by-candle replay proving no look-ahead.
+- [x] Replay uses only completed bars available at each decision point.
+- [x] Future-bar mutation regression guard.
+- [ ] Full historical options replay with real historical option-chain snapshots.
 - [ ] Parameter contamination test.
 - [ ] Validation-reuse test.
 - [ ] Regime stability test.
@@ -149,8 +157,11 @@ No manual strike or lot selection is part of the intended autonomous path.
 
 - [x] Walk-forward foundations.
 - [x] Qualification/readiness foundations.
+- [x] Anti-look-ahead replay foundation.
 - [ ] Full intraday options historical replay.
 - [ ] Expired-options data integration for unbiased historical option testing.
+- [ ] Historical bid/ask/fill simulation.
+- [ ] Trade ledger/equity curve/drawdown statistics.
 - [ ] Survivorship/universe bias audit.
 - [ ] Corporate-action/universe audit where applicable.
 - [ ] Out-of-sample qualification report.
@@ -170,11 +181,13 @@ No manual strike or lot selection is part of the intended autonomous path.
 ## Current known limitations
 
 1. A green CI run proves code/tests pass; it does not prove that the strategy has predictive edge.
-2. Dhan live market data is required for forward paper trading.
-3. Dhan access tokens are time-limited; credential refresh must remain user-controlled and secret.
-4. Live order placement remains intentionally unavailable to the paper workflow.
-5. The autonomous F&O direction model is a strategy candidate, not yet a production-qualified trading edge.
-6. Paper trading must be run for an adequate forward sample before any real-money decision.
+2. The replay foundation is currently a deterministic anti-look-ahead harness, not a full historical options backtest.
+3. Expired-options historical snapshots with realistic historical bid/ask data are still required for unbiased options replay.
+4. Dhan live market data is required for forward paper trading.
+5. Dhan access tokens are time-limited; credential refresh must remain user-controlled and secret.
+6. Live order placement remains intentionally unavailable to the paper workflow.
+7. The autonomous F&O direction model is a strategy candidate, not yet a production-qualified trading edge.
+8. Paper trading must be run for an adequate forward sample before any real-money decision.
 
 ## Definition of paper-trading success
 
@@ -210,8 +223,8 @@ Live trading remains locked until all of the following are independently evidenc
 
 ## Next highest-priority attacks
 
-1. Validate the Dhan intraday candle path in a real market session and confirm completed-bar counts.
-2. Complete the option paper execution/reconciliation stress suite.
-3. Build the candle-by-candle options replay/backtest harness.
-4. Run strategy qualification and out-of-sample gates.
-5. Only after those gates pass, continue extended forward paper trading.
+1. **Finish the historical options replay/backtest engine** — expired option-chain snapshots, bid/ask fills, slippage, stop/target ordering, expiry-day behavior and portfolio statistics.
+2. Run parameter-contamination, validation-reuse, regime-stability and parameter-sensitivity tests.
+3. Complete paper execution idempotency/reconciliation/outage recovery.
+4. Add daily-loss, concentration, consecutive-loss and emergency kill-switch controls.
+5. Only after these gates pass, run extended forward paper trading and strategy qualification.
