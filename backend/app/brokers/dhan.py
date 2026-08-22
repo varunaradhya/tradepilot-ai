@@ -74,6 +74,12 @@ class DhanClient:
     def market_ohlc(self, exchange_segment: str, security_ids: list[str]) -> dict[str, Any]:
         return self._request("POST", "/marketfeed/ohlc", {exchange_segment: [int(x) for x in security_ids]})
 
+    def market_quote(self, exchange_segment: str, security_ids: list[str]) -> dict[str, Any]:
+        """Return executable-side quote data (best bid/ask) for paper marking."""
+        if not security_ids:
+            return {"data": {}, "status": "success"}
+        return self._request("POST", "/marketfeed/quote", {exchange_segment: [int(x) for x in security_ids]})
+
     def option_expiries(self, underlying_security_id: int, underlying_segment: str):
         return self._request("POST", "/optionchain/expirylist", {"UnderlyingScrip": underlying_security_id, "UnderlyingSeg": underlying_segment})
 
