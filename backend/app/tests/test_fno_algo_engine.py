@@ -1,3 +1,7 @@
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+from app.api.v1.fno import _historical_rows
 from app.services.fno_algo_engine import build_autonomous_option_decision, infer_direction
 
 
@@ -71,3 +75,55 @@ def test_autonomous_decision_rejects_capital_that_cannot_fund_one_lot():
     )
     assert result["decision"] == "NO_TRADE"
     assert result["reason"] == "RISK_BUDGET_TOO_SMALL_FOR_ONE_LOT"
+
+
+class _HistoricalClient:
+    def __init__(self, rows):
+        self.rows = rows
+        self.call = None
+
+    def historical_intraday(self, security_id, segment, instrument, interval, from_date, to_date):
+        self.call = (security_id, segment, instrument, interval, from_date, to_date)
+        return self.rows
+
+
+def test_historical_rows_requests_current_session_with_ist_timestamps_and_filters_incomplete_bars():
+    now = datetime.now(ZoneInfo("Asia/Kolkata"))
+    timestamps = [now.timestamp() - 600, now.timestamp() - 300, now.timestamp() - 60]
+    payload = {
+        "data": {
+            "open": [100, 101, 102],
+            "high": [101, 102, 103],
+            "low": [99, 100, 101],
+            "close": [100.5, 101.5, 102.5],
+            "volume": [1000, 1100, 1200],
+            "timestamp": timestamps,
+        }
+    }
+    client = _HistoricalClient(payload)
+    rows = _historical_rows(client, 13, "IDX_I", "5")
+
+    assert client.call is not None
+    assert client.call[0:4] == ("13", "IDX_I", "INDEX", "5")
+    assert " 09:15:00" in client.call[4]
+    assert client.call[5].count(":") == 2
+    assert len(rows) == 2
+    assert rows == sorted(rows, key=lambda row: row["timestamp"])
+
+
+def test_historical_rows_deduplicates_timestamps_and_rejects_invalid_ohlc():
+    now = datetime.now(ZoneInfo("Asia/Kolkata")).timestamp()
+    timestamp = now - 600
+    payload = {
+        "data": {
+            "open": [100, 100, 100],
+            "high": [101, 101, 99],
+            "low": [99, 99, 101],
+            "close": [100.5, 100.5, 100.5],
+            "volume": [1000, 1100, 1200],
+            "timestamp": [timestamp, timestamp, now - 300],
+        }
+    }
+    rows = _historical_rows(_HistoricalClient(payload), 13, "IDX_I", "5")
+    assert len(rows) == 1
+    assert rows[0]["timestamp"] == timestamp
