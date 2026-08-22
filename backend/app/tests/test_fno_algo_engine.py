@@ -93,8 +93,16 @@ class _HistoricalClient:
         return self.rows
 
 
-def test_historical_rows_requests_current_session_with_ist_timestamps_and_filters_incomplete_bars():
-    now = datetime.now(ZoneInfo("Asia/Kolkata"))
+class _FixedDateTime:
+    @classmethod
+    def now(cls, tz=None):
+        fixed = datetime(2026, 8, 22, 10, 30, tzinfo=ZoneInfo("Asia/Kolkata"))
+        return fixed.astimezone(tz) if tz else fixed
+
+
+def test_historical_rows_requests_current_session_with_ist_timestamps_and_filters_incomplete_bars(monkeypatch):
+    monkeypatch.setattr("app.api.v1.fno.datetime", _FixedDateTime)
+    now = _FixedDateTime.now(ZoneInfo("Asia/Kolkata"))
     timestamps = [now.timestamp() - 600, now.timestamp() - 300, now.timestamp() - 60]
     payload = {
         "data": {
@@ -117,8 +125,9 @@ def test_historical_rows_requests_current_session_with_ist_timestamps_and_filter
     assert rows == sorted(rows, key=lambda row: row["timestamp"])
 
 
-def test_historical_rows_deduplicates_timestamps_and_rejects_invalid_ohlc():
-    now = datetime.now(ZoneInfo("Asia/Kolkata")).timestamp()
+def test_historical_rows_deduplicates_timestamps_and_rejects_invalid_ohlc(monkeypatch):
+    monkeypatch.setattr("app.api.v1.fno.datetime", _FixedDateTime)
+    now = _FixedDateTime.now(ZoneInfo("Asia/Kolkata")).timestamp()
     timestamp = now - 600
     payload = {
         "data": {
