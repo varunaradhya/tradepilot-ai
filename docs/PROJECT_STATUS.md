@@ -10,7 +10,7 @@ This is the handoff/checkpoint for future TradePilot sessions. Before starting n
 
 **Milestone: F&O autonomous paper-trading integrity — historical replay/backtest engine**
 
-Status: **IN PROGRESS**
+Status: **IN PROGRESS — CI VERIFICATION PENDING**
 
 ### Completed in the latest QA cycle
 
@@ -38,7 +38,7 @@ Status: **IN PROGRESS**
 - Added `backend/app/tests/test_fno_backtest_service.py`.
 - Uses the autonomous replay engine rather than a separate strategy implementation.
 - Enforces next-bar entry after a qualified signal.
-- Resolves the selected contract from the **entry-bar snapshot**, never from the signal-time contract.
+- Resolves the selected contract from the entry-bar snapshot, never from the signal-time contract.
 - Uses ask-side entry and bid-side exit when available.
 - Refuses to substitute stale quotes when the required historical contract/quote is missing.
 - End-of-test liquidation uses the final available contract snapshot rather than the entry snapshot.
@@ -46,7 +46,8 @@ Status: **IN PROGRESS**
 - Enforces lot-size, capital-allocation and risk-budget gates.
 - Simulates stop/target exits conservatively.
 - Produces trade ledger, equity curve, return, win rate, profit factor, expectancy and max drawdown metrics.
-- Added regression coverage for next-bar execution, missing-contract safety, input alignment and risk-compatible test sizing.
+- Added regression coverage for next-bar execution, later-bar target execution, missing-contract safety, input alignment and risk-compatible test sizing.
+- Corrected a regression fixture that was impossible under the configured 0.5% risk gate and did not actually model a later-bar exit.
 
 ### Important limitation
 
@@ -54,31 +55,36 @@ The backtest engine is now structurally complete enough for deterministic replay
 
 ## Current priority queue
 
-1. **Complete historical F&O evidence layer**
+1. **CI verification of the latest backtest fixes**
+   - backend tests;
+   - frontend build;
+   - deployment configuration;
+   - release gate.
+2. **Complete historical F&O evidence layer**
    - historical option-chain snapshot ingestion;
    - real expired contracts;
    - realistic historical bid/ask and fill evolution;
    - expiry-day behavior;
    - slippage/market-impact scenarios.
-2. **Qualification / anti-overfitting gates**
+3. **Qualification / anti-overfitting gates**
    - parameter contamination;
    - validation reuse;
    - regime stability;
    - parameter sensitivity;
    - walk-forward and out-of-sample separation;
    - minimum trade-count/statistical significance.
-3. **Paper execution resilience**
+4. **Paper execution resilience**
    - explicit autonomous request idempotency;
    - restart reconciliation;
    - duplicate scan protection;
    - broker/data outage recovery.
-4. **Risk hardening**
+5. **Risk hardening**
    - daily loss limit;
    - concentration limits;
    - consecutive-loss protection;
    - volatility-regime adjustment;
    - emergency kill switch.
-5. **Extended forward paper trading** only after the above gates produce evidence.
+6. **Extended forward paper trading** only after the above gates produce evidence.
 
 ## Do not repeat
 
@@ -99,7 +105,8 @@ Do not re-implement or re-test as a new feature without first checking the QA pl
 - Dhan authentication/refresh foundation;
 - CI backend/frontend/deployment release gates;
 - replay anti-look-ahead foundation;
-- next-bar F&O fill and historical contract-resolution fix.
+- next-bar F&O fill and historical contract-resolution fix;
+- corrected next-bar/later-bar backtest regression fixture.
 
 ## Live trading status
 
@@ -111,6 +118,7 @@ Never mark a milestone green merely because code was committed. A milestone beco
 
 ## Latest implementation commits
 
+- Latest corrected F&O backtest regression fixture: `4aadfc3c2e70d84c962b4ed22e88c6c8a55bc4a2`
 - Historical backtest fill-integrity fix: `614a44d110853ab37bcc7c5cc48f663e8f9e19dd`
 - Historical backtest regression tests: `3e017402dfe1680fac87327d6b039db600cb8613`
 - F&O backtest engine: `9bf31e1f5650bb112c8a624c1e0f6a1639eafbdb`
