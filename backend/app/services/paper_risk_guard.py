@@ -1,9 +1,8 @@
-from __future__ import annotations
-
+from datetime import datetime, date
+from zoneinfo import ZoneInfo
 from dataclasses import dataclass, field
-from datetime import date
-from typing import Iterable
 
+IST = ZoneInfo("Asia/Kolkata")
 
 @dataclass(frozen=True)
 class PaperRiskConfig:
@@ -14,7 +13,6 @@ class PaperRiskConfig:
     long_only: bool = True
     require_market_session: bool = True
 
-
 @dataclass
 class PaperRiskState:
     trading_date: date
@@ -24,42 +22,24 @@ class PaperRiskState:
     open_symbols: set[str] = field(default_factory=set)
     accepted_signal_ids: set[str] = field(default_factory=set)
 
-
 @dataclass(frozen=True)
 class RiskDecision:
     allowed: bool
     reason: str
 
-
-def evaluate_paper_entry(
-    *,
-    side: str,
-    symbol: str,
-    signal_id: str,
-    in_market_session: bool,
-    state: PaperRiskState,
-    config: PaperRiskConfig,
-) -> RiskDecision:
-    """Fail-closed gate for a new paper position.
-
-    This guard intentionally does not place orders. It only decides whether a
-    strategy signal is eligible to reach the paper execution layer.
-    """
+def evaluate_paper_entry(*, side: str, symbol: str, signal_id: str, in_market_session: bool, state: PaperRiskState, config: PaperRiskConfig) -> RiskDecision:
     if config.require_market_session and not in_market_session:
         return RiskDecision(False, "OUTSIDE_MARKET_SESSION")
-
     normalized_side = side.strip().upper()
     normalized_symbol = symbol.strip().upper()
     if config.long_only and normalized_side != "BUY":
         return RiskDecision(False, "LONG_ONLY")
-
     if not normalized_symbol:
         return RiskDecision(False, "INVALID_SYMBOL")
     if not signal_id.strip():
         return RiskDecision(False, "MISSING_SIGNAL_ID")
     if signal_id in state.accepted_signal_ids:
         return RiskDecision(False, "DUPLICATE_SIGNAL")
-
     if state.realized_pnl <= -abs(config.max_daily_loss):
         return RiskDecision(False, "DAILY_LOSS_LIMIT")
     if state.trades_today >= config.max_daily_trades:
@@ -70,13 +50,10 @@ def evaluate_paper_entry(
         return RiskDecision(False, "POSITION_ALREADY_OPEN")
     if len(state.open_symbols) >= config.max_open_positions:
         return RiskDecision(False, "OPEN_POSITION_LIMIT")
-
     return RiskDecision(True, "APPROVED")
-
 
 def record_accepted_signal(state: PaperRiskState, signal_id: str) -> None:
     state.accepted_signal_ids.add(signal_id)
-
 
 def record_closed_trade(state: PaperRiskState, pnl: float, symbol: str) -> None:
     state.realized_pnl += float(pnl)
@@ -87,6 +64,13 @@ def record_closed_trade(state: PaperRiskState, pnl: float, symbol: str) -> None:
     elif pnl > 0:
         state.consecutive_losses = 0
 
-
 def open_position(state: PaperRiskState, symbol: str) -> None:
     state.open_symbols.add(symbol.strip().upper())
+
+def normalize_trade_timestamp(value: datetime | None) -> datetime | None:
+    """Normalize SQLite-naive and timezone-aware timestamps to IST safely."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=IST)
+    return value.astimezone(IST)
