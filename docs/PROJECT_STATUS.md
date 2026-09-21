@@ -136,6 +136,12 @@ Never mark a milestone green merely because code was committed. A milestone beco
 
 ## Latest implementation commits
 
+- F&O idempotency/candle identity: `ab6ae24ebc9acae11c9074e3a78256b4fbcb05a6`, `b47be9fe18377433a4de23b9ba0941bcff39eb99`
+- F&O quote outage hardening: `cd8c65774c8c6dd442403bf4aadbf61217573c22`
+- Conservative gap-through replay: `f26e399a05aa8077c422a89f5477764d084f749f`, test `ef04997c30adddbfb35aea08f46a7810597f4529`
+- F&O risk integration: `0f8ce98498af580f44c047f70145ef1072f76591`, test `5836a8bb1639e03de6f74bf1a7789c97f9b0eabd`
+- Live execution hard lock: `2155244ff7ed0fff7a01824f7f91a53c0d841c16`, test `10f9d19f4993f2a20950972bb9c26bafad98ca3c`
+
 - F&O session/freshness hardening: `914115460df874c286ed538a3358d717c1cc85a6`
 - Deterministic F&O freshness gate: `c5837d55ccc8966740a75cc01106a6349c35746f`
 - F&O session/freshness tests: `4516c566ddb2da9d10f5fc4d77f1f85569bc3d3a`
