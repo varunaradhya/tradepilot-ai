@@ -161,3 +161,21 @@ def test_fno_backtest_uses_bid_for_end_of_test_liquidation(monkeypatch):
 
     assert result["trades"] == 1
     assert result["trades_detail"][0]["exit"] == 90
+
+
+def test_fno_backtest_does_not_assume_stop_fill_above_gap_through_bid(monkeypatch):
+    bars = [{"open": 100, "high": 101, "low": 99, "close": 100, "timestamp": i} for i in range(63)]
+    chains = [_chain(price=100) for _ in bars]
+    chains[61] = _chain(price=100)
+    chains[62] = _chain(price=70, low=70, high=90)
+    decisions = [{"bar_index": 60, "timestamp": 60, "decision": _decision()}]
+    monkeypatch.setattr(service, "replay_autonomous_option_decisions", lambda **kwargs: decisions)
+
+    result = service.run_fno_backtest(
+        underlying={"symbol": "NIFTY"}, bars=bars,
+        option_chain_snapshots=chains, lot_size=75,
+    )
+
+    trade = result["trades_detail"][0]
+    assert trade["reason"] == "STOP"
+    assert trade["exit"] == 70.0
