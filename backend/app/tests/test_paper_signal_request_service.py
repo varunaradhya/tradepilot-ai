@@ -75,3 +75,24 @@ def test_pending_request_stale_detection_handles_naive_utc():
     created = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=10)
     record = SimpleNamespace(decision="PENDING", created_at=created)
     assert is_stale_pending_request(record, max_age_seconds=300)
+
+
+def test_fresh_pending_request_is_not_reported_stale():
+    from datetime import datetime, timedelta, timezone
+    from types import SimpleNamespace
+    from app.services.paper_signal_request_service import is_stale_pending_request
+
+    now = datetime(2026, 9, 21, 10, 0, tzinfo=timezone.utc)
+    record = SimpleNamespace(decision="PENDING", created_at=now - timedelta(seconds=299))
+    assert is_stale_pending_request(record, max_age_seconds=300, now=now) is False
+
+
+def test_stale_pending_request_is_recovery_only_and_not_replayable():
+    from datetime import datetime, timedelta, timezone
+    from app.services.paper_signal_request_service import is_stale_pending_request, replay_response
+    from types import SimpleNamespace
+
+    now = datetime(2026, 9, 21, 10, 0, tzinfo=timezone.utc)
+    record = SimpleNamespace(decision="PENDING", created_at=now - timedelta(seconds=301), response_json="{}")
+    assert is_stale_pending_request(record, max_age_seconds=300, now=now) is True
+    assert replay_response(record) is None
