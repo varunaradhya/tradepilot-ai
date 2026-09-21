@@ -51,6 +51,8 @@ This is the canonical implementation ledger for TradePilot AI. Before changing t
 | 2026-09-21 | Paper operations reconciliation | Reconciled existing P1/P5 paper monitoring, ledger reconciliation, market scheduler, freshness watchdog and durable kill-switch foundations before adding new F&O code | Existing adversarial test suites from `24de9a47` and `7e76c9e5`; no duplicate implementation added | VERIFIED FOUNDATION; F&O wiring still audited | 24de9a47 + 7e76c9e5 |
 | 2026-09-21 | F&O expiry safety | Auto-scan now accepts only broker-returned, non-expired expiries; arbitrary/expired requested expiry is rejected | Deterministic expiry fixtures for past, unknown, nearest and same-day expiry | DONE (full CI pending) | f349b279 + d8e21023 |
 
+| 2026-09-21 | F&O session/data safety | Auto-scan now fails closed outside NSE session, with no completed bars, invalid timestamps, future timestamps, or stale latest completed bars; new F&O paper entries are blocked outside session | Deterministic dummy tests cover inactive session, missing bars, fresh bars, future bars and interval-aware freshness | DONE (full CI pending) | 91411546 + c5837d55 + 4516c566 |
+
 ## Current open items
 
 ### P0 — Real historical F&O evidence
