@@ -123,10 +123,13 @@ def run_fno_backtest(
             reason = None
             exit_price = bid * (1.0 - config.slippage_rate)
             if low <= position["stop"]:
-                exit_price = position["stop"] * (1.0 - config.slippage_rate)
+                # A gap-through-stop cannot be filled above the executable bid.
+                exit_price = min(position["stop"], bid) * (1.0 - config.slippage_rate)
                 reason = "STOP"
             elif high >= position["target"]:
-                exit_price = position["target"] * (1.0 - config.slippage_rate)
+                # A target touch is not permission to assume a target fill when
+                # the contemporaneous executable bid is worse.
+                exit_price = min(position["target"], bid) * (1.0 - config.slippage_rate)
                 reason = "TARGET"
             if reason:
                 pnl, costs = estimate_net_pnl(position["entry"], exit_price, position["quantity"], config.cost)
