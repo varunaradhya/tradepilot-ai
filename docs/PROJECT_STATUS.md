@@ -32,6 +32,10 @@ Status: **IN PROGRESS — QUALIFICATION EVIDENCE REQUIRED**
 
 ### F&O QA hardening — executable quote boundary
 
+- Added replay chronology validation: supplied bar timestamps, when present, must be numeric and strictly increasing. This prevents duplicated/out-of-order bars from silently becoming time-aligned research evidence.
+- Added dummy-data tests for chronological rejection and executable quote behavior. The standalone sanity harness passed: LTP-only SELL quote rejected (`0`), valid BUY used ask (`120`), valid SELL used bid (`119`).
+- Repository test execution remains pending because GitHub currently exposes no workflow runs/status for these commits and the execution environment cannot clone the repository from the network; no CI-green claim is being made.
+
 - Added deterministic dummy-data regression coverage for next-bar entry, missing-bid handling, and end-of-test liquidation using executable bid only.
 - Local focused harness also verified BUY uses ask, SELL rejects missing bid, and SELL uses valid bid; this is supplementary to the repository tests.
 - Continuing QA into replay future-invariance, expiry/session boundaries, duplicate paper positions, and failure/retry behavior before historical qualification.
