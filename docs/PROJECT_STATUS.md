@@ -63,6 +63,18 @@ Status: **IN PROGRESS — QUALIFICATION EVIDENCE REQUIRED**
 - Underlying bars and option snapshots must be aligned and chronologically ordered.
 - Validation reports invalid rows instead of silently repairing evidence.
 
+
+### Latest batched F&O QA hardening
+
+- Paper risk timestamps now normalize both timezone-aware and SQLite-naive closed-trade timestamps safely.
+- Exact completed F&O paper requests are checked for replay before mutable session/risk gates, so a duplicate request cannot be rejected merely because risk state changed after the original acceptance.
+- Crash-left PENDING paper requests can now be identified as stale without automatically retrying them. Automatic retry remains intentionally disabled until restart reconciliation is proven at the process/database boundary.
+- Historical F&O replay now supports an optional maximum bid/ask spread gate.
+- Added a frozen execution-friction stress runner that varies only slippage and spread assumptions; it does not tune strategy parameters.
+- Added an optional minimum top-of-book bid/ask quantity filter when provider depth includes quantity.
+- Added regression coverage for spread rejection/acceptance, stress scenario enumeration, stale pending detection, timezone normalization, and top-of-book quantity filtering.
+- These changes do not create historical bid/ask evidence. Real execution-grade historical options data remains the qualification blocker.
+
 ## Critical limitation
 
 We still do **not** have evidence that the strategy is profitable. The historical evidence service is a validation boundary; it does not create historical data. We must ingest sufficiently large, timestamp-aligned historical expired-option datasets with realistic bid/ask evolution before calling the strategy qualified. Synthetic fixtures are for software tests only and must never be presented as performance evidence.
@@ -140,6 +152,7 @@ Never mark a milestone green merely because code was committed. A milestone beco
 - F&O quote outage hardening: `cd8c65774c8c6dd442403bf4aadbf61217573c22`
 - Conservative gap-through replay: `f26e399a05aa8077c422a89f5477764d084f749f`, test `ef04997c30adddbfb35aea08f46a7810597f4529`
 - F&O risk integration: `0f8ce98498af580f44c047f70145ef1072f76591`, test `5836a8bb1639e03de6f74bf1a7789c97f9b0eabd`
+- Batched F&O safety/realism hardening: `824d0c0`, `c3557205`, `787b6bb1`, `576afe8f`, `d420c448`, `ed8ad1ae`, `19a649ad`, `a56b0513`, `74c4f841`, `bd9b84ed`, `9c2b0d96`, ledger `3942af27`
 - Live execution hard lock: `2155244ff7ed0fff7a01824f7f91a53c0d841c16`, test `10f9d19f4993f2a20950972bb9c26bafad98ca3c`
 
 - F&O session/freshness hardening: `914115460df874c286ed538a3358d717c1cc85a6`
