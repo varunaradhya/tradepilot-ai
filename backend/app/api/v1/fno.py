@@ -262,7 +262,7 @@ def open_option_paper_trade(data: FNOPaperOpenRequest, current_user: User = Depe
     existing=db.query(PaperTrade).filter(PaperTrade.user_id==current_user.id,PaperTrade.status=="OPEN",PaperTrade.asset_type=="OPTION",PaperTrade.security_id==str(security_id)).first()
     if existing: raise HTTPException(status_code=409, detail="A paper position for this option contract is already open.")
     session=str(underlying.get("session") or datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%Y-%m-%d"))
-    signal={**decision, "symbol": str(underlying.get("symbol") or "NIFTY"), "interval": str(underlying.get("interval") or "5"), "strategy_version": data.strategy_version, "session": session}
+    signal={**decision, "symbol": str(underlying.get("symbol") or "NIFTY"), "interval": str(underlying.get("interval") or "5"), "strategy_version": data.strategy_version, "session": session, "candle_timestamp": decision.get("candle_timestamp", underlying.get("candle_timestamp"))}
     request_id=data.request_id or f"fno-{request_fingerprint(signal)}"
     request_record, claimed=claim_request(db, current_user.id, request_id, signal)
     if not claimed:
