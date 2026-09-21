@@ -91,6 +91,10 @@ def validate_historical_dataset(
         result = validate_historical_snapshot(snapshot=snapshot, decision_timestamp=timestamp, config=config)
         if not result["valid"]:
             invalid.append({"index": index, "reason": result["reason"]})
+            continue
+        snapshot_timestamp = _number(snapshot.get("timestamp"))
+        if snapshot_timestamp is not None and snapshot_timestamp != timestamp:
+            invalid.append({"index": index, "reason": "TIMESTAMP_MISALIGNMENT"})
 
     return {
         "valid": not invalid,
