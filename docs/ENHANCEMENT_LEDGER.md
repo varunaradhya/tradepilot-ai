@@ -59,6 +59,10 @@ This is the canonical implementation ledger for TradePilot AI. Before changing t
 | 2026-09-21 | F&O risk integration | Existing daily-loss, trade-count, loss-streak, open-position and session gates wired into F&O paper entry | Deterministic risk-gate integration fixtures | DONE (full CI pending) | 0f8ce984 + 5836a8bb |
 | 2026-09-21 | Live execution safety | Environment variables cannot unlock real-money F&O execution | Environment-lock/no-place-order tests | LOCKED | 2155244f + 10f9d19f |
 
+| 2026-09-21 | F&O paper safety | SQLite-naive timestamps normalized safely; exact completed idempotent requests replay before mutable session/risk gates | timezone + idempotency regression coverage | DONE (full CI pending) | 824d0c0 + c3557205 + 787b6bb1 |
+| 2026-09-21 | F&O recovery | Added stale PENDING request age detection without automatic retry, preventing crash recovery from creating duplicate trades | stale-pending unit test | DONE (reconciliation action still explicit) | a56b0513 + 74c4f841 |
+| 2026-09-21 | Options realism | Added configurable historical spread stress gate and frozen execution-friction scenario runner; added optional top-of-book quantity gate when depth data provides quantity | spread, stress-runner and depth-quantity regression tests | DONE (full CI pending) | 576afe8f + d420c448 + ed8ad1ae + 19a649ad + bd9b84ed + 9c2b0d96 |
+
 ## Current open items
 
 ### P0 — Real historical F&O evidence
@@ -68,9 +72,9 @@ This is the canonical implementation ledger for TradePilot AI. Before changing t
 
 ### P0 — Paper execution resilience
 - Existing general paper idempotency/risk foundations are recorded above; the remaining task is to verify and, where needed, explicitly wire those controls into the autonomous F&O session rather than duplicating them.
-- Explicit autonomous-session idempotency key.
-- Restart reconciliation test.
-- Duplicate scan/candle protection.
+- Explicit autonomous-session idempotency key. **DONE:** deterministic F&O request fingerprint/candle identity is persisted and exact completed requests replay before risk/session gates.
+- Restart reconciliation test. **PARTIAL:** stale PENDING requests are detectable; automatic recovery remains intentionally disabled until process/database boundary behavior is verified.
+- Duplicate scan/candle protection. **DONE:** completed-candle identity is part of the persisted request fingerprint.
 - Broker/data outage recovery and retry behavior.
 
 ### P0 — Risk hardening
@@ -81,8 +85,8 @@ This is the canonical implementation ledger for TradePilot AI. Before changing t
 - Emergency kill switch integration test.
 
 ### P1 — Options realism
-- Configurable spread-width stress gate.
-- Minimum bid/ask quantity gate where provider data supports it.
+- Configurable spread-width stress gate. **DONE:** historical replay can reject entries above a configured spread limit, with a frozen scenario runner.
+- Minimum bid/ask quantity gate where provider data supports it. **DONE:** optional top-of-book quantity filter.
 - Circuit/price-band handling.
 - Expiry-day behavior.
 - Gap-through-stop test.
