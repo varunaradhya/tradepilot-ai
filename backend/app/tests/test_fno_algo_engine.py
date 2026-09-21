@@ -142,3 +142,9 @@ def test_historical_rows_deduplicates_timestamps_and_rejects_invalid_ohlc(monkey
     rows = _historical_rows(_HistoricalClient(payload), 13, "IDX_I", "5")
     assert len(rows) == 1
     assert rows[0]["timestamp"] == timestamp
+
+
+def test_quote_parser_does_not_fallback_to_ltp_for_missing_bid_ask():
+    response = {"data": {"NSE_FNO": {"123": {"last_price": 105.0}}}}
+    quote = _quote_from_response(response, "123")
+    assert quote == {"bid": 0.0, "ask": 0.0, "ltp": 105.0}
