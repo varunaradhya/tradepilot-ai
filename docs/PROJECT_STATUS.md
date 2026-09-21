@@ -136,6 +136,9 @@ Never mark a milestone green merely because code was committed. A milestone beco
 
 ## Latest implementation commits
 
+- Enhancement ledger reconciliation: `3cb09e191e3e8f94866b437bbc0126a6a65d09b1`
+- QA handoff now references canonical ledger: `9ab8a9aafb3f52e62a8e81f7714ccdcfc5ea5ab9`
+
 - Canonical enhancement/QA ledger: `f642e89ad443cd50397b88856b99e8486f0b6129`
 
 - F&O executable quote hardening: `13581e0bc188043dd47d4560bb14a1806f10389a` (backtest), `dcfe81507c8158ad11c2836f2b01a59e58904eee` (selection), `8358c47371740929fedaed62fe7a613f1cfee9ea` (autonomous decision)
