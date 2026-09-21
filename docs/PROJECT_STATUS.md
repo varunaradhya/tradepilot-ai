@@ -1,6 +1,6 @@
 # TradePilot AI — Persistent Project Status
 
-Last updated: 2026-08-22
+Last updated: 2026-09-21
 
 ## How to use this file
 
@@ -21,6 +21,14 @@ Status: **IN PROGRESS — QUALIFICATION EVIDENCE REQUIRED**
 - Historical replay is anti-look-ahead by construction: decisions use only bars through the current index and the option-chain snapshot at that index.
 - Historical backtest uses next-bar contract resolution, ask-side entry and bid-side exit and refuses stale quote substitution.
 - Qualification service evaluates frozen IS/OOS results and does not tune strategy parameters.
+
+### New historical evidence ingestion layer
+
+- Added `backend/app/services/fno_historical_ingestion_service.py` and tests.
+- Added deterministic normalization for Dhan expired rolling-option responses into timestamped option bars/snapshots.
+- The adapter preserves OHLC/OI/IV/volume/spot and explicitly marks these observations as non-execution-grade because Dhan's expired-options API does not provide historical best bid/ask.
+- The adapter never copies close/LTP into bid/ask and rejects duplicate timestamp/strike/side observations.
+- Dhan's expired-options endpoint can therefore supply real historical contract/market evidence for the research layer, but it is **not sufficient by itself for execution-grade qualification**; a historical executable bid/ask source is still required.
 
 ### New historical evidence layer
 
@@ -43,7 +51,8 @@ We still do **not** have evidence that the strategy is profitable. The historica
    - expired NIFTY option contracts;
    - historical option-chain snapshots;
    - timestamp-aligned bid/ask evolution;
-   - contract lifecycle and expiry-day behavior.
+   - contract lifecycle and expiry-day behavior;
+   - execution-grade historical bid/ask source (Dhan expired OHLC alone is not enough).
 2. **Run frozen historical replay**
    - freeze strategy parameters before OOS;
    - run in-sample and OOS without tuning OOS;
@@ -92,7 +101,8 @@ Do not re-implement or re-test as a new feature without first checking this file
 - corrected next-bar/later-bar backtest regression fixture;
 - deterministic IST clock handling in historical-candle tests;
 - frozen IS/OOS qualification gate;
-- historical snapshot validation boundary.
+- historical snapshot validation boundary;
+- Dhan expired-option response normalization without fake bid/ask.
 
 ## Live trading status
 
