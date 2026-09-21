@@ -19,6 +19,7 @@ from app.services.paper_trading_service import close_paper_trade, list_paper_tra
 from app.services.paper_signal_request_service import claim_request, complete_request, replay_response, request_fingerprint
 from app.services.market_data_health import evaluate_market_data_freshness
 from app.services.market_session_scheduler import scheduler_status
+from app.services.paper_risk_guard import PaperRiskConfig, PaperRiskState, evaluate_paper_entry
 
 router = APIRouter(prefix="/fno", tags=["F&O"])
 
@@ -133,6 +134,45 @@ def _expiry_dates(payload: Any) -> list[str]:
             for item in value.values(): walk(item)
     walk(payload)
     return sorted(set(values))
+
+def _fno_paper_risk_gate(db, user_id: int, symbol: str, signal_id: str) -> str | None:
+    today = datetime.now(ZoneInfo("Asia/Kolkata")).date()
+    trades = db.query(PaperTrade).filter(PaperTrade.user_id == user_id).all()
+    closed_today = [
+        trade for trade in trades
+        if trade.status == "CLOSED"
+        and trade.closed_at is not None
+        and trade.closed_at.astimezone(ZoneInfo("Asia/Kolkata")).date() == today
+    ]
+    open_symbols = {
+        str(trade.underlying or trade.symbol).strip().upper()
+        for trade in trades
+        if trade.status == "OPEN"
+    }
+    consecutive_losses = 0
+    for trade in sorted(closed_today, key=lambda item: item.closed_at, reverse=True):
+        pnl = float(trade.pnl or 0.0)
+        if pnl < 0:
+            consecutive_losses += 1
+        elif pnl > 0:
+            break
+    state = PaperRiskState(
+        trading_date=today,
+        realized_pnl=sum(float(trade.pnl or 0.0) for trade in closed_today),
+        trades_today=len(closed_today),
+        consecutive_losses=consecutive_losses,
+        open_symbols=open_symbols,
+    )
+    decision = evaluate_paper_entry(
+        side="BUY",
+        symbol=symbol,
+        signal_id=signal_id,
+        in_market_session=scheduler_status()["session_active"],
+        state=state,
+        config=PaperRiskConfig(),
+    )
+    return None if decision.allowed else decision.reason
+
 
 def _fno_session_data_gate(bars: list[dict[str, Any]], interval: str, now: datetime | None = None) -> dict[str, Any]:
     """Fail closed unless NSE is open and the latest completed bar is fresh."""
@@ -264,6 +304,9 @@ def open_option_paper_trade(data: FNOPaperOpenRequest, current_user: User = Depe
     session=str(underlying.get("session") or datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%Y-%m-%d"))
     signal={**decision, "symbol": str(underlying.get("symbol") or "NIFTY"), "interval": str(underlying.get("interval") or "5"), "strategy_version": data.strategy_version, "session": session, "candle_timestamp": decision.get("candle_timestamp", underlying.get("candle_timestamp"))}
     request_id=data.request_id or f"fno-{request_fingerprint(signal)}"
+    risk_block = _fno_paper_risk_gate(db, current_user.id, str(underlying.get("symbol") or "NIFTY"), request_id)
+    if risk_block:
+        raise HTTPException(status_code=409, detail=f"F&O paper risk gate blocked entry: {risk_block}")
     request_record, claimed=claim_request(db, current_user.id, request_id, signal)
     if not claimed:
         replay=replay_response(request_record)
