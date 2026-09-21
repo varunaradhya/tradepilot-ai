@@ -22,6 +22,7 @@ def select_option_contracts(chain:dict[str,Any],direction:str,cfg:FNOConfig=FNOC
   c=(data or {}).get(side)
   if not isinstance(c,dict):continue
   score,comp=_score(c,cfg)
+  bid=_num(c.get("top_bid_price")); ask=_num(c.get("top_ask_price"))
   # Contract selection is for executable paper trading; a missing/invalid bid or ask is a hard rejection.
   if bid <= 0 or ask <= 0 or bid > ask:continue
   if score<cfg.min_score:continue
