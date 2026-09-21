@@ -63,6 +63,8 @@ This is the canonical implementation ledger for TradePilot AI. Before changing t
 | 2026-09-21 | F&O recovery | Added stale PENDING request age detection without automatic retry, preventing crash recovery from creating duplicate trades | stale-pending unit test | DONE (reconciliation action still explicit) | a56b0513 + 74c4f841 |
 | 2026-09-21 | Options realism | Added configurable historical spread stress gate and frozen execution-friction scenario runner; added optional top-of-book quantity gate when depth data provides quantity | spread, stress-runner and depth-quantity regression tests | DONE (full CI pending) | 576afe8f + d420c448 + ed8ad1ae + 19a649ad + bd9b84ed + 9c2b0d96 |
 
+| 2026-09-21 | F&O QA batch | Repaired CI-blocking request-service syntax; enforced request fingerprint before replay; preserved replay before mutable gates; wired durable kill-switch fail-closed behavior; enforced bar/snapshot timestamp alignment; corrected open-position reconciliation; hardened stress input validation | Focused regression coverage added; CI verification pending on post-batch HEAD | PARTIAL — implementation committed; real evidence still BLOCKED | 2045c276 + 2a8db1e0 |
+
 ## Current open items
 
 ### P0 — Real historical F&O evidence
@@ -71,6 +73,7 @@ This is the canonical implementation ledger for TradePilot AI. Before changing t
 - Synthetic data may validate software behavior only; it cannot establish strategy performance.
 
 ### P0 — Paper execution resilience
+- Restart reconciliation remains **PARTIAL**: stale PENDING requests are explicitly recovery-required and never retried automatically; reconciliation now has open-position identity checks, but there is still no proof of process/database crash recovery at the production boundary.
 - Existing general paper idempotency/risk foundations are recorded above; the remaining task is to verify and, where needed, explicitly wire those controls into the autonomous F&O session rather than duplicating them.
 - Explicit autonomous-session idempotency key. **DONE:** deterministic F&O request fingerprint/candle identity is persisted and exact completed requests replay before risk/session gates.
 - Restart reconciliation test. **PARTIAL:** stale PENDING requests are detectable; automatic recovery remains intentionally disabled until process/database boundary behavior is verified.
