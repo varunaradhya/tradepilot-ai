@@ -22,12 +22,14 @@ def select_option_contracts(chain:dict[str,Any],direction:str,cfg:FNOConfig=FNOC
   c=(data or {}).get(side)
   if not isinstance(c,dict):continue
   score,comp=_score(c,cfg)
+  # Contract selection is for executable paper trading; a missing/invalid bid or ask is a hard rejection.
+  if bid <= 0 or ask <= 0 or bid > ask:continue
   if score<cfg.min_score:continue
   g=c.get("greeks")or{};rows.append({"strike":strike,"option_type":"CE" if side=="ce" else "PE","security_id":c.get("security_id"),"last_price":_num(c.get("last_price")),"bid":_num(c.get("top_bid_price")),"ask":_num(c.get("top_ask_price")),"volume":int(_num(c.get("volume"))),"oi":int(_num(c.get("oi"))),"iv":_num(c.get("implied_volatility")),"delta":_num(g.get("delta")),"gamma":_num(g.get("gamma")),"theta":_num(g.get("theta")),"vega":_num(g.get("vega")),"score":score,"score_components":comp})
  rows.sort(key=lambda r:r["score"],reverse=True);return rows[:max(1,min(limit,20))]
 def build_fno_decision(underlying:dict[str,Any],direction:str,candidates:list[dict[str,Any]],cfg:FNOConfig=FNOConfig()):
  if not candidates:return {"decision":"NO_TRADE","reason":"NO_CONTRACT_PASSED_FILTERS","underlying":underlying}
- best=candidates[0];premium=best["ask"] or best["last_price"]
+ best=candidates[0];premium=best["ask"]
  if premium<=0:return {"decision":"NO_TRADE","reason":"INVALID_PREMIUM","underlying":underlying}
  capital=_num(underlying.get("capital"));risk_budget=capital*cfg.risk_per_trade;max_capital=capital*cfg.max_capital_percent;stop_pct=.25;risk_unit=premium*stop_pct;lot=max(1,int(_num(underlying.get("lot_size"),1)));qty=(int(risk_budget//risk_unit)//lot)*lot if risk_unit>0 else 0
  if premium*qty>max_capital:qty=(int(max_capital//premium)//lot)*lot
