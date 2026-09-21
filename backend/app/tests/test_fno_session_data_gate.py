@@ -44,8 +44,7 @@ def test_fno_gate_accepts_fresh_completed_bar(monkeypatch):
         "app.api.v1.fno.scheduler_status",
         lambda: {"session_active": True},
     )
-    monkeypatch.setattr("app.api.v1.fno.datetime", __import__("datetime").datetime)
-    result = _fno_session_data_gate([{"timestamp": datetime(2026, 9, 21, 9, 55, tzinfo=IST).timestamp()}], "5")
+    result = _fno_session_data_gate([{"timestamp": datetime(2026, 9, 21, 9, 55, tzinfo=IST).timestamp()}], "5", now=now)
     assert result["ready"] is True
     assert result["reason"] == "FRESH"
 
@@ -55,8 +54,9 @@ def test_fno_gate_rejects_future_completed_bar(monkeypatch):
         "app.api.v1.fno.scheduler_status",
         lambda: {"session_active": True},
     )
-    future = datetime.now(ZoneInfo("UTC")).timestamp() + 600
-    result = _fno_session_data_gate([{"timestamp": future}], "5")
+    now = datetime(2026, 9, 21, 10, 0, tzinfo=IST)
+    future = now.timestamp() + 600
+    result = _fno_session_data_gate([{"timestamp": future}], "5", now=now)
     assert result["ready"] is False
     assert result["reason"] == "FUTURE_TIMESTAMP_REJECTED"
 
@@ -66,6 +66,7 @@ def test_fno_gate_uses_interval_aware_freshness_window(monkeypatch):
         "app.api.v1.fno.scheduler_status",
         lambda: {"session_active": True},
     )
-    recent = datetime.now(ZoneInfo("UTC")).timestamp() - 330
-    result = _fno_session_data_gate([{"timestamp": recent}], "5")
+    now = datetime(2026, 9, 21, 10, 0, tzinfo=IST)
+    recent = now.timestamp() - 330
+    result = _fno_session_data_gate([{"timestamp": recent}], "5", now=now)
     assert result["ready"] is True
