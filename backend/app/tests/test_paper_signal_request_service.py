@@ -65,3 +65,13 @@ def test_request_fingerprint_changes_when_completed_candle_changes():
     base = {**signal(), "candle_timestamp": 1758440700}
     changed = {**base, "candle_timestamp": 1758441000}
     assert request_fingerprint(base) != request_fingerprint(changed)
+
+
+def test_pending_request_stale_detection_handles_naive_utc():
+    from datetime import datetime, timedelta, timezone
+    from types import SimpleNamespace
+    from app.services.paper_signal_request_service import is_stale_pending_request
+
+    created = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=10)
+    record = SimpleNamespace(decision="PENDING", created_at=created)
+    assert is_stale_pending_request(record, max_age_seconds=300)
