@@ -13,5 +13,7 @@ def validate_fno_order(decision:dict[str,Any])->dict[str,Any]:
 def execute_fno_decision(client:DhanClient,decision:dict[str,Any],correlation_id:str)->dict[str,Any]:
     order=validate_fno_order(decision)
     if not TRADEPILOT_LIVE_EXECUTION_ENABLED:return {"mode":"PAPER_ONLY","submitted":False,"reason":"LIVE_EXECUTION_DISABLED","order":order}
+    # This endpoint remains a broker adapter only. Qualification and explicit live authorization
+    # are separate gates and must be enforced before any future live deployment enables this flag.
     payload={"dhanClientId":client.client_id,"correlationId":correlation_id[:30],"transactionType":"BUY","exchangeSegment":"NSE_FNO","productType":"INTRADAY","orderType":"MARKET","validity":"DAY","securityId":order["security_id"],"quantity":order["quantity"],"disclosedQuantity":"","price":"","triggerPrice":"","afterMarketOrder":False,"amoTime":"","boProfitValue":"","boStopLossValue":""}
     return {"mode":"LIVE","submitted":True,"order":client.place_order(payload)}
