@@ -136,6 +136,10 @@ Never mark a milestone green merely because code was committed. A milestone beco
 
 ## Latest implementation commits
 
+- F&O expiry validation: `f349b2795973c268dc59736e3355366e1c70e4ac`
+- F&O expiry regression tests: `d8e210232f27654b3dd48feca76527dd9b3df7d4`
+- Operations/reconciliation foundation audit recorded in enhancement ledger.
+
 - F&O paper idempotency integration: `4f9e5f45f2cd4ae31f9cd70c54e8228a6440196f`, lifecycle fix `03ba9bd9c6101e8073518e12e12f385f054ea754`, collision guard `e8fd79c910714b42cd9479b93fe430e88ca801af`
 
 - Enhancement ledger reconciliation: `3cb09e191e3e8f94866b437bbc0126a6a65d09b1`
