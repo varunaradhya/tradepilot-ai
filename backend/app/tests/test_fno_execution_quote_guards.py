@@ -49,3 +49,6 @@ def test_historical_backtest_never_uses_ltp_as_entry_quote(monkeypatch):
         underlying={"symbol":"NIFTY"},bars=bars,option_chain_snapshots=chains,lot_size=75
     )
     assert result["trades"]==0
+
+def test_strategy_rejects_inverted_market_even_when_quotes_are_present():
+    assert select_option_contracts(_chain(bid=101, ask=100), "BULLISH") == []
