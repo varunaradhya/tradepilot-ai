@@ -26,6 +26,18 @@ def replay_autonomous_option_decisions(
     """
     if len(bars) != len(option_chain_snapshots):
         raise ValueError("bars and option_chain_snapshots must have the same length")
+    timestamps = [bar.get("timestamp") for bar in bars]
+    numeric_timestamps = []
+    for value in timestamps:
+        if value is None:
+            numeric_timestamps = []
+            break
+        try:
+            numeric_timestamps.append(float(value))
+        except (TypeError, ValueError):
+            raise ValueError("bar timestamps must be numeric when provided")
+    if numeric_timestamps and any(current <= previous for previous, current in zip(numeric_timestamps, numeric_timestamps[1:])):
+        raise ValueError("bars must be strictly chronological")
     if lot_size <= 0:
         raise ValueError("lot_size must be positive")
     if start_index < MIN_COMPLETED_BARS - 1:
