@@ -11,9 +11,21 @@ def reconcile_paper_ledger(*, persisted_trades: list[Any], engine_trades: list[d
 
     engine_open_symbol = str((engine_position or {}).get("symbol") or "").upper()
     persisted_open_symbols = sorted(str(getattr(t, "symbol", "")).upper() for t in persisted_open)
-    position_consistent = (engine_position is None and not persisted_open) or (
-        engine_position is not None and len(persisted_open) == 0
-    )
+    if engine_position is None:
+        position_consistent = not persisted_open
+    else:
+        engine_identity = (
+            str(engine_position.get("symbol") or "").strip().upper(),
+            str(engine_position.get("security_id") or "").strip(),
+        )
+        persisted_identities = {
+            (
+                str(getattr(t, "symbol", "") or "").strip().upper(),
+                str(getattr(t, "security_id", "") or "").strip(),
+            )
+            for t in persisted_open
+        }
+        position_consistent = engine_identity in persisted_identities and len(persisted_open) == 1
 
     return {
         "status": "CONSISTENT" if abs(persisted_realized - engine_realized) <= 0.01 and position_consistent else "DIVERGED",
