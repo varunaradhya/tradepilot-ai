@@ -110,6 +110,9 @@ No manual strike or lot selection is part of the intended autonomous path.
 - [x] Future-bar mutation regression guard.
 - [ ] Full historical options replay with real historical option-chain snapshots.
 - [x] Dhan expired-option OHLC/OI/IV/volume/spot normalization without manufacturing bid/ask.
+- [x] Autonomous contract selection rejects missing/invalid executable bid/ask.
+- [x] Autonomous decision rejects missing executable ask instead of falling back to LTP.
+- [x] Historical backtest rejects LTP/close as a substitute for ask-side entry or bid-side exit.
 - [ ] Execution-grade historical bid/ask source for options.
 - [ ] Parameter contamination test.
 - [ ] Validation-reuse test.
@@ -186,6 +189,7 @@ No manual strike or lot selection is part of the intended autonomous path.
 ## Current known limitations
 
 1. A green CI run proves code/tests pass; it does not prove that the strategy has predictive edge.
+2. Current GitHub research data is not committed; local `backend/data/research/` data must be recovered or reacquired before F&O qualification.
 2. The new F&O backtest engine is a framework; real expired-option historical snapshots are still required for meaningful option-strategy qualification.
 3. Dhan live market data is required for forward paper trading.
 4. Dhan access tokens are time-limited; credential refresh must remain user-controlled and secret.
