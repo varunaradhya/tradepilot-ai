@@ -48,6 +48,9 @@ This is the canonical implementation ledger for TradePilot AI. Before changing t
 | 2026-08-18 | Strategy readiness | Fail-closed strategy readiness and cross-stock evidence gates | P3 adversarial tests | DONE | 11cb5c3c |
 | 2026-08-18 | Release safety | Fail-closed production/release validation | Release gate suite | DONE | eba782c5 |
 
+| 2026-09-21 | Paper operations reconciliation | Reconciled existing P1/P5 paper monitoring, ledger reconciliation, market scheduler, freshness watchdog and durable kill-switch foundations before adding new F&O code | Existing adversarial test suites from `24de9a47` and `7e76c9e5`; no duplicate implementation added | VERIFIED FOUNDATION; F&O wiring still audited | 24de9a47 + 7e76c9e5 |
+| 2026-09-21 | F&O expiry safety | Auto-scan now accepts only broker-returned, non-expired expiries; arbitrary/expired requested expiry is rejected | Deterministic expiry fixtures for past, unknown, nearest and same-day expiry | DONE (full CI pending) | f349b279 + d8e21023 |
+
 ## Current open items
 
 ### P0 — Real historical F&O evidence
