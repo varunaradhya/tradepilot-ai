@@ -129,7 +129,7 @@ No manual strike or lot selection is part of the intended autonomous path.
 - [x] Continuous session waits instead of forcing a trade.
 - [x] Executable bid used for long-option paper marking/exit decisions.
 - [x] Historical backtest uses next-bar entry and conservative stop/target ordering.
-- [ ] Explicit paper order idempotency key for autonomous session retries.
+- [x] Persistent paper-signal idempotency wired into autonomous F&O paper opening; completed request replay and request-id collision rejection are covered by deterministic tests.
 - [ ] Reconciliation test after backend restart.
 - [ ] Duplicate-candle/duplicate-scan test at session level.
 - [ ] Broker/data outage recovery test.
