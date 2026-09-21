@@ -72,8 +72,9 @@ def validate_historical_dataset(
 ) -> dict[str, Any]:
     """Validate aligned underlying bars and historical option snapshots.
 
-    This is intentionally a validation/ingestion boundary, not a strategy
-    optimizer. Invalid rows are reported rather than silently repaired.
+    Execution-grade qualification requires each option snapshot to be
+    timestamp-aligned with its underlying bar. Invalid rows are reported
+    rather than silently repaired; this is not an optimizer.
     """
     if len(bars) != len(snapshots):
         return {"valid": False, "reason": "LENGTH_MISMATCH", "bars": len(bars), "snapshots": len(snapshots)}
