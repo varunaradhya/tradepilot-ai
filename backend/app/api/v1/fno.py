@@ -75,7 +75,7 @@ def _quote_from_response(response: dict[str, Any], security_id: str) -> dict[str
             if isinstance(sells, list) and sells and isinstance(sells[0], dict):
                 ask = num_from_depth(sells[0].get("price"))
     ltp = num("last_price")
-    return {"bid": bid or ltp or 0.0, "ask": ask or ltp or 0.0, "ltp": ltp or 0.0}
+    return {"bid": bid or 0.0, "ask": ask or 0.0, "ltp": ltp or 0.0}
 
 def num_from_depth(value: Any) -> float | None:
     try:
@@ -212,10 +212,10 @@ def option_paper_positions(current_user: User = Depends(get_current_user), db=De
     positions=[]
     for trade in trades:
         quote=_quote_from_response(quotes,str(trade.security_id))
-        executable_price=quote["bid"] if quote and quote.get("bid",0)>0 else (quote.get("ltp",0) if quote else 0)
+        executable_price=quote["bid"] if quote and quote.get("bid",0)>0 else 0
         if executable_price > 0:
             trade=update_paper_trade(db,trade,executable_price)
-        costs=paper_trade_costs(trade,executable_price if executable_price > 0 else trade.entry_price)
+        costs=paper_trade_costs(trade,executable_price if executable_price > 0 else None)
         positions.append({"id":trade.id,"symbol":trade.symbol,"underlying":trade.underlying,"expiry":trade.expiry,"strike":trade.strike,"option_type":trade.option_type,"security_id":trade.security_id,"quantity":trade.quantity,"entry_price":trade.entry_price,"last_price":quote.get("ltp") if quote else None,"executable_bid":quote.get("bid") if quote else None,"ask":quote.get("ask") if quote else None,"stop_price":trade.stop_price,"target_price":trade.target_price,"pnl":trade.pnl,"estimated_round_trip_costs":costs,"status":trade.status,"reason":trade.reason})
     return {"mode":"PAPER_ONLY","market_connected":True,"positions":positions}
 
