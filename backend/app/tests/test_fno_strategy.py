@@ -75,3 +75,16 @@ def test_no_trade_when_risk_budget_cannot_buy_lot():
         rows,
     )
     assert d["decision"] == "NO_TRADE"
+
+
+def test_min_bid_ask_quantity_filters_thin_top_of_book():
+    data = chain()
+    data["oc"]["25000.000000"]["ce"]["depth"] = {
+        "buy": [{"price": 119, "quantity": 10}],
+        "sell": [{"price": 120, "quantity": 10}],
+    }
+    rows = select_option_contracts(
+        data, "BULLISH",
+        cfg=__import__("app.services.fno_strategy", fromlist=["FNOConfig"]).FNOConfig(min_bid_ask_quantity=100),
+    )
+    assert rows == []
