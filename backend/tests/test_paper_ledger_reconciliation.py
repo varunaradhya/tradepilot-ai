@@ -23,3 +23,27 @@ def test_detects_realized_pnl_divergence():
     )
     assert result["status"] == "DIVERGED"
     assert result["realized_pnl_delta"] == -2.08
+
+
+def test_open_position_reconciliation_matches_symbol_and_security_id():
+    from types import SimpleNamespace
+    persisted = [SimpleNamespace(status="OPEN", pnl=0.0, symbol="NIFTY 2026-09-24 25000 CE", security_id="12345")]
+    result = reconcile_paper_ledger(
+        persisted_trades=persisted,
+        engine_trades=[],
+        engine_position={"symbol": "NIFTY 2026-09-24 25000 CE", "security_id": "12345"},
+    )
+    assert result["status"] == "CONSISTENT"
+    assert result["position_consistent"] is True
+
+
+def test_open_position_reconciliation_rejects_wrong_contract_identity():
+    from types import SimpleNamespace
+    persisted = [SimpleNamespace(status="OPEN", pnl=0.0, symbol="NIFTY 2026-09-24 25000 CE", security_id="12345")]
+    result = reconcile_paper_ledger(
+        persisted_trades=persisted,
+        engine_trades=[],
+        engine_position={"symbol": "NIFTY 2026-09-24 25000 PE", "security_id": "99999"},
+    )
+    assert result["status"] == "DIVERGED"
+    assert result["position_consistent"] is False
