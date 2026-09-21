@@ -45,6 +45,8 @@ def claim_request(
 ) -> tuple[PaperSignalRequest, bool]:
     existing = get_request(db, user_id, request_id)
     if existing is not None:
+        if existing.request_fingerprint != request_fingerprint(signal):
+            raise ValueError("paper signal request_id was already used for a different signal")
         return existing, False
 
     record = PaperSignalRequest(
@@ -66,6 +68,8 @@ def claim_request(
         existing = get_request(db, user_id, request_id)
         if existing is None:
             raise
+        if existing.request_fingerprint != request_fingerprint(signal):
+            raise ValueError("paper signal request_id was already used for a different signal")
         return existing, False
     db.refresh(record)
     return record, True
