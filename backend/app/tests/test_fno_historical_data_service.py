@@ -51,3 +51,12 @@ def test_dataset_rejects_length_mismatch():
     result = validate_historical_dataset(bars=[{"timestamp": 1000}], snapshots=[])
     assert result["valid"] is False
     assert result["reason"] == "LENGTH_MISMATCH"
+
+def test_dataset_rejects_timestamp_misalignment():
+    bars = [{"timestamp": 1000}, {"timestamp": 1300}]
+    result = validate_historical_dataset(
+        bars=bars,
+        snapshots=[_snapshot(999), _snapshot(1300)],
+    )
+    assert result["valid"] is False
+    assert result["invalid_rows"][0]["reason"] == "TIMESTAMP_MISALIGNMENT"
