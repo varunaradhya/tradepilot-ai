@@ -64,6 +64,19 @@ Status: **IN PROGRESS — QUALIFICATION EVIDENCE REQUIRED**
 - Validation reports invalid rows instead of silently repairing evidence.
 
 
+### Current QA batch — restart safety, quote integrity, and CI repair
+
+- Current GitHub HEAD is `2045c27659cf304f517fad6e1b2fe5a63a2b2e17`; this batch was based on that live branch state.
+- Repaired a CI-blocking literal escape in `paper_signal_request_service.py` that caused backend `compileall` SyntaxError.
+- F&O completed-request replay now verifies the persisted fingerprint before replay; request-id reuse for a different signal is rejected.
+- Completed request replay is now evaluated before session/risk gates, while new requests remain subject to the session gate.
+- F&O paper entry now consults the existing durable kill switch and fails closed when active; no new unlock path was introduced.
+- Historical evidence validation now rejects option snapshots whose timestamps do not exactly align with the underlying bar timestamp.
+- Paper-ledger reconciliation now validates restored open-position identity by symbol/security ID instead of incorrectly treating every engine open position as divergent.
+- Added regression coverage for stale/fresh PENDING recovery, ledger identity, kill-switch gate behavior, future-trade isolation, inverted quotes, timestamp misalignment, and invalid stress slippage.
+- Execution-friction stress validation now rejects negative slippage before any scenario backtest runs.
+- The qualification status remains blocked pending real timestamp-aligned historical bid/ask evidence; no synthetic result was promoted to performance evidence.
+
 ### Latest batched F&O QA hardening
 
 - Paper risk timestamps now normalize both timezone-aware and SQLite-naive closed-trade timestamps safely.
@@ -153,6 +166,7 @@ Never mark a milestone green merely because code was committed. A milestone beco
 - Conservative gap-through replay: `f26e399a05aa8077c422a89f5477764d084f749f`, test `ef04997c30adddbfb35aea08f46a7810597f4529`
 - F&O risk integration: `0f8ce98498af580f44c047f70145ef1072f76591`, test `5836a8bb1639e03de6f74bf1a7789c97f9b0eabd`
 - Batched F&O safety/realism hardening: `824d0c0`, `c3557205`, `787b6bb1`, `576afe8f`, `d420c448`, `ed8ad1ae`, `19a649ad`, `a56b0513`, `74c4f841`, `bd9b84ed`, `9c2b0d96`, ledger `3942af27`
+- Current QA repair/hardening batch: `77908ced`, `bbb2d5b5`, `63f88177`, `f86aed01`, `4e7fc427`, `c8e257f3`, `69207bd0`, `37df0f0e`, `ed6decca`, `7ac3e8cb`, `ad91ff17`, `2a8db1e0`, `2045c276`
 - Live execution hard lock: `2155244ff7ed0fff7a01824f7f91a53c0d841c16`, test `10f9d19f4993f2a20950972bb9c26bafad98ca3c`
 
 - F&O session/freshness hardening: `914115460df874c286ed538a3358d717c1cc85a6`
