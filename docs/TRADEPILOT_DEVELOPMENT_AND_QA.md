@@ -2,7 +2,7 @@
 
 Last updated: 2026-09-21
 
-> **Persistent handoff:** Read `docs/PROJECT_STATUS.md` before starting new work. It records the current milestone, completed foundations and priority queue so work is not repeated across sessions.
+ > **Persistent handoff:** Read `docs/PROJECT_STATUS.md` and `docs/ENHANCEMENT_LEDGER.md` before starting new work. The ledger is the canonical enhancement/fix history; extend existing foundations instead of re-implementing them.
 
 ## Product rule
 
@@ -185,6 +185,10 @@ No manual strike or lot selection is part of the intended autonomous path.
 - [ ] Expired access-token end-to-end test during an autonomous paper session.
 - [ ] Browser refresh/restart recovery test.
 - [ ] Refresh-token revocation test.
+
+## Ledger reconciliation
+
+Existing general paper-risk/session controls from the August hardening work are recorded in `ENHANCEMENT_LEDGER.md`. They must be explicitly verified for the autonomous F&O path before being marked as F&O-complete; this avoids both duplicate implementation and false completion claims.
 
 ## Current known limitations
 
