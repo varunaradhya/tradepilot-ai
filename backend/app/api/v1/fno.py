@@ -195,6 +195,13 @@ def open_option_paper_trade(data: FNOPaperOpenRequest, current_user: User = Depe
     decision=data.decision
     if decision.get("decision")!="QUALIFIED": raise HTTPException(status_code=422, detail="Only a QUALIFIED option decision can be paper traded.")
     underlying=decision.get("underlying") or {}
+    contract=decision.get("contract") or {}
+    security_id=contract.get("security_id")
+    quantity=int(decision.get("quantity") or 0)
+    lot_size=int(decision.get("lot_size") or 0)
+    if not security_id or quantity<=0 or lot_size<=0 or quantity%lot_size: raise HTTPException(status_code=422, detail="Option decision has invalid security ID, quantity, or lot size.")
+    existing=db.query(PaperTrade).filter(PaperTrade.user_id==current_user.id,PaperTrade.status=="OPEN",PaperTrade.asset_type=="OPTION",PaperTrade.security_id==str(security_id)).first()
+    if existing: raise HTTPException(status_code=409, detail="A paper position for this option contract is already open.")
     session=str(underlying.get("session") or datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%Y-%m-%d"))
     signal={**decision, "symbol": str(underlying.get("symbol") or "NIFTY"), "interval": str(underlying.get("interval") or "5"), "strategy_version": data.strategy_version, "session": session}
     request_id=data.request_id or f"fno-{request_fingerprint(signal)}"
@@ -204,14 +211,13 @@ def open_option_paper_trade(data: FNOPaperOpenRequest, current_user: User = Depe
         if replay is not None:
             return replay
         raise HTTPException(status_code=409, detail="A paper order request with this id is already being processed.")
-    contract=decision.get("contract") or {}; security_id=contract.get("security_id"); quantity=int(decision.get("quantity") or 0); lot_size=int(decision.get("lot_size") or 0)
-    if not security_id or quantity<=0 or lot_size<=0 or quantity%lot_size: raise HTTPException(status_code=422, detail="Option decision has invalid security ID, quantity, or lot size.")
-    existing=db.query(PaperTrade).filter(PaperTrade.user_id==current_user.id,PaperTrade.status=="OPEN",PaperTrade.asset_type=="OPTION",PaperTrade.security_id==str(security_id)).first()
-    if existing: raise HTTPException(status_code=409, detail="A paper position for this option contract is already open.")
     symbol=f"{underlying.get('symbol','OPTION')} {underlying.get('expiry','')} {contract.get('strike')} {contract.get('option_type')}".strip()
     try:
         trade=open_paper_trade(db,current_user.id,symbol=symbol[:30],quantity=quantity,entry_price=float(decision["entry"]),stop_price=float(decision["stop"]),target_price=float(decision["target"]),strategy_version=data.strategy_version,asset_type="OPTION",security_id=str(security_id),exchange_segment="NSE_FNO",underlying=str(underlying.get("symbol","")).upper(),expiry=underlying.get("expiry"),strike=float(contract.get("strike")) if contract.get("strike") is not None else None,option_type=contract.get("option_type"),lot_size=lot_size)
-    except (KeyError,TypeError,ValueError) as exc: raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except (KeyError,TypeError,ValueError) as exc:
+        response={"mode":"PAPER_ONLY","accepted":False,"request_id":request_id,"error":str(exc)}
+        complete_request(db, request_record, response)
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     response={"mode":"PAPER_ONLY","accepted":True,"request_id":request_id,"position":{"id":trade.id,"symbol":trade.symbol,"underlying":trade.underlying,"expiry":trade.expiry,"strike":trade.strike,"option_type":trade.option_type,"security_id":trade.security_id,"quantity":trade.quantity,"entry_price":trade.entry_price,"stop_price":trade.stop_price,"target_price":trade.target_price,"pnl":trade.pnl,"status":trade.status}}
     complete_request(db, request_record, response)
     return response
