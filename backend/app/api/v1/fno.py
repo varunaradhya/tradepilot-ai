@@ -134,7 +134,7 @@ def _expiry_dates(payload: Any) -> list[str]:
     walk(payload)
     return sorted(set(values))
 
-def _fno_session_data_gate(bars: list[dict[str, Any]], interval: str) -> dict[str, Any]:
+def _fno_session_data_gate(bars: list[dict[str, Any]], interval: str, now: datetime | None = None) -> dict[str, Any]:
     """Fail closed unless NSE is open and the latest completed bar is fresh."""
     session = scheduler_status()
     if not session["session_active"]:
@@ -149,6 +149,7 @@ def _fno_session_data_gate(bars: list[dict[str, Any]], interval: str) -> dict[st
         return {"ready": False, "reason": "INVALID_COMPLETED_BAR_TIMESTAMP", "session": session, "market_data": None}
     health = evaluate_market_data_freshness(
         latest_dt,
+        now=now,
         max_age_seconds=max(120, interval_seconds * 2 + 30),
     )
     return {
