@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Any
+from datetime import datetime, timezone\nfrom typing import Any
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -92,3 +92,26 @@ def replay_response(record: PaperSignalRequest) -> dict[str, Any] | None:
     if record.decision == "PENDING":
         return None
     return json.loads(record.response_json)
+
+
+def pending_request_age_seconds(record: PaperSignalRequest, now: datetime | None = None) -> float:
+    """Return age of a PENDING request using UTC-safe timestamp handling."""
+    if record.decision != "PENDING":
+        return 0.0
+    current = now or datetime.now(timezone.utc)
+    created = record.created_at
+    if created.tzinfo is None:
+        created = created.replace(tzinfo=timezone.utc)
+    return max(0.0, (current - created.astimezone(timezone.utc)).total_seconds())
+
+
+def is_stale_pending_request(
+    record: PaperSignalRequest,
+    *,
+    max_age_seconds: float = 300.0,
+    now: datetime | None = None,
+) -> bool:
+    """Identify crash-left PENDING requests without silently retrying them."""
+    if max_age_seconds <= 0:
+        raise ValueError("max_age_seconds must be positive")
+    return record.decision == "PENDING" and pending_request_age_seconds(record, now) > max_age_seconds
