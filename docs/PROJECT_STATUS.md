@@ -30,6 +30,14 @@ Status: **IN PROGRESS — QUALIFICATION EVIDENCE REQUIRED**
 - The adapter never copies close/LTP into bid/ask and rejects duplicate timestamp/strike/side observations.
 - Dhan's expired-options endpoint can therefore supply real historical contract/market evidence for the research layer, but it is **not sufficient by itself for execution-grade qualification**; a historical executable bid/ask source is still required.
 
+### F&O QA hardening — executable quote boundary
+
+- Audited the autonomous F&O selection, decision, and historical replay paths for executable-price fallbacks.
+- Fixed autonomous F&O decisioning so a missing/invalid ask produces `NO_TRADE` instead of substituting LTP.
+- Fixed option-contract selection so missing/invalid bid/ask is rejected before a contract can qualify.
+- Fixed historical F&O backtesting so entry uses ask-side quotes and exit uses bid-side quotes only; LTP/close is never a simulated executable fill.
+- Added regression tests covering missing ask/bid and LTP-only historical snapshots.
+
 ### New historical evidence layer
 
 - Added `backend/app/services/fno_historical_data_service.py`.
@@ -113,6 +121,9 @@ Do not re-implement or re-test as a new feature without first checking this file
 Never mark a milestone green merely because code was committed. A milestone becomes green only after relevant automated tests pass and, where applicable, real/replay evidence is captured.
 
 ## Latest implementation commits
+
+- F&O executable quote hardening: `13581e0bc188043dd47d4560bb14a1806f10389a` (backtest), `dcfe81507c8158ad11c2836f2b01a59e58904eee` (selection), `8358c47371740929fedaed62fe7a613f1cfee9ea` (autonomous decision)
+- F&O executable quote regression tests: `6230330aa8db1bd48454f1c39c4c33bc11a5e14a`
 
 - Historical evidence validation service: `493d1ad08e03c56953bb1948b23e8a29dc20bff0`
 - Historical evidence validation tests: `6b97e40c18328f85583a14825927096ec8e35209`
