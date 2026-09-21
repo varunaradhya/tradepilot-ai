@@ -53,3 +53,15 @@ def test_request_id_cannot_be_reused_for_a_different_signal():
     import pytest
     with pytest.raises(ValueError, match="different signal"):
         claim_request(db, 1, "fno-dummy-002", changed)
+
+
+def test_request_fingerprint_changes_when_option_contract_changes():
+    base = {**signal(), "decision": "QUALIFIED", "contract": {"security_id": "123", "strike": 25000, "option_type": "CE"}}
+    changed = {**base, "contract": {"security_id": "124", "strike": 25000, "option_type": "CE"}}
+    assert request_fingerprint(base) != request_fingerprint(changed)
+
+
+def test_request_fingerprint_changes_when_completed_candle_changes():
+    base = {**signal(), "candle_timestamp": 1758440700}
+    changed = {**base, "candle_timestamp": 1758441000}
+    assert request_fingerprint(base) != request_fingerprint(changed)
