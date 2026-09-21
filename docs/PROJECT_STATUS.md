@@ -32,6 +32,10 @@ Status: **IN PROGRESS — QUALIFICATION EVIDENCE REQUIRED**
 
 ### F&O QA hardening — executable quote boundary
 
+- Added deterministic dummy-data regression coverage for next-bar entry, missing-bid handling, and end-of-test liquidation using executable bid only.
+- Local focused harness also verified BUY uses ask, SELL rejects missing bid, and SELL uses valid bid; this is supplementary to the repository tests.
+- Continuing QA into replay future-invariance, expiry/session boundaries, duplicate paper positions, and failure/retry behavior before historical qualification.
+
 - Follow-up audit found and corrected a quote-guard regression introduced during hardening: bid/ask values are now initialized before validation.
 - Paper position marking no longer falls back from missing executable bid to LTP; missing bid leaves the position unmarked rather than fabricating an executable exit.
 - Added regression coverage for quote responses containing LTP without bid/ask.
