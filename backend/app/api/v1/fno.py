@@ -18,6 +18,7 @@ from app.services.fno_instrument_service import fno_instrument_master
 from app.services.paper_trading_service import close_paper_trade, list_paper_trades, open_paper_trade, paper_trade_costs, update_paper_trade
 from app.services.paper_signal_request_service import claim_request, complete_request, get_request, replay_response, request_fingerprint, is_stale_pending_request
 from app.services.kill_switch_service import kill_switch_status
+from app.services.kill_switch_service import kill_switch_status
 from app.services.market_data_health import evaluate_market_data_freshness
 from app.services.market_session_scheduler import scheduler_status
 from app.services.paper_risk_guard import PaperRiskConfig, PaperRiskState, evaluate_paper_entry, normalize_trade_timestamp
@@ -135,6 +136,11 @@ def _expiry_dates(payload: Any) -> list[str]:
             for item in value.values(): walk(item)
     walk(payload)
     return sorted(set(values))
+
+def _fno_kill_switch_gate(db):
+    status = kill_switch_status(db)
+    return 'KILL_SWITCH_ACTIVE:' + status['reason'] if status['active'] else None
+
 
 def _fno_paper_risk_gate(db, user_id: int, symbol: str, signal_id: str) -> str | None:
     today = datetime.now(ZoneInfo("Asia/Kolkata")).date()
@@ -289,9 +295,6 @@ def scan(data: FNODecisionRequest, current_user: User = Depends(get_current_user
 
 @router.post("/paper/open")
 def open_option_paper_trade(data: FNOPaperOpenRequest, current_user: User = Depends(get_current_user), db=Depends(get_db)):
-    session=scheduler_status()
-    if not session["session_active"]:
-        raise HTTPException(status_code=422, detail="NSE market session is inactive; new F&O paper entries are blocked.")
     decision=data.decision
     if decision.get("decision")!="QUALIFIED": raise HTTPException(status_code=422, detail="Only a QUALIFIED option decision can be paper traded.")
     underlying=decision.get("underlying") or {}
@@ -308,15 +311,20 @@ def open_option_paper_trade(data: FNOPaperOpenRequest, current_user: User = Depe
     # can change. A duplicate must never become a new risk decision.
     existing_request=get_request(db,current_user.id,request_id)
     if existing_request is not None:
+        if existing_request.request_fingerprint != request_fingerprint(signal):
+            raise HTTPException(status_code=409,detail="paper signal request_id was already used for a different signal")
         replay=replay_response(existing_request)
         if replay is not None:
             return replay
         recovery_required=is_stale_pending_request(existing_request)
         detail="A stale PENDING paper request requires reconciliation before retry." if recovery_required else "A paper order request with this id is already being processed."
         raise HTTPException(status_code=409,detail=detail)
-    switch=kill_switch_status(db)
-    if switch["active"]:
-        raise HTTPException(status_code=409,detail=f"F&O paper risk gate blocked entry: KILL_SWITCH_ACTIVE:{switch['reason']}")
+    kill_block=_fno_kill_switch_gate(db)
+    if kill_block:
+        raise HTTPException(status_code=409,detail="F&O paper risk gate blocked entry: " + kill_block)
+    session=scheduler_status()
+    if not session["session_active"]:
+        raise HTTPException(status_code=422,detail="NSE market session is inactive; new F&O paper entries are blocked.")
 
     existing=db.query(PaperTrade).filter(PaperTrade.user_id==current_user.id,PaperTrade.status=="OPEN",PaperTrade.asset_type=="OPTION",PaperTrade.security_id==str(security_id)).first()
     if existing: raise HTTPException(status_code=409, detail="A paper position for this option contract is already open.")
