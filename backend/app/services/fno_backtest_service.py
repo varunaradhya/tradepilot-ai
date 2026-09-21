@@ -13,6 +13,7 @@ class FNOBacktestConfig:
     risk_per_trade: float = 0.005
     max_capital_percent: float = 0.50
     slippage_rate: float = 0.0
+    max_spread_percent: float | None = None
     cost: FNOCostConfig = FNOCostConfig()
 
 
@@ -90,6 +91,8 @@ def run_fno_backtest(
         raise ValueError("max_capital_percent must be between 0 and 1")
     if config.slippage_rate < 0:
         raise ValueError("slippage_rate must be non-negative")
+    if config.max_spread_percent is not None and config.max_spread_percent <= 0:
+        raise ValueError("max_spread_percent must be positive when configured")
     if lot_size <= 0:
         raise ValueError("lot_size must be positive")
     if len(bars) != len(option_chain_snapshots):
@@ -150,6 +153,14 @@ def run_fno_backtest(
             entry_contract = _find_contract(option_chain_snapshots[index + 1], strike, option_type)
             if entry_contract is None:
                 continue
+            if config.max_spread_percent is not None:
+                bid = _quote(entry_contract, "SELL")
+                ask = _quote(entry_contract, "BUY")
+                if bid <= 0 or ask <= 0 or ask < bid:
+                    continue
+                spread = (ask - bid) / ((ask + bid) / 2.0) * 100.0
+                if spread > config.max_spread_percent:
+                    continue
             entry = _quote(entry_contract, "BUY") * (1.0 + config.slippage_rate)
             quantity = int(decision.get("quantity") or 0)
             stop = float(decision.get("stop") or 0)
