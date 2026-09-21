@@ -4,7 +4,7 @@ Last updated: 2026-09-21
 
 ## How to use this file
 
-This is the handoff/checkpoint for future TradePilot sessions. Before starting new work, read this file and `TRADEPILOT_DEVELOPMENT_AND_QA.md` so completed work is not repeated.
+This is the handoff/checkpoint for future TradePilot sessions. Before starting new work, read this file, `TRADEPILOT_DEVELOPMENT_AND_QA.md`, and `ENHANCEMENT_LEDGER.md` so completed work is not repeated. The enhancement ledger is the canonical change/fix history.
 
 ## Current milestone
 
@@ -31,6 +31,8 @@ Status: **IN PROGRESS — QUALIFICATION EVIDENCE REQUIRED**
 - Dhan's expired-options endpoint can therefore supply real historical contract/market evidence for the research layer, but it is **not sufficient by itself for execution-grade qualification**; a historical executable bid/ask source is still required.
 
 ### F&O QA hardening — executable quote boundary
+
+- Canonical enhancement/fix ledger created at `docs/ENHANCEMENT_LEDGER.md`; recent quote, replay, historical-fill, paper-safety and authentication changes are consolidated there with commits and evidence status.
 
 - Added replay chronology validation: supplied bar timestamps, when present, must be numeric and strictly increasing. This prevents duplicated/out-of-order bars from silently becoming time-aligned research evidence.
 - Added dummy-data tests for chronological rejection and executable quote behavior. The standalone sanity harness passed: LTP-only SELL quote rejected (`0`), valid BUY used ask (`120`), valid SELL used bid (`119`).
@@ -133,6 +135,8 @@ Do not re-implement or re-test as a new feature without first checking this file
 Never mark a milestone green merely because code was committed. A milestone becomes green only after relevant automated tests pass and, where applicable, real/replay evidence is captured.
 
 ## Latest implementation commits
+
+- Canonical enhancement/QA ledger: `f642e89ad443cd50397b88856b99e8486f0b6129`
 
 - F&O executable quote hardening: `13581e0bc188043dd47d4560bb14a1806f10389a` (backtest), `dcfe81507c8158ad11c2836f2b01a59e58904eee` (selection), `8358c47371740929fedaed62fe7a613f1cfee9ea` (autonomous decision)
 - F&O executable quote regression tests: `6230330aa8db1bd48454f1c39c4c33bc11a5e14a`
