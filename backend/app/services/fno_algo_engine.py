@@ -157,7 +157,10 @@ def build_autonomous_option_decision(
         return {"decision": "NO_TRADE", "reason": "NO_OPTION_CONTRACT_PASSED_FILTERS", **base}
 
     best = candidates[0]
-    entry = _num(best.get("ask")) or _num(best.get("last_price"))
+    # Autonomous paper entry must be executable: never substitute LTP/close for a missing ask.
+    entry = _num(best.get("ask"))
+    if entry <= 0:
+        return {"decision": "NO_TRADE", "reason": "NO_EXECUTABLE_ASK", "contract": best, **base}
     delta = abs(_num(best.get("delta")))
     if entry <= 0 or delta <= 0 or direction.atr <= 0:
         return {"decision": "NO_TRADE", "reason": "INVALID_OPTION_RISK_INPUT", "contract": best, **base}
