@@ -105,6 +105,19 @@ def _ltp_from_response(response: dict[str, Any], security_id: str) -> float | No
         except (TypeError, ValueError): return None
     return None
 
+def _select_valid_expiry(requested: str | None, available: list[str], today: datetime.date | None = None) -> str | None:
+    """Select only an expiry actually returned by Dhan and not in the past."""
+    if not available:
+        return None
+    reference = today or datetime.now(ZoneInfo("Asia/Kolkata")).date()
+    valid = sorted({value for value in available if datetime.strptime(value, "%Y-%m-%d").date() >= reference})
+    if requested:
+        if requested not in valid:
+            raise ValueError("Requested expiry is not available or has already expired.")
+        return requested
+    return valid[0] if valid else None
+
+
 def _expiry_dates(payload: Any) -> list[str]:
     values: list[str] = []
     def walk(value: Any) -> None:
@@ -166,7 +179,10 @@ def autonomous_scan(data: FNOAutoScanRequest, current_user: User = Depends(get_c
     client=_dhan(db,current_user.id)
     try:
         expiry_dates=_expiry_dates(client.option_expiries(data.underlying_security_id,data.underlying_segment))
-        selected_expiry=data.expiry or (expiry_dates[0] if expiry_dates else None)
+        try:
+            selected_expiry=_select_valid_expiry(data.expiry, expiry_dates)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
         if not selected_expiry: raise HTTPException(status_code=422, detail="No valid NSE option expiry is available.")
         raw_chain=client.option_chain(data.underlying_security_id,data.underlying_segment,selected_expiry)
         chain=raw_chain.get("data") if isinstance(raw_chain,dict) and isinstance(raw_chain.get("data"),dict) else raw_chain
