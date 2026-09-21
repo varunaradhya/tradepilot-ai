@@ -23,6 +23,7 @@ This is the canonical implementation ledger for TradePilot AI. Before changing t
 
 | Date | Area | Enhancement / fix | Evidence / test | Status | Commit |
 |---|---|---|---|---|---|
+| 2026-09-21 | F&O execution | Wire existing persistent paper-signal idempotency into F&O `/paper/open`; replay completed requests and reject request-id reuse for a different signal | Dummy SQLite idempotency/replay + collision tests | DONE (F&O endpoint integration added; full CI pending) | 4f9e5f45 + 03ba9bd9 + e8fd79c9 + 1cac8e3e |
 | 2026-09-21 | F&O quotes | Autonomous entry requires executable ask; no LTP fallback | Missing-ask regression | DONE | 8358c473 |
 | 2026-09-21 | F&O contract selection | Reject missing/invalid bid or ask | Missing bid/ask regression | DONE | dcfe8150 |
 | 2026-09-21 | Historical replay | BUY uses ask and SELL uses bid only | LTP-only snapshot regression | DONE | 13581e0b |
