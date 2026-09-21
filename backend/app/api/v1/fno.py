@@ -17,6 +17,8 @@ from app.services.fno_strategy import FNOConfig, build_fno_decision, select_opti
 from app.services.fno_instrument_service import fno_instrument_master
 from app.services.paper_trading_service import close_paper_trade, list_paper_trades, open_paper_trade, paper_trade_costs, update_paper_trade
 from app.services.paper_signal_request_service import claim_request, complete_request, replay_response, request_fingerprint
+from app.services.market_data_health import evaluate_market_data_freshness
+from app.services.market_session_scheduler import scheduler_status
 
 router = APIRouter(prefix="/fno", tags=["F&O"])
 
@@ -132,6 +134,31 @@ def _expiry_dates(payload: Any) -> list[str]:
     walk(payload)
     return sorted(set(values))
 
+def _fno_session_data_gate(bars: list[dict[str, Any]], interval: str) -> dict[str, Any]:
+    """Fail closed unless NSE is open and the latest completed bar is fresh."""
+    session = scheduler_status()
+    if not session["session_active"]:
+        return {"ready": False, "reason": "MARKET_SESSION_INACTIVE", "session": session, "market_data": None}
+    if not bars:
+        return {"ready": False, "reason": "NO_COMPLETED_BARS", "session": session, "market_data": None}
+    try:
+        latest = float(bars[-1]["timestamp"])
+        latest_dt = datetime.fromtimestamp(latest, tz=ZoneInfo("UTC"))
+        interval_seconds = int(interval) * 60
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return {"ready": False, "reason": "INVALID_COMPLETED_BAR_TIMESTAMP", "session": session, "market_data": None}
+    health = evaluate_market_data_freshness(
+        latest_dt,
+        max_age_seconds=max(120, interval_seconds * 2 + 30),
+    )
+    return {
+        "ready": health.fresh,
+        "reason": health.reason,
+        "session": session,
+        "market_data": health.as_dict(),
+    }
+
+
 def _historical_rows(client: DhanClient, security_id: int, segment: str, interval: str) -> list[dict[str, Any]]:
     """Fetch and normalize today's completed underlying candles."""
     ist = ZoneInfo("Asia/Kolkata")
@@ -187,6 +214,18 @@ def autonomous_scan(data: FNOAutoScanRequest, current_user: User = Depends(get_c
         raw_chain=client.option_chain(data.underlying_security_id,data.underlying_segment,selected_expiry)
         chain=raw_chain.get("data") if isinstance(raw_chain,dict) and isinstance(raw_chain.get("data"),dict) else raw_chain
         bars=_historical_rows(client,data.underlying_security_id,data.underlying_segment,data.interval)
+        gate=_fno_session_data_gate(bars,data.interval)
+        if not gate["ready"]:
+            return {
+                "mode":"PAPER_ONLY",
+                "symbol":data.symbol.strip().upper(),
+                "interval":data.interval,
+                "expiry":selected_expiry,
+                "completed_bars":len(bars),
+                "decision":{"decision":"NO_TRADE","reason":gate["reason"],"paper_only":True},
+                "session":gate["session"],
+                "market_data":gate["market_data"],
+            }
         underlying={"symbol":data.symbol.strip().upper(),"security_id":data.underlying_security_id,"exchange_segment":data.underlying_segment,"expiry":selected_expiry,"capital":data.capital}
         preliminary=build_autonomous_option_decision(underlying=underlying,bars=bars,option_chain=chain,lot_size=1,config=FNOConfig())
         contract=preliminary.get("contract") or {}
@@ -208,6 +247,9 @@ def scan(data: FNODecisionRequest, current_user: User = Depends(get_current_user
 
 @router.post("/paper/open")
 def open_option_paper_trade(data: FNOPaperOpenRequest, current_user: User = Depends(get_current_user), db=Depends(get_db)):
+    session=scheduler_status()
+    if not session["session_active"]:
+        raise HTTPException(status_code=422, detail="NSE market session is inactive; new F&O paper entries are blocked.")
     decision=data.decision
     if decision.get("decision")!="QUALIFIED": raise HTTPException(status_code=422, detail="Only a QUALIFIED option decision can be paper traded.")
     underlying=decision.get("underlying") or {}
