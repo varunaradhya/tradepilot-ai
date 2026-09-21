@@ -44,3 +44,12 @@ def test_request_fingerprint_changes_when_execution_inputs_change():
     base = signal()
     changed = {**base, "entry": 121}
     assert request_fingerprint(base) != request_fingerprint(changed)
+
+
+def test_request_id_cannot_be_reused_for_a_different_signal():
+    db = make_db()
+    claim_request(db, 1, "fno-dummy-002", signal())
+    changed = {**signal(), "target": 181}
+    import pytest
+    with pytest.raises(ValueError, match="different signal"):
+        claim_request(db, 1, "fno-dummy-002", changed)
