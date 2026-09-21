@@ -16,6 +16,7 @@ from app.services.fno_execution import execute_fno_decision
 from app.services.fno_strategy import FNOConfig, build_fno_decision, select_option_contracts
 from app.services.fno_instrument_service import fno_instrument_master
 from app.services.paper_trading_service import close_paper_trade, list_paper_trades, open_paper_trade, paper_trade_costs, update_paper_trade
+from app.services.paper_signal_request_service import claim_request, complete_request, replay_response, request_fingerprint
 
 router = APIRouter(prefix="/fno", tags=["F&O"])
 
@@ -44,6 +45,7 @@ class FNOExecuteRequest(BaseModel):
 class FNOPaperOpenRequest(BaseModel):
     decision: dict[str, Any]
     strategy_version: str = Field(default="V1", pattern="^(V1|V2)$")
+    request_id: str | None = Field(default=None, min_length=8, max_length=100)
 
 def _dhan(db, user_id: int) -> DhanClient:
     c = get_user_broker(db, user_id, "DHAN")
@@ -192,7 +194,17 @@ def scan(data: FNODecisionRequest, current_user: User = Depends(get_current_user
 def open_option_paper_trade(data: FNOPaperOpenRequest, current_user: User = Depends(get_current_user), db=Depends(get_db)):
     decision=data.decision
     if decision.get("decision")!="QUALIFIED": raise HTTPException(status_code=422, detail="Only a QUALIFIED option decision can be paper traded.")
-    contract=decision.get("contract") or {}; underlying=decision.get("underlying") or {}; security_id=contract.get("security_id"); quantity=int(decision.get("quantity") or 0); lot_size=int(decision.get("lot_size") or 0)
+    underlying=decision.get("underlying") or {}
+    session=str(underlying.get("session") or datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%Y-%m-%d"))
+    signal={**decision, "symbol": str(underlying.get("symbol") or "NIFTY"), "interval": str(underlying.get("interval") or "5"), "strategy_version": data.strategy_version, "session": session}
+    request_id=data.request_id or f"fno-{request_fingerprint(signal)}"
+    request_record, claimed=claim_request(db, current_user.id, request_id, signal)
+    if not claimed:
+        replay=replay_response(request_record)
+        if replay is not None:
+            return replay
+        raise HTTPException(status_code=409, detail="A paper order request with this id is already being processed.")
+    contract=decision.get("contract") or {}; security_id=contract.get("security_id"); quantity=int(decision.get("quantity") or 0); lot_size=int(decision.get("lot_size") or 0)
     if not security_id or quantity<=0 or lot_size<=0 or quantity%lot_size: raise HTTPException(status_code=422, detail="Option decision has invalid security ID, quantity, or lot size.")
     existing=db.query(PaperTrade).filter(PaperTrade.user_id==current_user.id,PaperTrade.status=="OPEN",PaperTrade.asset_type=="OPTION",PaperTrade.security_id==str(security_id)).first()
     if existing: raise HTTPException(status_code=409, detail="A paper position for this option contract is already open.")
@@ -200,7 +212,9 @@ def open_option_paper_trade(data: FNOPaperOpenRequest, current_user: User = Depe
     try:
         trade=open_paper_trade(db,current_user.id,symbol=symbol[:30],quantity=quantity,entry_price=float(decision["entry"]),stop_price=float(decision["stop"]),target_price=float(decision["target"]),strategy_version=data.strategy_version,asset_type="OPTION",security_id=str(security_id),exchange_segment="NSE_FNO",underlying=str(underlying.get("symbol","")).upper(),expiry=underlying.get("expiry"),strike=float(contract.get("strike")) if contract.get("strike") is not None else None,option_type=contract.get("option_type"),lot_size=lot_size)
     except (KeyError,TypeError,ValueError) as exc: raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return {"mode":"PAPER_ONLY","position":{"id":trade.id,"symbol":trade.symbol,"underlying":trade.underlying,"expiry":trade.expiry,"strike":trade.strike,"option_type":trade.option_type,"security_id":trade.security_id,"quantity":trade.quantity,"entry_price":trade.entry_price,"stop_price":trade.stop_price,"target_price":trade.target_price,"pnl":trade.pnl,"status":trade.status}}
+    response={"mode":"PAPER_ONLY","accepted":True,"request_id":request_id,"position":{"id":trade.id,"symbol":trade.symbol,"underlying":trade.underlying,"expiry":trade.expiry,"strike":trade.strike,"option_type":trade.option_type,"security_id":trade.security_id,"quantity":trade.quantity,"entry_price":trade.entry_price,"stop_price":trade.stop_price,"target_price":trade.target_price,"pnl":trade.pnl,"status":trade.status}}
+    complete_request(db, request_record, response)
+    return response
 
 @router.get("/paper/positions")
 def option_paper_positions(current_user: User = Depends(get_current_user), db=Depends(get_db)):
