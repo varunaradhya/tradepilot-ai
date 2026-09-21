@@ -16,11 +16,16 @@ def request_fingerprint(signal: dict[str, Any]) -> str:
         "symbol": str(signal.get("symbol", "")).strip().upper(),
         "interval": str(signal.get("interval", "5")),
         "strategy_version": str(signal.get("strategy_version", "V1")),
-        "action": str(signal.get("action", "")).upper(),
+        "action": str(signal.get("action", signal.get("direction", ""))).upper(),
+        "decision": str(signal.get("decision", "")).upper(),
         "entry": signal.get("entry"),
         "stop": signal.get("stop"),
         "target": signal.get("target"),
         "lot_size": signal.get("lot_size", 1),
+        "security_id": str((signal.get("contract") or {}).get("security_id", signal.get("security_id", ""))),
+        "strike": (signal.get("contract") or {}).get("strike", signal.get("strike")),
+        "option_type": str((signal.get("contract") or {}).get("option_type", signal.get("option_type", ""))).upper(),
+        "candle_timestamp": signal.get("candle_timestamp", signal.get("bar_timestamp")),
     }
     encoded = json.dumps(canonical, sort_keys=True, separators=(",", ":"), default=str).encode()
     return hashlib.sha256(encoded).hexdigest()
