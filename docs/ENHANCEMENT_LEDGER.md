@@ -53,6 +53,12 @@ This is the canonical implementation ledger for TradePilot AI. Before changing t
 
 | 2026-09-21 | F&O session/data safety | Auto-scan now fails closed outside NSE session, with no completed bars, invalid timestamps, future timestamps, or stale latest completed bars; new F&O paper entries are blocked outside session | Deterministic dummy tests cover inactive session, missing bars, fresh bars, future bars and interval-aware freshness | DONE (full CI pending) | 91411546 + c5837d55 + 4516c566 |
 
+| 2026-09-21 | F&O signal identity | Persistent idempotency fingerprint includes decision, contract security ID/strike/type and completed-candle timestamp | Fingerprint regression tests | DONE (full CI pending) | ab6ae24e + b47be9fe + 92cd32ad |
+| 2026-09-21 | F&O quote outage | Paper positions report DEGRADED and quote failures when executable bids are unavailable | Executable-bid safety coverage | DONE (full CI pending) | cd8c6577 |
+| 2026-09-21 | Historical F&O realism | Gap-through stop/target replay uses conservative executable-bid fills | Deterministic gap-through-stop fixture | DONE (full CI pending) | f26e399a + ef04997c |
+| 2026-09-21 | F&O risk integration | Existing daily-loss, trade-count, loss-streak, open-position and session gates wired into F&O paper entry | Deterministic risk-gate integration fixtures | DONE (full CI pending) | 0f8ce984 + 5836a8bb |
+| 2026-09-21 | Live execution safety | Environment variables cannot unlock real-money F&O execution | Environment-lock/no-place-order tests | LOCKED | 2155244f + 10f9d19f |
+
 ## Current open items
 
 ### P0 — Real historical F&O evidence
