@@ -17,7 +17,9 @@ class FNOBacktestConfig:
 
 
 def _quote(contract: dict[str, Any], side: str) -> float:
-    keys = ("ask", "top_ask_price", "last_price") if side == "BUY" else ("bid", "top_bid_price", "last_price")
+    # Historical execution must use executable-side quotes only. LTP/close is
+    # research evidence but is not a substitute for ask-side entry or bid-side exit.
+    keys = ("ask", "top_ask_price") if side == "BUY" else ("bid", "top_bid_price")
     for key in keys:
         try:
             value = float(contract.get(key) or 0)
