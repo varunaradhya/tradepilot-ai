@@ -4,7 +4,7 @@ from math import isfinite
 from typing import Any
 @dataclass(frozen=True)
 class FNOConfig:
- min_volume:int=1000; min_oi:int=10000; max_spread_percent:float=1.5; min_delta:float=.35; max_delta:float=.70; max_iv:float=80.; min_score:float=60.; risk_per_trade:float=.005; max_capital_percent:float=.20
+ min_volume:int=1000; min_oi:int=10000; max_spread_percent:float=1.5; min_delta:float=.35; max_delta:float=.70; max_iv:float=80.; min_score:float=60.; risk_per_trade:float=.005; max_capital_percent:float=.20; min_bid_ask_quantity:int=0
 def _num(v:Any,d:float=0.)->float:
  try:x=float(v);return x if isfinite(x) else d
  except(TypeError,ValueError):return d
@@ -26,7 +26,7 @@ def select_option_contracts(chain:dict[str,Any],direction:str,cfg:FNOConfig=FNOC
   # Contract selection is for executable paper trading; a missing/invalid bid or ask is a hard rejection.
   if bid <= 0 or ask <= 0 or bid > ask:continue
   if score<cfg.min_score:continue
-  g=c.get("greeks")or{};rows.append({"strike":strike,"option_type":"CE" if side=="ce" else "PE","security_id":c.get("security_id"),"last_price":_num(c.get("last_price")),"bid":_num(c.get("top_bid_price")),"ask":_num(c.get("top_ask_price")),"volume":int(_num(c.get("volume"))),"oi":int(_num(c.get("oi"))),"iv":_num(c.get("implied_volatility")),"delta":_num(g.get("delta")),"gamma":_num(g.get("gamma")),"theta":_num(g.get("theta")),"vega":_num(g.get("vega")),"score":score,"score_components":comp})
+  depth=c.get("depth") or {}; buys=depth.get("buy") if isinstance(depth,dict) else None; sells=depth.get("sell") if isinstance(depth,dict) else None\n  bid_qty=_num((buys[0] if isinstance(buys,list) and buys and isinstance(buys[0],dict) else {}).get("quantity"))\n  ask_qty=_num((sells[0] if isinstance(sells,list) and sells and isinstance(sells[0],dict) else {}).get("quantity"))\n  if cfg.min_bid_ask_quantity > 0 and (bid_qty < cfg.min_bid_ask_quantity or ask_qty < cfg.min_bid_ask_quantity):continue\n  g=c.get("greeks")or{};rows.append({"strike":strike,"option_type":"CE" if side=="ce" else "PE","security_id":c.get("security_id"),"last_price":_num(c.get("last_price")),"bid":_num(c.get("top_bid_price")),"ask":_num(c.get("top_ask_price")),"bid_quantity":int(bid_qty),"ask_quantity":int(ask_qty),"volume":int(_num(c.get("volume"))),"oi":int(_num(c.get("oi"))),"iv":_num(c.get("implied_volatility")),"delta":_num(g.get("delta")),"gamma":_num(g.get("gamma")),"theta":_num(g.get("theta")),"vega":_num(g.get("vega")),"score":score,"score_components":comp})
  rows.sort(key=lambda r:r["score"],reverse=True);return rows[:max(1,min(limit,20))]
 def build_fno_decision(underlying:dict[str,Any],direction:str,candidates:list[dict[str,Any]],cfg:FNOConfig=FNOConfig()):
  if not candidates:return {"decision":"NO_TRADE","reason":"NO_CONTRACT_PASSED_FILTERS","underlying":underlying}
