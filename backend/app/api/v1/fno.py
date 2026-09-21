@@ -16,7 +16,7 @@ from app.services.fno_execution import execute_fno_decision
 from app.services.fno_strategy import FNOConfig, build_fno_decision, select_option_contracts
 from app.services.fno_instrument_service import fno_instrument_master
 from app.services.paper_trading_service import close_paper_trade, list_paper_trades, open_paper_trade, paper_trade_costs, update_paper_trade
-from app.services.paper_signal_request_service import claim_request, complete_request, replay_response, request_fingerprint
+from app.services.paper_signal_request_service import claim_request, complete_request, get_request, replay_response, request_fingerprint
 from app.services.market_data_health import evaluate_market_data_freshness
 from app.services.market_session_scheduler import scheduler_status
 from app.services.paper_risk_guard import PaperRiskConfig, PaperRiskState, evaluate_paper_entry, normalize_trade_timestamp
@@ -299,20 +299,32 @@ def open_option_paper_trade(data: FNOPaperOpenRequest, current_user: User = Depe
     quantity=int(decision.get("quantity") or 0)
     lot_size=int(decision.get("lot_size") or 0)
     if not security_id or quantity<=0 or lot_size<=0 or quantity%lot_size: raise HTTPException(status_code=422, detail="Option decision has invalid security ID, quantity, or lot size.")
-    existing=db.query(PaperTrade).filter(PaperTrade.user_id==current_user.id,PaperTrade.status=="OPEN",PaperTrade.asset_type=="OPTION",PaperTrade.security_id==str(security_id)).first()
-    if existing: raise HTTPException(status_code=409, detail="A paper position for this option contract is already open.")
     session=str(underlying.get("session") or datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%Y-%m-%d"))
     signal={**decision, "symbol": str(underlying.get("symbol") or "NIFTY"), "interval": str(underlying.get("interval") or "5"), "strategy_version": data.strategy_version, "session": session, "candle_timestamp": decision.get("candle_timestamp", underlying.get("candle_timestamp"))}
     request_id=data.request_id or f"fno-{request_fingerprint(signal)}"
+
+    # Exact completed idempotent requests must replay before session/risk state
+    # can change. A duplicate must never become a new risk decision.
+    existing_request=get_request(db,current_user.id,request_id)
+    if existing_request is not None:
+        replay=replay_response(existing_request)
+        if replay is not None:
+            return replay
+        raise HTTPException(status_code=409,detail="A paper order request with this id is already being processed.")
+
+    existing=db.query(PaperTrade).filter(PaperTrade.user_id==current_user.id,PaperTrade.status=="OPEN",PaperTrade.asset_type=="OPTION",PaperTrade.security_id==str(security_id)).first()
+    if existing: raise HTTPException(status_code=409, detail="A paper position for this option contract is already open.")
+
     risk_block = _fno_paper_risk_gate(db, current_user.id, str(underlying.get("symbol") or "NIFTY"), request_id)
     if risk_block:
         raise HTTPException(status_code=409, detail=f"F&O paper risk gate blocked entry: {risk_block}")
-    request_record, claimed=claim_request(db, current_user.id, request_id, signal)
+
+    request_record,claimed=claim_request(db,current_user.id,request_id,signal)
     if not claimed:
         replay=replay_response(request_record)
         if replay is not None:
             return replay
-        raise HTTPException(status_code=409, detail="A paper order request with this id is already being processed.")
+        raise HTTPException(status_code=409,detail="A paper order request with this id is already being processed.")
     symbol=f"{underlying.get('symbol','OPTION')} {underlying.get('expiry','')} {contract.get('strike')} {contract.get('option_type')}".strip()
     try:
         trade=open_paper_trade(db,current_user.id,symbol=symbol[:30],quantity=quantity,entry_price=float(decision["entry"]),stop_price=float(decision["stop"]),target_price=float(decision["target"]),strategy_version=data.strategy_version,asset_type="OPTION",security_id=str(security_id),exchange_segment="NSE_FNO",underlying=str(underlying.get("symbol","")).upper(),expiry=underlying.get("expiry"),strike=float(contract.get("strike")) if contract.get("strike") is not None else None,option_type=contract.get("option_type"),lot_size=lot_size)
