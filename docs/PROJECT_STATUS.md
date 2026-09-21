@@ -136,6 +136,10 @@ Never mark a milestone green merely because code was committed. A milestone beco
 
 ## Latest implementation commits
 
+- F&O session/freshness hardening: `914115460df874c286ed538a3358d717c1cc85a6`
+- Deterministic F&O freshness gate: `c5837d55ccc8966740a75cc01106a6349c35746f`
+- F&O session/freshness tests: `4516c566ddb2da9d10f5fc4d77f1f85569bc3d3a`
+
 - F&O expiry validation: `f349b2795973c268dc59736e3355366e1c70e4ac`
 - F&O expiry regression tests: `d8e210232f27654b3dd48feca76527dd9b3df7d4`
 - Operations/reconciliation foundation audit recorded in enhancement ledger.
