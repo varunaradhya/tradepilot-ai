@@ -1,6 +1,6 @@
 # TradePilot AI — Development & QA Control Plan
 
-Last updated: 2026-08-22
+Last updated: 2026-09-21
 
 > **Persistent handoff:** Read `docs/PROJECT_STATUS.md` before starting new work. It records the current milestone, completed foundations and priority queue so work is not repeated across sessions.
 
@@ -109,6 +109,8 @@ No manual strike or lot selection is part of the intended autonomous path.
 - [x] Replay uses only completed bars available at each decision point.
 - [x] Future-bar mutation regression guard.
 - [ ] Full historical options replay with real historical option-chain snapshots.
+- [x] Dhan expired-option OHLC/OI/IV/volume/spot normalization without manufacturing bid/ask.
+- [ ] Execution-grade historical bid/ask source for options.
 - [ ] Parameter contamination test.
 - [ ] Validation-reuse test.
 - [ ] Regime stability test.
@@ -162,6 +164,7 @@ No manual strike or lot selection is part of the intended autonomous path.
 - [x] Qualification/readiness foundations.
 - [x] Anti-look-ahead replay foundation.
 - [x] Initial autonomous F&O historical backtest engine and metrics.
+- [x] Historical expired-options provider normalization boundary.
 - [ ] Historical expired-options dataset integration for unbiased option testing.
 - [ ] Full intraday options historical replay using real option snapshots.
 - [ ] Survivorship/universe bias audit.
@@ -202,7 +205,7 @@ Live trading remains locked until robust historical backtest, no-look-ahead repl
 
 ## Next highest-priority attacks
 
-1. Add real expired-option historical snapshot ingestion/replay so the F&O backtest represents actual historical contracts rather than synthetic fixtures.
+1. Acquire/ingest real expired-option historical data; Dhan's expired endpoint now normalizes OHLC/OI/IV/volume/spot, but execution-grade historical bid/ask remains required for realistic fills.
 2. Add option spread/liquidity/price-band and slippage stress gates.
 3. Add daily-loss, kill-switch, restart reconciliation and session-level idempotency tests.
 4. Run parameter sensitivity, regime stability, validation-reuse and out-of-sample qualification.
