@@ -104,3 +104,29 @@ def test_replay_does_not_mutate_input_bars():
         lot_size=75,
     )
     assert bars == original
+
+
+def test_replay_rejects_non_chronological_timestamps():
+    bars = _bars()
+    bars[10]["timestamp"] = bars[9]["timestamp"]
+    chains = [_chain() for _ in bars]
+    with pytest.raises(ValueError, match="strictly chronological"):
+        replay_autonomous_option_decisions(
+            underlying={"symbol": "NIFTY", "capital": 300000},
+            bars=bars,
+            option_chain_snapshots=chains,
+            lot_size=75,
+        )
+
+
+def test_replay_rejects_non_numeric_timestamps_when_provided():
+    bars = _bars()
+    bars[10]["timestamp"] = "bad-timestamp"
+    chains = [_chain() for _ in bars]
+    with pytest.raises(ValueError, match="timestamps must be numeric"):
+        replay_autonomous_option_decisions(
+            underlying={"symbol": "NIFTY", "capital": 300000},
+            bars=bars,
+            option_chain_snapshots=chains,
+            lot_size=75,
+        )
