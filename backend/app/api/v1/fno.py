@@ -19,7 +19,7 @@ from app.services.paper_trading_service import close_paper_trade, list_paper_tra
 from app.services.paper_signal_request_service import claim_request, complete_request, replay_response, request_fingerprint
 from app.services.market_data_health import evaluate_market_data_freshness
 from app.services.market_session_scheduler import scheduler_status
-from app.services.paper_risk_guard import PaperRiskConfig, PaperRiskState, evaluate_paper_entry
+from app.services.paper_risk_guard import PaperRiskConfig, PaperRiskState, evaluate_paper_entry, normalize_trade_timestamp
 
 router = APIRouter(prefix="/fno", tags=["F&O"])
 
@@ -142,7 +142,7 @@ def _fno_paper_risk_gate(db, user_id: int, symbol: str, signal_id: str) -> str |
         trade for trade in trades
         if trade.status == "CLOSED"
         and trade.closed_at is not None
-        and trade.closed_at.astimezone(ZoneInfo("Asia/Kolkata")).date() == today
+        and (normalize_trade_timestamp(trade.closed_at) or datetime.min.replace(tzinfo=ZoneInfo("Asia/Kolkata"))).date() == today
     ]
     open_symbols = {
         str(trade.underlying or trade.symbol).strip().upper()
