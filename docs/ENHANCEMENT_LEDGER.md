@@ -39,6 +39,9 @@ This is the canonical implementation ledger for TradePilot AI. Before changing t
 | 2026-08-21 | F&O P&L | Make option paper P&L net of trading costs | P&L tests | DONE | 899c12b9 |
 | 2026-08-21 | Dhan auth | Persistent refresh-token sessions and automatic access refresh | Auth/session tests | DONE | 1e2913e4 + 518163de |
 | 2026-08-18 | Paper safety | Paper state/risk boundaries, stale-session protection, symbol isolation | Adversarial paper-risk tests | DONE | ba46f607 |
+| 2026-08-17 | Market safety | Indian market session and price-band execution guards | Session/price-band tests; session-equity risk baseline | DONE (general paper layer; F&O integration still audited) | f6c35267 |
+| 2026-08-17 | Risk engine | Daily intraday risk/trade caps and risk-aware paper decision gates | Daily-risk and risk-gate regression suites | DONE (general layer; F&O integration still audited) | d9b14e45 + 996fc9cf |
+| 2026-08-17 | Portfolio risk | Exposure/risk gates and same-bar re-entry protection | Portfolio-risk and execution timing tests | DONE (general layer; F&O integration still audited) | 924c40f9 + bf0b08ef |
 | 2026-08-18 | Paper operations | Monitoring, reconciliation, scheduler and evidence gates | P1 paper operations suite | DONE | 24de9a47 |
 | 2026-08-18 | Strategy evidence | Harden evidence/OOS integrity gates | Evidence regression suite | DONE | 9600f38 |
 | 2026-08-18 | Strategy readiness | Fail-closed strategy readiness and cross-stock evidence gates | P3 adversarial tests | DONE | 11cb5c3c |
@@ -52,6 +55,7 @@ This is the canonical implementation ledger for TradePilot AI. Before changing t
 - Synthetic data may validate software behavior only; it cannot establish strategy performance.
 
 ### P0 — Paper execution resilience
+- Existing general paper idempotency/risk foundations are recorded above; the remaining task is to verify and, where needed, explicitly wire those controls into the autonomous F&O session rather than duplicating them.
 - Explicit autonomous-session idempotency key.
 - Restart reconciliation test.
 - Duplicate scan/candle protection.
