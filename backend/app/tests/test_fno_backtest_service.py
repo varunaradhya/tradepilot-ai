@@ -119,3 +119,45 @@ def test_fno_backtest_reports_no_trades_without_qualified_decisions(monkeypatch)
     )
     assert result["trades"] == 0
     assert result["ending_capital"] == result["initial_capital"]
+
+
+def test_fno_backtest_does_not_exit_on_ltp_when_bid_is_missing(monkeypatch):
+    bars = [{"open": 100, "high": 101, "low": 99, "close": 100, "timestamp": i} for i in range(64)]
+    chains = [_chain() for _ in bars]
+    chains[61] = _chain(price=100)
+    # LTP/option OHLC reaches target, but executable bid is absent.
+    chains[62] = {"oc": {"25000": {"ce": {
+        "strike": 25000, "option_type": "CE", "ask": 125,
+        "bid": 0, "last_price": 125, "low": 100, "high": 125
+    }}}}
+    chains[63] = _chain(price=110)
+    decisions = [
+        {"bar_index": 60, "timestamp": 60, "decision": _decision()},
+        _no_trade(61), _no_trade(62), _no_trade(63),
+    ]
+    monkeypatch.setattr(service, "replay_autonomous_option_decisions", lambda **kwargs: decisions)
+
+    result = service.run_fno_backtest(
+        underlying={"symbol": "NIFTY"}, bars=bars,
+        option_chain_snapshots=chains, lot_size=75,
+    )
+
+    assert result["trades"] == 1
+    assert result["trades_detail"][0]["reason"] == "END_OF_TEST"
+    assert result["trades_detail"][0]["exit_bar_index"] == 63
+
+
+def test_fno_backtest_uses_bid_for_end_of_test_liquidation(monkeypatch):
+    bars = [{"open": 100, "high": 101, "low": 99, "close": 100, "timestamp": i} for i in range(62)]
+    chains = [_chain(price=100) for _ in bars]
+    chains[61] = _chain(price=90)
+    decisions = [{"bar_index": 60, "timestamp": 60, "decision": _decision()}]
+    monkeypatch.setattr(service, "replay_autonomous_option_decisions", lambda **kwargs: decisions)
+
+    result = service.run_fno_backtest(
+        underlying={"symbol": "NIFTY"}, bars=bars,
+        option_chain_snapshots=chains, lot_size=75,
+    )
+
+    assert result["trades"] == 1
+    assert result["trades_detail"][0]["exit"] == 90
