@@ -59,3 +59,20 @@ def test_fno_risk_gate_allows_clean_session(monkeypatch):
     monkeypatch.setattr(fno, "scheduler_status", lambda: {"session_active": True})
     reason = fno._fno_paper_risk_gate(FakeDB([]), 1, "NIFTY", "signal-003")
     assert reason is None
+
+def test_fno_kill_switch_gate_blocks_when_active(monkeypatch):
+    monkeypatch.setattr(fno, "kill_switch_status", lambda db: {"active": True, "reason": "MANUAL_HALT"})
+    assert fno._fno_kill_switch_gate(object()) == "KILL_SWITCH_ACTIVE:MANUAL_HALT"
+
+
+def test_fno_kill_switch_gate_allows_when_inactive(monkeypatch):
+    monkeypatch.setattr(fno, "kill_switch_status", lambda db: {"active": False, "reason": "CLEARED"})
+    assert fno._fno_kill_switch_gate(object()) is None
+
+
+def test_fno_risk_gate_ignores_future_closed_trade_for_daily_loss(monkeypatch):
+    monkeypatch.setattr(fno, "scheduler_status", lambda: {"session_active": True})
+    from datetime import timedelta
+    future = datetime.now(IST) + timedelta(days=1)
+    reason = fno._fno_paper_risk_gate(FakeDB([_trade("CLOSED", -5000.0, future)]), 1, "NIFTY", "signal-future")
+    assert reason is None
