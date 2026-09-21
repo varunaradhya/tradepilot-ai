@@ -32,6 +32,10 @@ Status: **IN PROGRESS — QUALIFICATION EVIDENCE REQUIRED**
 
 ### F&O QA hardening — executable quote boundary
 
+- Follow-up audit found and corrected a quote-guard regression introduced during hardening: bid/ask values are now initialized before validation.
+- Paper position marking no longer falls back from missing executable bid to LTP; missing bid leaves the position unmarked rather than fabricating an executable exit.
+- Added regression coverage for quote responses containing LTP without bid/ask.
+
 - Audited the autonomous F&O selection, decision, and historical replay paths for executable-price fallbacks.
 - Fixed autonomous F&O decisioning so a missing/invalid ask produces `NO_TRADE` instead of substituting LTP.
 - Fixed option-contract selection so missing/invalid bid/ask is rejected before a contract can qualify.
