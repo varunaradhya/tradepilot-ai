@@ -24,9 +24,10 @@ def run_fno_execution_stress(
     """
     scenarios: list[dict[str, Any]] = []
     for slippage in slippage_rates:
+        if float(slippage) < 0:
+            raise ValueError("slippage rates must be non-negative")
+    for slippage in slippage_rates:
         for spread in spread_limits:
-            if slippage < 0:
-                raise ValueError("slippage rates must be non-negative")
             result = run_fno_backtest(
                 underlying=underlying,
                 bars=bars,
