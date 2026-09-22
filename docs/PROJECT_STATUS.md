@@ -1,6 +1,6 @@
 # TradePilot AI — Persistent Project Status
 
-Last updated: 2026-09-21
+Last updated: 2026-09-22
 
 ## How to use this file
 
@@ -76,6 +76,16 @@ Status: **IN PROGRESS — QUALIFICATION EVIDENCE REQUIRED**
 - Added regression coverage for stale/fresh PENDING recovery, ledger identity, kill-switch gate behavior, future-trade isolation, inverted quotes, timestamp misalignment, and invalid stress slippage.
 - Execution-friction stress validation now rejects negative slippage before any scenario backtest runs.
 - The qualification status remains blocked pending real timestamp-aligned historical bid/ask evidence; no synthetic result was promoted to performance evidence.
+
+### Restart reconciliation and broker resilience batch — 2026-09-22
+
+- Crash-left PENDING F&O paper requests are now reconciled only when the exact request fingerprint matches and exactly one matching persisted open option trade can be proven from contract identity, quantity, prices, strategy version, and request/trade chronology.
+- Reconciliation never creates a trade and never automatically retries an order. Ambiguous or unmatched PENDING requests remain recovery-required.
+- Added `GET /fno/paper/recovery` to expose durable pending/recovery state without retrying anything.
+- Dhan retry backoff now bounds provider-supplied `Retry-After` values to 20 seconds and falls back safely for invalid/negative values; regression coverage added for 429/503 retry behavior and exhaustion.
+- Historical Dhan rolling-option normalization now rejects duplicate timestamps within a contract response instead of silently retaining ambiguous observations.
+- Live execution remains hard-locked and no broker credentials/tokens were requested or used.
+- CI is still being verified against the latest push; previous workflow runs were cancelled/replaced while this batch was being committed, so no green claim is made until the final run completes.
 
 ### Latest batched F&O QA hardening
 
@@ -167,6 +177,7 @@ Never mark a milestone green merely because code was committed. A milestone beco
 - F&O risk integration: `0f8ce98498af580f44c047f70145ef1072f76591`, test `5836a8bb1639e03de6f74bf1a7789c97f9b0eabd`
 - Batched F&O safety/realism hardening: `824d0c0`, `c3557205`, `787b6bb1`, `576afe8f`, `d420c448`, `ed8ad1ae`, `19a649ad`, `a56b0513`, `74c4f841`, `bd9b84ed`, `9c2b0d96`, ledger `3942af27`
 - Current QA repair/hardening batch: `77908ced`, `bbb2d5b5`, `63f88177`, `f86aed01`, `4e7fc427`, `c8e257f3`, `69207bd0`, `37df0f0e`, `ed6decca`, `7ac3e8cb`, `ad91ff17`, `2a8db1e0`, `2045c276`
+- Restart/recovery + broker resilience batch: `c6e41ff2`, `a8750c63`, `b6a2dcf9`, `7ab7b78a`, `5d7bd6cd`, `6173a699`, `568e2b72`, `d1ab819f`
 - Live execution hard lock: `2155244ff7ed0fff7a01824f7f91a53c0d841c16`, test `10f9d19f4993f2a20950972bb9c26bafad98ca3c`
 
 - F&O session/freshness hardening: `914115460df874c286ed538a3358d717c1cc85a6`
