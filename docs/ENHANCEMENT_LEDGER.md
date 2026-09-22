@@ -1,6 +1,6 @@
 # TradePilot AI — Enhancement & QA Ledger
 
-Last updated: 2026-09-21
+Last updated: 2026-09-22
 
 ## Purpose
 
@@ -64,6 +64,11 @@ This is the canonical implementation ledger for TradePilot AI. Before changing t
 | 2026-09-21 | Options realism | Added configurable historical spread stress gate and frozen execution-friction scenario runner; added optional top-of-book quantity gate when depth data provides quantity | spread, stress-runner and depth-quantity regression tests | DONE (full CI pending) | 576afe8f + d420c448 + ed8ad1ae + 19a649ad + bd9b84ed + 9c2b0d96 |
 
 | 2026-09-21 | F&O QA batch | Repaired CI-blocking request-service syntax; enforced request fingerprint before replay; preserved replay before mutable gates; wired durable kill-switch fail-closed behavior; enforced bar/snapshot timestamp alignment; corrected open-position reconciliation; hardened stress input validation | Focused regression coverage added; CI verification pending on post-batch HEAD | PARTIAL — implementation committed; real evidence still BLOCKED | 2045c276 + 2a8db1e0 |
+
+| 2026-09-22 | F&O restart reconciliation | Reconcile crash-left PENDING requests only against exactly one matching persisted open option trade; expose recovery state without retry | SQLite regression coverage for exact recovery and ambiguous-match fail-closed behavior | PARTIAL — recovery is deterministic; production crash-boundary exercise remains outstanding | c6e41ff2 + a8750c63 + b6a2dcf9 |
+| 2026-09-22 | Dhan broker resilience | Bound Retry-After backoff and preserve final HTTP status on retry exhaustion | 429/503 retry, negative/oversized Retry-After and exhaustion tests | DONE (focused coverage; full CI pending) | 7ab7b78a + 5d7bd6cd |
+| 2026-09-22 | Historical evidence normalization | Reject duplicate timestamps inside one Dhan rolling-option response | Duplicate timestamp regression | DONE (execution-grade evidence still blocked by missing historical bid/ask) | 6173a699 + 568e2b72 |
+| 2026-09-22 | F&O recovery observability | Add read-only `/fno/paper/recovery` state endpoint; automatic retry remains disabled | Endpoint implementation; state remains PAPER_ONLY | DONE | d1ab819f |
 
 ## Current open items
 
