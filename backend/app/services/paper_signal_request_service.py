@@ -24,9 +24,12 @@ def request_fingerprint(signal: dict[str, Any]) -> str:
         "stop": signal.get("stop"),
         "target": signal.get("target"),
         "lot_size": signal.get("lot_size", 1),
+        "quantity": signal.get("quantity"),
         "security_id": str((signal.get("contract") or {}).get("security_id", signal.get("security_id", ""))),
+        "exchange_segment": str((signal.get("contract") or {}).get("exchange_segment", signal.get("exchange_segment", ""))).upper(),
         "strike": (signal.get("contract") or {}).get("strike", signal.get("strike")),
         "option_type": str((signal.get("contract") or {}).get("option_type", signal.get("option_type", ""))).upper(),
+        "expiry": (signal.get("underlying") or {}).get("expiry", signal.get("expiry")),
         "candle_timestamp": signal.get("candle_timestamp", signal.get("bar_timestamp")),
     }
     encoded = json.dumps(canonical, sort_keys=True, separators=(",", ":"), default=str).encode()
