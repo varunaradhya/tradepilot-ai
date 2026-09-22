@@ -3,7 +3,8 @@ from sqlalchemy.orm import sessionmaker
 
 from app.db.database import Base
 from app.models.paper_signal_request import PaperSignalRequest
-from app.services.paper_signal_request_service import claim_request, complete_request, replay_response, request_fingerprint
+from app.models.paper_trade import PaperTrade
+from app.services.paper_signal_request_service import claim_request, complete_request, replay_response, request_fingerprint, reconcile_pending_request
 
 
 def make_db():
@@ -96,3 +97,74 @@ def test_stale_pending_request_is_recovery_only_and_not_replayable():
     record = SimpleNamespace(decision="PENDING", created_at=now - timedelta(seconds=301), response_json="{}")
     assert is_stale_pending_request(record, max_age_seconds=300, now=now) is True
     assert replay_response(record) is None
+
+
+def test_pending_request_reconciles_exact_existing_option_trade():
+    from datetime import datetime, timezone
+
+    db = make_db()
+    signal_data = {
+        **signal(),
+        "decision": "QUALIFIED",
+        "quantity": 75,
+        "underlying": {"symbol": "NIFTY", "expiry": "2026-09-24"},
+        "contract": {"security_id": "12345", "strike": 25000, "option_type": "CE"},
+    }
+    record, claimed = claim_request(db, 1, "fno-recovery-001", signal_data)
+    assert claimed is True
+
+    trade = PaperTrade(
+        user_id=1,
+        symbol="NIFTY 2026-09-24 25000 CE",
+        side="BUY",
+        status="OPEN",
+        quantity=75,
+        entry_price=120,
+        stop_price=90,
+        target_price=180,
+        strategy_version="V1",
+        asset_type="OPTION",
+        security_id="12345",
+        exchange_segment="NSE_FNO",
+        underlying="NIFTY",
+        expiry="2026-09-24",
+        strike=25000,
+        option_type="CE",
+        lot_size=75,
+        created_at=datetime.now(timezone.utc),
+    )
+    db.add(trade)
+    db.commit()
+    db.refresh(trade)
+
+    recovered = reconcile_pending_request(db, record, signal_data)
+    assert recovered is not None
+    assert recovered["accepted"] is True
+    assert recovered["recovered"] is True
+    assert recovered["position"]["id"] == trade.id
+    db.refresh(record)
+    assert record.decision == "ACCEPTED"
+
+
+def test_pending_request_does_not_reconcile_ambiguous_existing_trades():
+    db = make_db()
+    signal_data = {
+        **signal(),
+        "decision": "QUALIFIED",
+        "quantity": 75,
+        "underlying": {"symbol": "NIFTY", "expiry": "2026-09-24"},
+        "contract": {"security_id": "12345", "strike": 25000, "option_type": "CE"},
+    }
+    record, _ = claim_request(db, 1, "fno-recovery-002", signal_data)
+    for _ in range(2):
+        db.add(PaperTrade(
+            user_id=1, symbol="NIFTY 2026-09-24 25000 CE", side="BUY", status="OPEN",
+            quantity=75, entry_price=120, stop_price=90, target_price=180,
+            strategy_version="V1", asset_type="OPTION", security_id="12345",
+            exchange_segment="NSE_FNO", underlying="NIFTY", expiry="2026-09-24",
+            strike=25000, option_type="CE", lot_size=75,
+        ))
+    db.commit()
+    assert reconcile_pending_request(db, record, signal_data) is None
+    db.refresh(record)
+    assert record.decision == "PENDING"
