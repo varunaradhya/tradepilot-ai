@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -110,7 +110,7 @@ def _ltp_from_response(response: dict[str, Any], security_id: str) -> float | No
         except (TypeError, ValueError): return None
     return None
 
-def _select_valid_expiry(requested: str | None, available: list[str], today: datetime.date | None = None) -> str | None:
+def _select_valid_expiry(requested: str | None, available: list[str], today: date | None = None) -> str | None:
     """Select only an expiry actually returned by Dhan and not in the past."""
     if not available:
         return None
