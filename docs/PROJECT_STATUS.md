@@ -16,7 +16,7 @@ Status: **IN PROGRESS — QUALIFICATION EVIDENCE REQUIRED**
 
 - The latest CI failure was traced to `datetime.date` being used as a type annotation while only `datetime` was imported in `fno.py`; this caused 20 test-collection errors under Python 3.12. The import was corrected.
 - Replay future-invariance coverage was also found to be partially vacuous for normal 75-bar fixtures; the guard now compares the pre-mutation decision boundary and mutates future option-chain quotes as well as future bars.
-- Final CI verification is pending on the latest push.
+- Final CI verification for the code/test batch passed: 636 backend tests, frontend build, Docker Compose validation, and release gate are green on the latest verified run.
 - Completed-candle filtering, invalid OHLC rejection, duplicate timestamp handling and chronological ordering are covered.
 - Dhan authentication/refresh foundation is complete.
 - Autonomous F&O direction/CE/PE/strike/lot selection and cost-aware risk/reward gates are implemented.
