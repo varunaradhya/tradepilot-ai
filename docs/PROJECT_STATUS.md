@@ -14,7 +14,9 @@ Status: **IN PROGRESS — QUALIFICATION EVIDENCE REQUIRED**
 
 ### Verified latest QA cycle
 
-- Full backend pytest suite is green after correcting time-dependent historical-candle tests to use deterministic IST test time.
+- The latest CI failure was traced to `datetime.date` being used as a type annotation while only `datetime` was imported in `fno.py`; this caused 20 test-collection errors under Python 3.12. The import was corrected.
+- Replay future-invariance coverage was also found to be partially vacuous for normal 75-bar fixtures; the guard now compares the pre-mutation decision boundary and mutates future option-chain quotes as well as future bars.
+- Final CI verification is pending on the latest push.
 - Completed-candle filtering, invalid OHLC rejection, duplicate timestamp handling and chronological ordering are covered.
 - Dhan authentication/refresh foundation is complete.
 - Autonomous F&O direction/CE/PE/strike/lot selection and cost-aware risk/reward gates are implemented.
@@ -66,7 +68,7 @@ Status: **IN PROGRESS — QUALIFICATION EVIDENCE REQUIRED**
 
 ### Current QA batch — restart safety, quote integrity, and CI repair
 
-- Current GitHub HEAD is `2045c27659cf304f517fad6e1b2fe5a63a2b2e17`; this batch was based on that live branch state.
+- Current GitHub HEAD for this QA batch is being advanced through the CI-fix and replay-integrity commits; the latest code commit is `734b3971f5105f24823805543cc4f9c5be733ea5`.
 - Repaired a CI-blocking literal escape in `paper_signal_request_service.py` that caused backend `compileall` SyntaxError.
 - F&O completed-request replay now verifies the persisted fingerprint before replay; request-id reuse for a different signal is rejected.
 - Completed request replay is now evaluated before session/risk gates, while new requests remain subject to the session gate.
@@ -85,7 +87,7 @@ Status: **IN PROGRESS — QUALIFICATION EVIDENCE REQUIRED**
 - Dhan retry backoff now bounds provider-supplied `Retry-After` values to 20 seconds and falls back safely for invalid/negative values; regression coverage added for 429/503 retry behavior and exhaustion.
 - Historical Dhan rolling-option normalization now rejects duplicate timestamps within a contract response instead of silently retaining ambiguous observations.
 - Live execution remains hard-locked and no broker credentials/tokens were requested or used.
-- CI is still being verified against the latest push; previous workflow runs were cancelled/replaced while this batch was being committed, so no green claim is made until the final run completes.
+- CI verification is required after the final replay-integrity commit; earlier runs were cancelled/replaced during the batch.
 
 ### Latest batched F&O QA hardening
 
@@ -97,6 +99,12 @@ Status: **IN PROGRESS — QUALIFICATION EVIDENCE REQUIRED**
 - Added an optional minimum top-of-book bid/ask quantity filter when provider depth includes quantity.
 - Added regression coverage for spread rejection/acceptance, stress scenario enumeration, stale pending detection, timezone normalization, and top-of-book quantity filtering.
 - These changes do not create historical bid/ask evidence. Real execution-grade historical options data remains the qualification blocker.
+
+### Latest replay-integrity hardening — 2026-09-22
+
+- Corrected the F&O expiry helper type annotation so the backend test suite can collect under Python 3.12.
+- Strengthened the replay future-invariance guard: the previous comparison window could be empty for normal fixtures; the guard now checks the first decision before the mutation boundary and mutates both future underlying bars and future option-chain quotes.
+- Live execution remains locked; these changes only affect research/replay QA.
 
 ## Critical limitation
 
