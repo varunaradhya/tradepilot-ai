@@ -19,6 +19,17 @@ class DhanClient:
         self.access_token = access_token.strip()
         self.max_retries = max(0, int(max_retries))
 
+    def _retry_delay(self, attempt: int, retry_after: str | None = None) -> float:
+        fallback = min(20.0, 1.5 * (2 ** attempt))
+        if retry_after:
+            try:
+                parsed = float(retry_after)
+                if parsed >= 0:
+                    fallback = min(20.0, parsed)
+            except (TypeError, ValueError):
+                pass
+        return fallback + random.uniform(0, 0.5)
+
     def _request(self, method: str, path: str, json: dict[str, Any] | None = None, *, include_client_id: bool = True) -> Any:
         headers = {"Accept": "application/json", "Content-Type": "application/json", "access-token": self.access_token}
         if include_client_id:
@@ -29,7 +40,7 @@ class DhanClient:
             except httpx.RequestError as exc:
                 if attempt >= self.max_retries:
                     raise DhanAPIError(f"Dhan connection failed after {attempt + 1} attempts: {exc}") from exc
-                delay = min(20.0, 1.5 * (2 ** attempt)) + random.uniform(0, 0.5)
+                delay = self._retry_delay(attempt)
                 print(f"Dhan connection retry {attempt + 1}/{self.max_retries} in {delay:.1f}s: {exc}", flush=True)
                 time.sleep(delay)
                 continue
@@ -39,9 +50,7 @@ class DhanClient:
                     except Exception: p = r.text
                     raise DhanAPIError(f"Dhan API returned {r.status_code} after {attempt + 1} attempts: {p}", r.status_code)
                 retry_after = r.headers.get("Retry-After")
-                try: delay = float(retry_after) if retry_after else min(20.0, 1.5 * (2 ** attempt))
-                except ValueError: delay = min(20.0, 1.5 * (2 ** attempt))
-                delay += random.uniform(0, 0.5)
+                delay = self._retry_delay(attempt, retry_after)
                 print(f"Dhan HTTP {r.status_code} retry {attempt + 1}/{self.max_retries} in {delay:.1f}s", flush=True)
                 time.sleep(delay)
                 continue
