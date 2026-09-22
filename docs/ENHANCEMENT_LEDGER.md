@@ -70,7 +70,8 @@ This is the canonical implementation ledger for TradePilot AI. Before changing t
 | 2026-09-22 | Historical evidence normalization | Reject duplicate timestamps inside one Dhan rolling-option response | Duplicate timestamp regression | DONE (execution-grade evidence still blocked by missing historical bid/ask) | 6173a699 + 568e2b72 |
 | 2026-09-22 | F&O recovery observability | Add read-only `/fno/paper/recovery` state endpoint; automatic retry remains disabled | Endpoint implementation; state remains PAPER_ONLY | DONE | d1ab819f |
 
-| 2026-09-22 | F&O request identity | Request fingerprint now includes quantity, expiry and exchange segment in addition to contract/security/candle inputs | Quantity/expiry fingerprint regression tests | DONE (full CI pending) | f5a602de + 019676a0 |
+| 2026-09-22 | F&O request identity | Request fingerprint now includes quantity, expiry and exchange segment in addition to contract/security/candle inputs | Quantity/expiry fingerprint regression tests | DONE | f5a602de + 019676a0 |
+| 2026-09-22 | Replay QA | Fixed a CI-blocking `datetime.date` annotation error and strengthened future-invariance coverage so mutations after the decision boundary cannot affect earlier replay decisions | GitHub CI collection failure reproduced; replay regression guard strengthened for future bars and option snapshots | PARTIAL — final CI verification pending | a650f737 + 5676638e + 734b3971 |
 ## Current open items
 
 ### P0 — Real historical F&O evidence
