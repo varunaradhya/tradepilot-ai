@@ -174,7 +174,10 @@ def reconcile_pending_request(
                 request_created = request_created.replace(tzinfo=timezone.utc)
             if created.astimezone(timezone.utc) < request_created.astimezone(timezone.utc):
                 continue
-            if trade.symbol.upper() != symbol:
+            # Option trade symbols are contract-specific (e.g. strike/expiry),
+            # while the request symbol is the underlying. Identity is therefore
+            # checked against the persisted underlying field, not the contract label.
+            if str(trade.underlying or "").upper() != underlying:
                 continue
             if abs(float(trade.entry_price) - entry) > 1e-9:
                 continue
