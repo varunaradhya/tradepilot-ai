@@ -70,10 +70,14 @@ def normalize_dhan_rolling_option_response(
 
     timestamps = payload.get("timestamp") or []
     rows: list[HistoricalOptionBar] = []
+    seen_timestamps: set[int] = set()
     for index, raw_timestamp in enumerate(timestamps):
         timestamp = _int(raw_timestamp)
         if timestamp is None:
             continue
+        if timestamp in seen_timestamps:
+            raise ValueError(f"duplicate historical option timestamp: {timestamp}")
+        seen_timestamps.add(timestamp)
         strike = _float(_array_value(payload.get("strike"), index))
         rows.append(
             HistoricalOptionBar(
