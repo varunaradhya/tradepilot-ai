@@ -16,8 +16,7 @@ from app.services.fno_execution import execute_fno_decision
 from app.services.fno_strategy import FNOConfig, build_fno_decision, select_option_contracts
 from app.services.fno_instrument_service import fno_instrument_master
 from app.services.paper_trading_service import close_paper_trade, list_paper_trades, open_paper_trade, paper_trade_costs, update_paper_trade
-from app.services.paper_signal_request_service import claim_request, complete_request, get_request, replay_response, request_fingerprint, is_stale_pending_request
-from app.services.kill_switch_service import kill_switch_status
+from app.services.paper_signal_request_service import claim_request, complete_request, get_request, replay_response, request_fingerprint, is_stale_pending_request, reconcile_pending_request
 from app.services.kill_switch_service import kill_switch_status
 from app.services.market_data_health import evaluate_market_data_freshness
 from app.services.market_session_scheduler import scheduler_status
@@ -316,6 +315,9 @@ def open_option_paper_trade(data: FNOPaperOpenRequest, current_user: User = Depe
         replay=replay_response(existing_request)
         if replay is not None:
             return replay
+        recovered=reconcile_pending_request(db, existing_request, signal)
+        if recovered is not None:
+            return recovered
         recovery_required=is_stale_pending_request(existing_request)
         detail="A stale PENDING paper request requires reconciliation before retry." if recovery_required else "A paper order request with this id is already being processed."
         raise HTTPException(status_code=409,detail=detail)
