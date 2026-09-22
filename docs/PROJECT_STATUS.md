@@ -178,6 +178,7 @@ Never mark a milestone green merely because code was committed. A milestone beco
 - Batched F&O safety/realism hardening: `824d0c0`, `c3557205`, `787b6bb1`, `576afe8f`, `d420c448`, `ed8ad1ae`, `19a649ad`, `a56b0513`, `74c4f841`, `bd9b84ed`, `9c2b0d96`, ledger `3942af27`
 - Current QA repair/hardening batch: `77908ced`, `bbb2d5b5`, `63f88177`, `f86aed01`, `4e7fc427`, `c8e257f3`, `69207bd0`, `37df0f0e`, `ed6decca`, `7ac3e8cb`, `ad91ff17`, `2a8db1e0`, `2045c276`
 - Restart/recovery + broker resilience batch: `c6e41ff2`, `a8750c63`, `b6a2dcf9`, `7ab7b78a`, `5d7bd6cd`, `6173a699`, `568e2b72`, `d1ab819f`
+- Follow-up execution identity hardening: `f5a602de`, `019676a0`
 - Live execution hard lock: `2155244ff7ed0fff7a01824f7f91a53c0d841c16`, test `10f9d19f4993f2a20950972bb9c26bafad98ca3c`
 
 - F&O session/freshness hardening: `914115460df874c286ed538a3358d717c1cc85a6`
