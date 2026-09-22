@@ -71,6 +71,8 @@ This is the canonical implementation ledger for TradePilot AI. Before changing t
 | 2026-09-22 | F&O recovery observability | Add read-only `/fno/paper/recovery` state endpoint; automatic retry remains disabled | Endpoint implementation; state remains PAPER_ONLY | DONE | d1ab819f |
 
 | 2026-09-22 | F&O request identity | Request fingerprint now includes quantity, expiry and exchange segment in addition to contract/security/candle inputs | Quantity/expiry fingerprint regression tests | DONE | f5a602de + 019676a0 |
+| 2026-09-22 | F&O restart reconciliation | Corrected crash-left request matching to compare the persisted option trade's underlying against the request underlying; contract symbol remains contract-specific | Exact SQLite reconciliation regression now passes | DONE (deterministic recovery; process-boundary evidence still outstanding) | 9a71a538 |
+| 2026-09-22 | F&O CI hardening | Corrected stale test expectations/fixtures after fail-closed idempotency and next-bar execution changes; final CI now passes | 636 backend tests + frontend build + Docker Compose validation + release gate | DONE | a96f3bd2 + 380735c8 + c0376f16 + 29fbe4be + 5d1858a4 + cbacf73f |
 | 2026-09-22 | Replay QA | Fixed a CI-blocking `datetime.date` annotation error and strengthened future-invariance coverage so mutations after the decision boundary cannot affect earlier replay decisions | GitHub CI collection failure reproduced; replay regression guard strengthened for future bars and option snapshots | PARTIAL — final CI verification pending | a650f737 + 5676638e + 734b3971 |
 ## Current open items
 
