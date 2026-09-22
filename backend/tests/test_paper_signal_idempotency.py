@@ -51,12 +51,12 @@ def test_reusing_request_id_for_a_different_signal_is_detectable():
     db = make_session()
     first, owner = claim_request(db, 7, "req-1", signal())
     second_signal = signal(entry=101.0)
-    second, second_owner = claim_request(db, 7, "req-1", second_signal)
+    import pytest
+    with pytest.raises(ValueError, match="different signal"):
+        claim_request(db, 7, "req-1", second_signal)
 
     assert owner is True
-    assert second_owner is False
     assert first.request_fingerprint != request_fingerprint(second_signal)
-    assert second.request_fingerprint == first.request_fingerprint
 
 
 def test_completed_request_replays_exact_response_without_reexecution():
