@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from typing import Any, Sequence
 
 from app.services.fno_algo_engine import build_autonomous_option_decision
@@ -92,20 +93,35 @@ def assert_replay_is_future_invariant(
         mutated[index]["high"] = float(mutated[index].get("high", 1.0)) * 1.75
         mutated[index]["low"] = float(mutated[index].get("low", 1.0)) * 1.75
 
+    mutated_chains = copy.deepcopy(option_chain_snapshots)
+    for index in range(MIN_COMPLETED_BARS, len(mutated_chains)):
+        chain = mutated_chains[index].get("oc") if isinstance(mutated_chains[index], dict) else None
+        if isinstance(chain, dict):
+            for quote_group in chain.values():
+                if not isinstance(quote_group, dict):
+                    continue
+                for contract in quote_group.values():
+                    if isinstance(contract, dict):
+                        for key in ("last_price", "top_bid_price", "top_ask_price", "bid", "ask"):
+                            if key in contract:
+                                try:
+                                    contract[key] = float(contract[key]) * 1.75
+                                except (TypeError, ValueError):
+                                    pass
+
     changed = replay_autonomous_option_decisions(
         underlying=underlying,
         bars=mutated,
-        option_chain_snapshots=option_chain_snapshots,
+        option_chain_snapshots=mutated_chains,
         lot_size=lot_size,
         config=config,
     )
 
     baseline_by_index = {item["bar_index"]: item["decision"] for item in baseline}
     changed_by_index = {item["bar_index"]: item["decision"] for item in changed}
-    # Bars from MIN_COMPLETED_BARS onward are mutated. Every decision strictly
-    # before that mutation boundary must remain identical. The previous guard
-    # compared against len(bars) - MIN_COMPLETED_BARS, which could produce an
-    # empty range for normal-sized fixtures and therefore prove nothing.
+    # Bars and option snapshots from MIN_COMPLETED_BARS onward are mutated.
+    # Every decision strictly before that mutation boundary must remain
+    # identical. This guards against future leakage from either input stream.
     mutation_start = MIN_COMPLETED_BARS
     for index in range(MIN_COMPLETED_BARS - 1, min(mutation_start, len(bars))):
         if baseline_by_index[index] != changed_by_index[index]:
