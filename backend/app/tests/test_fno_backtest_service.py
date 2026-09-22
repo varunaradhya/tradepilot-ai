@@ -217,7 +217,7 @@ def test_fno_backtest_accepts_quote_within_spread_stress_limit(monkeypatch):
         bars=bars,
         option_chain_snapshots=chains,
         lot_size=75,
-        config=service.FNOBacktestConfig(max_spread_percent=5.0),
+        config=service.FNOBacktestConfig(risk_per_trade=0.01, max_spread_percent=5.0),
     )
 
     assert result["trades"] == 1
