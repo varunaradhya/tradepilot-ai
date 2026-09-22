@@ -10,13 +10,14 @@ from app.db.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models.user import User
 from app.models.paper_trade import PaperTrade
+from app.models.paper_signal_request import PaperSignalRequest
 from app.services.broker_service import get_access_token, get_user_broker
 from app.services.fno_algo_engine import build_autonomous_option_decision
 from app.services.fno_execution import execute_fno_decision
 from app.services.fno_strategy import FNOConfig, build_fno_decision, select_option_contracts
 from app.services.fno_instrument_service import fno_instrument_master
 from app.services.paper_trading_service import close_paper_trade, list_paper_trades, open_paper_trade, paper_trade_costs, update_paper_trade
-from app.services.paper_signal_request_service import claim_request, complete_request, get_request, replay_response, request_fingerprint, is_stale_pending_request, reconcile_pending_request
+from app.services.paper_signal_request_service import claim_request, complete_request, get_request, replay_response, request_fingerprint, is_stale_pending_request, pending_request_age_seconds, reconcile_pending_request
 from app.services.kill_switch_service import kill_switch_status
 from app.services.market_data_health import evaluate_market_data_freshness
 from app.services.market_session_scheduler import scheduler_status
@@ -351,6 +352,36 @@ def open_option_paper_trade(data: FNOPaperOpenRequest, current_user: User = Depe
     response={"mode":"PAPER_ONLY","accepted":True,"request_id":request_id,"position":{"id":trade.id,"symbol":trade.symbol,"underlying":trade.underlying,"expiry":trade.expiry,"strike":trade.strike,"option_type":trade.option_type,"security_id":trade.security_id,"quantity":trade.quantity,"entry_price":trade.entry_price,"stop_price":trade.stop_price,"target_price":trade.target_price,"pnl":trade.pnl,"status":trade.status}}
     complete_request(db, request_record, response)
     return response
+
+@router.get("/paper/recovery")
+def option_paper_recovery_status(
+    current_user: User = Depends(get_current_user),
+    db=Depends(get_db),
+) -> dict[str, Any]:
+    """Expose durable PENDING requests requiring reconciliation without retrying them."""
+    records = (
+        db.query(PaperSignalRequest)
+        .filter(PaperSignalRequest.user_id == current_user.id, PaperSignalRequest.decision == "PENDING")
+        .order_by(PaperSignalRequest.created_at.asc())
+        .all()
+    )
+    return {
+        "mode": "PAPER_ONLY",
+        "automatic_retry": False,
+        "pending_count": len(records),
+        "recovery_required": [
+            {
+                "request_id": record.request_id,
+                "symbol": record.symbol,
+                "strategy_version": record.strategy_version,
+                "interval": record.interval,
+                "session": record.session,
+                "age_seconds": round(pending_request_age_seconds(record), 3),
+                "stale": is_stale_pending_request(record),
+            }
+            for record in records
+        ],
+    }
 
 @router.get("/paper/positions")
 def option_paper_positions(current_user: User = Depends(get_current_user), db=Depends(get_db)):
