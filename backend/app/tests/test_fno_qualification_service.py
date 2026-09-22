@@ -18,7 +18,7 @@ def test_walk_forward_uses_frozen_oos_results_without_optimizing():
     result = qualify_walk_forward(
         in_sample_trades=_trades([100.0] * 20 + [-50.0] * 10),
         out_of_sample_trades=_trades([80.0] * 10),
-        config=QualificationConfig(min_trades=30, min_oos_trades=10, min_profit_factor=1.2),
+        config=QualificationConfig(min_trades=30, min_oos_trades=10, min_profit_factor=1.2, max_drawdown_percent=30.0),
     )
     assert result["qualified"] is True
     assert result["in_sample"]["trades"] == 30
