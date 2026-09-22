@@ -102,7 +102,11 @@ def assert_replay_is_future_invariant(
 
     baseline_by_index = {item["bar_index"]: item["decision"] for item in baseline}
     changed_by_index = {item["bar_index"]: item["decision"] for item in changed}
-    cutoff = len(bars) - MIN_COMPLETED_BARS
-    for index in range(MIN_COMPLETED_BARS - 1, cutoff):
+    # Bars from MIN_COMPLETED_BARS onward are mutated. Every decision strictly
+    # before that mutation boundary must remain identical. The previous guard
+    # compared against len(bars) - MIN_COMPLETED_BARS, which could produce an
+    # empty range for normal-sized fixtures and therefore prove nothing.
+    mutation_start = MIN_COMPLETED_BARS
+    for index in range(MIN_COMPLETED_BARS - 1, min(mutation_start, len(bars))):
         if baseline_by_index[index] != changed_by_index[index]:
             raise AssertionError(f"Future-bar mutation changed replay decision at bar {index}")
