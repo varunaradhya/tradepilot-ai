@@ -157,6 +157,7 @@ def test_fno_backtest_uses_bid_for_end_of_test_liquidation(monkeypatch):
     result = service.run_fno_backtest(
         underlying={"symbol": "NIFTY"}, bars=bars,
         option_chain_snapshots=chains, lot_size=75,
+        config=service.FNOBacktestConfig(risk_per_trade=0.01),
     )
 
     assert result["trades"] == 1
@@ -174,6 +175,7 @@ def test_fno_backtest_does_not_assume_stop_fill_above_gap_through_bid(monkeypatc
     result = service.run_fno_backtest(
         underlying={"symbol": "NIFTY"}, bars=bars,
         option_chain_snapshots=chains, lot_size=75,
+        config=service.FNOBacktestConfig(risk_per_trade=0.01),
     )
 
     trade = result["trades_detail"][0]
@@ -195,7 +197,7 @@ def test_fno_backtest_spread_stress_rejects_wide_entry_quote(monkeypatch):
         bars=bars,
         option_chain_snapshots=chains,
         lot_size=75,
-        config=service.FNOBacktestConfig(max_spread_percent=5.0),
+        config=service.FNOBacktestConfig(risk_per_trade=0.01, max_spread_percent=5.0),
     )
 
     assert result["trades"] == 0
