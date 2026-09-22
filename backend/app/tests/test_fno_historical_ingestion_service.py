@@ -89,3 +89,13 @@ def test_merge_rejects_duplicate_observation():
         assert False, "expected duplicate rejection"
     except ValueError as exc:
         assert "duplicate historical option observation" in str(exc)
+
+
+def test_normalize_rejects_duplicate_timestamps():
+    response = _response()
+    response["data"]["ce"]["timestamp"] = [1000, 1000]
+    try:
+        normalize_dhan_rolling_option_response(response, strike_hint=25000, option_type="CE")
+        assert False, "expected duplicate timestamp rejection"
+    except ValueError as exc:
+        assert "duplicate historical option timestamp" in str(exc)
