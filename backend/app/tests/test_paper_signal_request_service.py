@@ -168,3 +168,15 @@ def test_pending_request_does_not_reconcile_ambiguous_existing_trades():
     assert reconcile_pending_request(db, record, signal_data) is None
     db.refresh(record)
     assert record.decision == "PENDING"
+
+
+def test_request_fingerprint_changes_when_quantity_changes():
+    base = {**signal(), "quantity": 75}
+    changed = {**base, "quantity": 150}
+    assert request_fingerprint(base) != request_fingerprint(changed)
+
+
+def test_request_fingerprint_changes_when_expiry_changes():
+    base = {**signal(), "underlying": {"symbol": "NIFTY", "expiry": "2026-09-24"}}
+    changed = {**signal(), "underlying": {"symbol": "NIFTY", "expiry": "2026-10-01"}}
+    assert request_fingerprint(base) != request_fingerprint(changed)
