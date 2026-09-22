@@ -151,7 +151,10 @@ def test_fno_backtest_uses_bid_for_end_of_test_liquidation(monkeypatch):
     bars = [{"open": 100, "high": 101, "low": 99, "close": 100, "timestamp": i} for i in range(62)]
     chains = [_chain(price=100) for _ in bars]
     chains[61] = _chain(price=90)
-    decisions = [{"bar_index": 60, "timestamp": 60, "decision": _decision()}]
+    decisions = [
+        {"bar_index": 60, "timestamp": 60, "decision": _decision()},
+        _no_trade(61),
+    ]
     monkeypatch.setattr(service, "replay_autonomous_option_decisions", lambda **kwargs: decisions)
 
     result = service.run_fno_backtest(
@@ -169,7 +172,11 @@ def test_fno_backtest_does_not_assume_stop_fill_above_gap_through_bid(monkeypatc
     chains = [_chain(price=100) for _ in bars]
     chains[61] = _chain(price=100)
     chains[62] = _chain(price=70, low=70, high=90)
-    decisions = [{"bar_index": 60, "timestamp": 60, "decision": _decision()}]
+    decisions = [
+        {"bar_index": 60, "timestamp": 60, "decision": _decision()},
+        _no_trade(61),
+        _no_trade(62),
+    ]
     monkeypatch.setattr(service, "replay_autonomous_option_decisions", lambda **kwargs: decisions)
 
     result = service.run_fno_backtest(
