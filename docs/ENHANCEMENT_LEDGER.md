@@ -145,3 +145,5 @@ A feature can move from PARTIAL/BLOCKED to qualification-ready only when:
 ## Live trading
 
 **LOCKED.** No qualification shortcut or synthetic test can unlock live broker execution.
+
+| 2026-09-24 | Execution-grade historical evidence boundary | Added explicit external bid/ask import/normalization with timestamp, contract, provenance and duplicate/inverted-quote validation; qualification now fails closed without execution-grade evidence | Execution quote import tests + qualification evidence-gate tests | DONE (software boundary); external dataset still required | 239c6fe0 + 05ac7c51 + f18fcf74 + df1f07bf |
