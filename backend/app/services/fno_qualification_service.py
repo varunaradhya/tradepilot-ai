@@ -12,6 +12,7 @@ class QualificationConfig:
     max_drawdown_percent: float = 20.0
     min_expectancy: float = 0.0
     min_oos_trades: int = 10
+    require_execution_grade_evidence: bool = True
 
 
 def _finite(value: Any, default: float = 0.0) -> float:
@@ -52,6 +53,7 @@ def qualify_walk_forward(
     in_sample_trades: Sequence[dict[str, Any]],
     out_of_sample_trades: Sequence[dict[str, Any]],
     config: QualificationConfig = QualificationConfig(),
+    execution_grade_evidence: bool = False,
 ) -> dict[str, Any]:
     """Apply deterministic qualification gates without tuning strategy parameters.
 
@@ -63,6 +65,9 @@ def qualify_walk_forward(
     ins = _metrics(in_sample_trades)
     oos = _metrics(out_of_sample_trades)
     gates = {
+        "execution_grade_evidence": (
+            execution_grade_evidence if config.require_execution_grade_evidence else True
+        ),
         "in_sample_min_trades": ins["trades"] >= config.min_trades,
         "in_sample_profit_factor": ins["profit_factor"] >= config.min_profit_factor,
         "in_sample_expectancy": ins["expectancy"] > config.min_expectancy,
@@ -83,5 +88,9 @@ def qualify_walk_forward(
             "max_drawdown_percent": config.max_drawdown_percent,
             "min_expectancy": config.min_expectancy,
             "min_oos_trades": config.min_oos_trades,
+            "require_execution_grade_evidence": config.require_execution_grade_evidence,
+        },
+        "evidence": {
+            "execution_grade": execution_grade_evidence,
         },
     }
