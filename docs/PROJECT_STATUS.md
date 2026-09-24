@@ -1,6 +1,6 @@
 # TradePilot AI — Persistent Project Status
 
-Last updated: 2026-09-22
+Last updated: 2026-09-24
 
 ## How to use this file
 
@@ -68,7 +68,7 @@ Status: **IN PROGRESS — QUALIFICATION EVIDENCE REQUIRED**
 
 ### Current QA batch — restart safety, quote integrity, and CI repair
 
-- Current GitHub HEAD for this QA batch is being advanced through the CI-fix and replay-integrity commits; the latest code commit is `734b3971f5105f24823805543cc4f9c5be733ea5`.
+- Current GitHub HEAD for this batch is `aaaf90c3e1970982815edc0b4473b0deef469625`; the latest workflow is still pending verification.
 - Repaired a CI-blocking literal escape in `paper_signal_request_service.py` that caused backend `compileall` SyntaxError.
 - F&O completed-request replay now verifies the persisted fingerprint before replay; request-id reuse for a different signal is rejected.
 - Completed request replay is now evaluated before session/risk gates, while new requests remain subject to the session gate.
@@ -87,7 +87,7 @@ Status: **IN PROGRESS — QUALIFICATION EVIDENCE REQUIRED**
 - Dhan retry backoff now bounds provider-supplied `Retry-After` values to 20 seconds and falls back safely for invalid/negative values; regression coverage added for 429/503 retry behavior and exhaustion.
 - Historical Dhan rolling-option normalization now rejects duplicate timestamps within a contract response instead of silently retaining ambiguous observations.
 - Live execution remains hard-locked and no broker credentials/tokens were requested or used.
-- CI verification is required after the final replay-integrity commit; earlier runs were cancelled/replaced during the batch.
+- The prior code/test checkpoint is CI-green; the latest evidence-boundary/docs commit has a new CI run pending completion.
 
 ### Latest batched F&O QA hardening
 
