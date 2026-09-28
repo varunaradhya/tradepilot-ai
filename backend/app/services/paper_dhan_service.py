@@ -13,7 +13,7 @@ from app.services.dhan_historical_service import HistoricalRequest, fetch_intrad
 from app.services.instrument_master_service import InstrumentMaster, instrument_master
 from app.services.paper_market_service import PaperMarketCoordinator
 from app.services.paper_ml_service import record_trade_outcome
-from app.services.paper_validation_service import validation_run_key, capture_day_from_ledger, record_validation_day
+from app.services.paper_validation_service import validation_run_key, capture_day_from_ledger, record_validation_day, complete_validation_day
 
 
 def run_dhan_paper_session(
@@ -154,7 +154,7 @@ def run_dhan_paper_session(
         persisted += 1
 
     db.commit()
-    validation = capture_day_from_ledger(db, user_id, run_key, trading_day, diagnostics)
+    validation = complete_validation_day(db, user_id, run_key, trading_day, diagnostics)
 
     return {
         "mode": "SIMULATION_ONLY",
