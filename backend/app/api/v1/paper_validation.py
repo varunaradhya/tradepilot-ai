@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models.user import User
-from app.services.paper_validation_service import validation_run_key,build_validation_report,capture_day_from_ledger,complete_validation_day
+from app.services.paper_validation_service import validation_run_key,build_validation_report,capture_day_from_ledger,complete_validation_day,validation_progress
 
 router=APIRouter(prefix="/paper-validation",tags=["Paper Validation"])
 
@@ -43,3 +43,10 @@ def complete_day(payload:ValidationCaptureRequest,current_user:User=Depends(get_
     row=complete_validation_day(db,current_user.id,key,payload.session_date,{"valid":True,"bars":payload.bars})
     report=build_validation_report(db,current_user.id,key)
     return {"mode":"SIMULATION_ONLY","status":row.status,"validation_run":key,"report_status":report["status"],"fingerprint":report["days"][-1]["fingerprint"]}
+
+
+@router.get("/progress")
+def validation_progress_report(start:date,current_user:User=Depends(get_current_user),db:Session=Depends(get_db))->dict[str,Any]:
+    try:key=validation_run_key(start)
+    except ValueError as exc: raise HTTPException(422,str(exc)) from exc
+    return {"mode":"SIMULATION_ONLY","validation_run":key,**validation_progress(db,current_user.id,key,start)}
