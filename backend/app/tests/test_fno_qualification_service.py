@@ -60,6 +60,7 @@ def test_walk_forward_uses_verified_frozen_evidence():
     assert result["qualified"] is True
     assert result["gates"]["execution_grade_evidence"] is True
     assert result["in_sample"]["trades"] == 30
+    assert result["evidence"]["package_sha256"] == _evidence().package_sha256
 
 
 def test_walk_forward_rejects_tampered_execution_package():
