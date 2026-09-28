@@ -53,7 +53,7 @@ def qualify_walk_forward(
     in_sample_trades: Sequence[dict[str, Any]],
     out_of_sample_trades: Sequence[dict[str, Any]],
     config: QualificationConfig = QualificationConfig(),
-    execution_grade_evidence: bool = False,
+    execution_evidence_package: Any | None = None,
 ) -> dict[str, Any]:
     """Apply deterministic qualification gates without tuning strategy parameters.
 
@@ -64,6 +64,10 @@ def qualify_walk_forward(
     """
     ins = _metrics(in_sample_trades)
     oos = _metrics(out_of_sample_trades)
+    execution_grade_evidence = False
+    if execution_evidence_package is not None:
+        from app.services.fno_execution_evidence_freeze_service import verify_frozen_execution_evidence
+        execution_grade_evidence = bool(verify_frozen_execution_evidence(execution_evidence_package))
     gates = {
         "execution_grade_evidence": (
             execution_grade_evidence if config.require_execution_grade_evidence else True
