@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.models.paper_trade import PaperTrade
 from app.models.paper_validation_day import PaperValidationDay
 from app.models.paper_validation_symbol import PaperValidationSymbol
+from app.services.nse_equity_calendar import DEFAULT_NSE_EQUITY_CALENDAR, NSEEquityCalendar
 
 VALIDATION_DAYS = 30
 VALID_STATUSES = {"VALID", "DATA_QUALITY_FAILED", "OPERATIONAL_FAILURE", "NO_DATA"}
@@ -135,23 +136,30 @@ def capture_day_from_ledger(db: Session, user_id: int, run_key: str, session_dat
     closed = [t for t in day_trades if str(t.status).upper() == "CLOSED"]
     return record_validation_day(db, user_id, run_key, session_date, status, len(closed), sum(float(t.pnl or 0) for t in closed), data_quality)
 
-def expected_trading_days(start: date, end: date, holidays=frozenset()) -> list[date]:
+def expected_trading_days(start: date, end: date, holidays=frozenset(), calendar: NSEEquityCalendar = DEFAULT_NSE_EQUITY_CALENDAR) -> list[date]:
     if end < start:
         raise ValueError("end must not be before start")
-    days, current = [], start
-    while current <= end:
-        if current.weekday() < 5 and current not in holidays:
-            days.append(current)
-        current += timedelta(days=1)
-    return days
+    if holidays:
+        allowed = set(calendar.holidays) | set(holidays)
+        custom = NSEEquityCalendar(
+            market=calendar.market,
+            calendar_year=calendar.calendar_year,
+            source=calendar.source,
+            source_version=calendar.source_version,
+            holidays=frozenset(allowed),
+        )
+    else:
+        custom = calendar
+    sessions = custom.expected_sessions(start, VALIDATION_DAYS)
+    return [day for day in sessions if day <= end]
 
-def validation_progress(db: Session, user_id: int, run_key: str, start: date, holidays=frozenset()) -> dict:
-    expected = expected_trading_days(start, start + timedelta(days=44), holidays)[:VALIDATION_DAYS]
+def validation_progress(db: Session, user_id: int, run_key: str, start: date, holidays=frozenset(), calendar: NSEEquityCalendar = DEFAULT_NSE_EQUITY_CALENDAR) -> dict:
+    expected = expected_trading_days(start, start + timedelta(days=44), holidays, calendar)[:VALIDATION_DAYS]
     rows = db.query(PaperValidationDay).filter(PaperValidationDay.user_id == user_id, PaperValidationDay.validation_run == run_key).all()
     by_date = {row.session_date: row for row in rows}
     complete_dates = [d for d in expected if by_date.get(d) and by_date[d].status == "COMPLETE"]
     failed_dates = [d for d in expected if by_date.get(d) and by_date[d].status in {"DATA_QUALITY_FAILED", "OPERATIONAL_FAILURE", "NO_DATA"}]
-    return {"required_sessions": VALIDATION_DAYS, "expected_sessions": len(expected), "completed_sessions": len(complete_dates), "failed_sessions": len(failed_dates), "remaining_sessions": max(VALIDATION_DAYS-len(complete_dates), 0), "complete": len(complete_dates) >= VALIDATION_DAYS, "evidence_is_descriptive": True, "expected_dates": [d.isoformat() for d in expected], "missing_dates": [d.isoformat() for d in expected if d not in by_date], "failed_dates": [d.isoformat() for d in failed_dates]}
+    return {"required_sessions": VALIDATION_DAYS, "expected_sessions": len(expected), "completed_sessions": len(complete_dates), "failed_sessions": len(failed_dates), "remaining_sessions": max(VALIDATION_DAYS-len(complete_dates), 0), "complete": len(complete_dates) >= VALIDATION_DAYS, "evidence_is_descriptive": True, "calendar": {"market": calendar.market, "source": calendar.source, "source_version": calendar.source_version}, "expected_dates": [d.isoformat() for d in expected], "missing_dates": [d.isoformat() for d in expected if d not in by_date], "failed_dates": [d.isoformat() for d in failed_dates]}
 
 def build_validation_report(db: Session, user_id: int, run_key: str) -> dict:
     rows = db.query(PaperValidationDay).filter(PaperValidationDay.user_id == user_id, PaperValidationDay.validation_run == run_key).order_by(PaperValidationDay.session_date.asc()).all()
