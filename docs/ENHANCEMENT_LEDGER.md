@@ -76,6 +76,8 @@ This is the canonical implementation ledger for TradePilot AI. Before changing t
 | 2026-09-22 | Replay QA | Fixed a CI-blocking `datetime.date` annotation error and strengthened future-invariance coverage so mutations after the decision boundary cannot affect earlier replay decisions | GitHub CI collection failure reproduced; replay regression guard strengthened for future bars and option snapshots | PARTIAL — final CI verification pending | a650f737 + 5676638e + 734b3971 |
 | 2026-09-28 | Historical evidence provenance | Added execution-evidence manifest and bound dataset timestamps to declared coverage; source/license/timezone/sampling/universe/checksum are mandatory | Manifest validation + coverage/alignment regression tests | PARTIAL — provenance boundary ready; real external evidence still BLOCKED | 6ccd6c9f + 07af022a + 2d0a4ed0 + 378da1f8 + ae222991 + 9a4db72c |
 
+| 2026-09-28 | Historical execution import | Preserved expiry/security/exchange contract identity and added explicit timestamp coverage reporting without repair | Contract-identity and missing-timestamp regression tests | PARTIAL — import contract hardened; real executable evidence still BLOCKED | d09b157d + d11a963f + b7dd80b2 + 12019fc |
+
 ## Current open items
 
 ### P0 — Real historical F&O evidence
