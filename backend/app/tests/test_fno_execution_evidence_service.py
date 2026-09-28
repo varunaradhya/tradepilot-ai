@@ -14,7 +14,9 @@ def _row(**overrides):
         "spot": 25010,
         "expiry": "2026-10-01",
         "security_id": "12345",
+            "exchange_segment": "NSE_FNO",
         "source": "vendor_x",
+        "exchange_segment": "NSE_FNO",
     }
     row.update(overrides)
     return row
@@ -25,6 +27,20 @@ def test_execution_quotes_require_real_bid_ask():
     assert rows[0].bid == 99.5
     assert rows[0].ask == 100.0
     assert rows[0].source == "vendor_x"
+
+
+def test_execution_quotes_preserve_contract_identity():
+    rows = normalize_execution_quotes([_row()])
+    assert rows[0].expiry == "2026-10-01"
+    assert rows[0].security_id == "12345"
+    assert rows[0].exchange_segment == "NSE_FNO"
+
+
+def test_execution_quotes_reject_explicit_blank_contract_identity():
+    import pytest
+
+    with pytest.raises(ValueError, match="security_id cannot be empty"):
+        normalize_execution_quotes([_row(security_id="")])
 
 
 def test_execution_quotes_never_fallback_to_close():
