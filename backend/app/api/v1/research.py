@@ -22,6 +22,8 @@ from app.services.intraday_evidence_aggregation import aggregate_scorecards
 from app.services.intraday_backtest import IntradayBacktestConfig
 from app.services.intraday_walk_forward import run_fixed_parameter_walk_forward
 from app.services.research_data_quality import analyze_intraday_quality
+from app.services.research_experiment_service import list_experiments, record_experiment
+from app.services.corporate_action_service import CorporateActionFactor, cumulative_adjustment_factor, adjust_ohlcv
 
 router = APIRouter(prefix="/research", tags=["Research"])
 
@@ -172,6 +174,48 @@ def intraday_regime_report(symbol: str=Query(min_length=1,max_length=30), benchm
         _, sector_rows = _dataset_rows(sector, interval)
         if not sector_rows: raise HTTPException(status_code=404,detail=f"Sector dataset not found: {sector.strip().upper()}")
     return {"symbol":symbol.strip().upper(),"benchmark":benchmark.strip().upper(),"sector":sector.strip().upper() if sector else None,"interval":interval,**build_intraday_regime_report(rows, benchmark_rows, sector_rows)}
+
+@router.get("/experiments")
+def research_experiments(limit: int=Query(default=50,ge=1,le=200), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)):
+    return list_experiments(db,current_user.id,limit)
+
+
+@router.post("/experiments")
+def save_research_experiment(
+    dataset_id: str=Query(min_length=1,max_length=200),
+    strategy_version: str=Query(min_length=1,max_length=40),
+    parameters: dict | None=None,
+    result: dict | None=None,
+    current_user: User=Depends(get_current_user),
+    db: Session=Depends(get_db),
+):
+    row=record_experiment(db,current_user.id,dataset_id,strategy_version,parameters or {},result or {})
+    return {"id":row.id,"experiment_key":row.experiment_key,"dataset_id":row.dataset_id,"strategy_version":row.strategy_version,"created_at":row.created_at}
+
+
+@router.post("/corporate-actions/adjust")
+def adjust_research_bar(
+    symbol: str=Query(min_length=1,max_length=30),
+    action_date: date=Query(...),
+    action_type: str=Query(...),
+    factor: float=Query(...,gt=0),
+    source: str=Query(min_length=1,max_length=80),
+    open_price: float=Query(...,gt=0),
+    high: float=Query(...,gt=0),
+    low: float=Query(...,gt=0),
+    close: float=Query(...,gt=0),
+    volume: float|None=Query(default=None,ge=0),
+    current_user: User=Depends(get_current_user),
+):
+    del current_user
+    action=CorporateActionFactor(symbol.strip().upper(),action_date,action_type.strip().upper(),factor,source.strip())
+    try:
+        factors=cumulative_adjustment_factor([action])
+        row=adjust_ohlcv({"open":open_price,"high":high,"low":low,"close":close,"volume":volume},factors[action.symbol])
+    except ValueError as exc:
+        raise HTTPException(status_code=422,detail=str(exc)) from exc
+    return {"symbol":action.symbol,"action_type":action.action_type,"factor":factor,"adjusted_bar":row}
+
 
 @router.get("/analyze")
 def analyze_research_dataset(symbol: str=Query(min_length=1,max_length=30), current_user: User=Depends(get_current_user)):
