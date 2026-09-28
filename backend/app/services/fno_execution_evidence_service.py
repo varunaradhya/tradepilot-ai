@@ -109,6 +109,25 @@ def normalize_execution_quotes(
     return sorted(normalized, key=lambda item: (item.timestamp, item.strike, item.option_type))
 
 
+def validate_execution_quote_coverage(
+    quotes: Iterable[ExecutionQuote],
+    *,
+    expected_timestamps: set[int],
+) -> dict[str, Any]:
+    """Report timestamp coverage without silently filling missing observations."""
+    actual = {quote.timestamp for quote in quotes}
+    expected = set(expected_timestamps)
+    missing = sorted(expected - actual)
+    unexpected = sorted(actual - expected)
+    return {
+        "valid": not missing and not unexpected,
+        "expected_timestamps": len(expected),
+        "actual_timestamps": len(actual),
+        "missing_timestamps": missing,
+        "unexpected_timestamps": unexpected,
+    }
+
+
 def build_execution_grade_snapshots(
     quotes: Iterable[ExecutionQuote],
 ) -> list[dict[str, Any]]:
