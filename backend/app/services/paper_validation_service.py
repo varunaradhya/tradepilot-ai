@@ -27,8 +27,10 @@ def record_validation_day(db:Session,user_id:int,run_key:str,session_date:date,s
     row.status=status[:30]; row.trades=max(0,int(trades)); row.net_pnl=float(net_pnl); row.data_quality_json=json.dumps(data_quality,sort_keys=True)
     db.commit(); db.refresh(row); return row
 
-def complete_validation_day(db:Session,user_id:int,run_key:str,session_date:date,trades:int,net_pnl:float,data_quality:dict)->PaperValidationDay:
-    row=record_validation_day(db,user_id,run_key,session_date,"VALID",trades,net_pnl,data_quality)
+def complete_validation_day(db:Session,user_id:int,run_key:str,session_date:date,data_quality:dict)->PaperValidationDay:
+    row=capture_day_from_ledger(db,user_id,run_key,session_date,data_quality)
+    if row.status!="VALID":
+        raise ValueError("validation day is not valid")
     row.status="COMPLETE"; db.commit(); db.refresh(row); return row
 
 def capture_day_from_ledger(db:Session,user_id:int,run_key:str,session_date:date,data_quality:dict)->PaperValidationDay:
