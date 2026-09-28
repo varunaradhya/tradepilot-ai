@@ -133,6 +133,14 @@ def validate_execution_dataset(
 
 def manifest_from_mapping(values: dict[str, Any]) -> ExecutionEvidenceManifest:
     """Create a manifest from an external metadata mapping without guessing."""
+    raw_execution_grade = values.get("execution_grade", True)
+    if isinstance(raw_execution_grade, bool):
+        execution_grade = raw_execution_grade
+    elif isinstance(raw_execution_grade, str) and raw_execution_grade.strip().lower() in {"true", "false"}:
+        execution_grade = raw_execution_grade.strip().lower() == "true"
+    else:
+        execution_grade = False
+
     return ExecutionEvidenceManifest(
         source=_text(values.get("source")),
         license=_text(values.get("license")),
@@ -142,6 +150,6 @@ def manifest_from_mapping(values: dict[str, Any]) -> ExecutionEvidenceManifest:
         sampling_seconds=int(values.get("sampling_seconds", 0)),
         contract_universe=_text(values.get("contract_universe")),
         checksum_sha256=_text(values.get("checksum_sha256")),
-        execution_grade=bool(values.get("execution_grade", True)),
+        execution_grade=execution_grade,
         created_at=int(values["created_at"]) if values.get("created_at") is not None else None,
     )
