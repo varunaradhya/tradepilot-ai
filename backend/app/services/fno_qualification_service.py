@@ -65,9 +65,12 @@ def qualify_walk_forward(
     ins = _metrics(in_sample_trades)
     oos = _metrics(out_of_sample_trades)
     execution_grade_evidence = False
+    package_sha256 = None
     if execution_evidence_package is not None:
         from app.services.fno_execution_evidence_freeze_service import verify_frozen_execution_evidence
         execution_grade_evidence = bool(verify_frozen_execution_evidence(execution_evidence_package))
+        if execution_grade_evidence:
+            package_sha256 = execution_evidence_package.package_sha256
     gates = {
         "execution_grade_evidence": (
             execution_grade_evidence if config.require_execution_grade_evidence else True
@@ -96,5 +99,6 @@ def qualify_walk_forward(
         },
         "evidence": {
             "execution_grade": execution_grade_evidence,
+            "package_sha256": package_sha256,
         },
     }
