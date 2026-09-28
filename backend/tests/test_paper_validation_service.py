@@ -16,3 +16,9 @@ def test_market_scheduler_rejects_weekend():
 def test_market_scheduler_honours_configured_holiday():
     holiday=date(2026,9,25)
     assert is_trading_day(holiday,frozenset({holiday})) is False
+
+from app.services.paper_validation_service import expected_trading_days
+
+def test_expected_sessions_skip_weekends():
+    days=expected_trading_days(date(2026,9,25),date(2026,9,29))
+    assert days==[date(2026,9,25),date(2026,9,28),date(2026,9,29)]
