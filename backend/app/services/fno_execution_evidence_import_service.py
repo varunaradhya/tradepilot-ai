@@ -10,9 +10,12 @@ provenance manifest. It never fills missing quotes or derives bid/ask from LTP.
 import csv
 import hashlib
 import io
-from typing import Any, Iterable
+from typing import Any
 
-from app.services.fno_evidence_manifest_service import (\n    ExecutionEvidenceManifest,\n    validate_execution_evidence_manifest,\n)
+from app.services.fno_evidence_manifest_service import (
+    ExecutionEvidenceManifest,
+    validate_execution_evidence_manifest,
+)
 from app.services.fno_execution_evidence_service import (
     ExecutionQuote,
     normalize_execution_quotes,
@@ -122,4 +125,8 @@ def import_execution_evidence_csv(
         execution_grade=True,
         created_at=created_at,
     )
+    try:
+        validate_execution_evidence_manifest(manifest)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("invalid execution evidence manifest") from exc
     return manifest, quotes
