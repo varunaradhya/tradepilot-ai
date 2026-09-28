@@ -6,9 +6,12 @@ from app.services.paper_validation_service import (
     DEFAULT_VALIDATION_SYMBOLS, normalize_validation_symbols, validation_run_key,
     finalize_multi_symbol_validation_day,
 )
+from app.services.nse_equity_calendar import DEFAULT_NSE_EQUITY_CALENDAR
 
 def run_daily_dhan_validation(db, user_id: int, symbols: Iterable[str] | None, session: date, interval: str = "5") -> dict:
     universe = normalize_validation_symbols(symbols or DEFAULT_VALIDATION_SYMBOLS)
+    if not DEFAULT_NSE_EQUITY_CALENDAR.is_trading_day(session):
+        raise ValueError(f"{session.isoformat()} is not an NSE equity regular trading session")
     results = []
     completed = failed = 0
     for symbol in universe:
@@ -30,4 +33,5 @@ def run_daily_dhan_validation(db, user_id: int, symbols: Iterable[str] | None, s
         "validation_run": run_key, "universe": universe, "symbols_requested": len(universe),
         "completed_symbols": completed, "failed_symbols": failed, "day_status": day.status,
         "results": results, "broker_orders_enabled": False,
+        "calendar": {"market": DEFAULT_NSE_EQUITY_CALENDAR.market, "source": DEFAULT_NSE_EQUITY_CALENDAR.source, "source_version": DEFAULT_NSE_EQUITY_CALENDAR.source_version},
     }
