@@ -31,6 +31,7 @@ def main() -> None:
     parser.add_argument("--root", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--symbols", nargs="*", help="Optional symbol list; default is every clean symbol file.")
+    parser.add_argument("--strategy-version", choices=["V1", "V2A"], default="V1")
     args = parser.parse_args()
 
     symbols = [s.strip().upper() for s in args.symbols] if args.symbols else discover_symbols(args.root)
@@ -39,7 +40,7 @@ def main() -> None:
 
     results: dict[str, Any] = {}
     for symbol in symbols:
-        results[symbol] = run_symbol_research(args.root, symbol)
+        results[symbol] = run_symbol_research(args.root, symbol, strategy_version=args.strategy_version)
 
     rows = []
     for symbol, result in results.items():
@@ -61,6 +62,7 @@ def main() -> None:
     output = {
         "status": "OK",
         "mode": "SIMULATION_ONLY",
+        "strategy_version": args.strategy_version,
         "symbols": [row["symbol"] for row in rows],
         "symbol_count": len(rows),
         "results": rows,
@@ -72,6 +74,7 @@ def main() -> None:
         "independent_net_pnl_sum": independent_net_pnl_sum,
         "warnings": [
             "Historical simulation evidence only; no live execution.",
+            f"Strategy version under test: {args.strategy_version}.",
             "The source universe is survivorship-biased until historical membership is available.",
             "Corporate-action adjustment status must be established before long-horizon conclusions.",
             "No parameter optimization is performed by this batch runner.",
