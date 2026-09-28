@@ -72,3 +72,17 @@ def test_import_never_fabricates_bid_ask_from_close():
     ).encode()
     with pytest.raises(ValueError, match="positive bid and ask"):
         parse_execution_quote_csv(raw)
+
+
+def test_import_rejects_invalid_provenance_metadata():
+    with pytest.raises(ValueError, match="invalid execution evidence manifest"):
+        import_execution_evidence_csv(
+            CSV,
+            source="",
+            license_name="commercial-research",
+            coverage_start=100,
+            coverage_end=160,
+            timezone="Asia/Kolkata",
+            sampling_seconds=60,
+            contract_universe="NIFTY weekly options",
+        )
