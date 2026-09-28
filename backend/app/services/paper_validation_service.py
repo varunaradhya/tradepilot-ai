@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.models.paper_trade import PaperTrade
 from app.models.paper_validation_day import PaperValidationDay
 from app.models.paper_validation_symbol import PaperValidationSymbol
+from app.models.paper_validation_manifest import PaperValidationManifest
 from app.services.nse_equity_calendar import DEFAULT_NSE_EQUITY_CALENDAR, NSEEquityCalendar
 
 VALIDATION_DAYS = 30
@@ -160,6 +161,83 @@ def validation_progress(db: Session, user_id: int, run_key: str, start: date, ho
     complete_dates = [d for d in expected if by_date.get(d) and by_date[d].status == "COMPLETE"]
     failed_dates = [d for d in expected if by_date.get(d) and by_date[d].status in {"DATA_QUALITY_FAILED", "OPERATIONAL_FAILURE", "NO_DATA"}]
     return {"required_sessions": VALIDATION_DAYS, "expected_sessions": len(expected), "completed_sessions": len(complete_dates), "failed_sessions": len(failed_dates), "remaining_sessions": max(VALIDATION_DAYS-len(complete_dates), 0), "complete": len(complete_dates) >= VALIDATION_DAYS, "evidence_is_descriptive": True, "calendar": {"market": calendar.market, "source": calendar.source, "source_version": calendar.source_version}, "expected_dates": [d.isoformat() for d in expected], "missing_dates": [d.isoformat() for d in expected if d not in by_date], "failed_dates": [d.isoformat() for d in failed_dates]}
+
+def _canonical_hash(payload: dict) -> str:
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode()).hexdigest()
+
+def build_validation_manifest(db: Session, user_id: int, run_key: str) -> dict:
+    rows = db.query(PaperValidationDay).filter(
+        PaperValidationDay.user_id == user_id,
+        PaperValidationDay.validation_run == run_key,
+    ).order_by(PaperValidationDay.session_date.asc()).all()
+    symbols = db.query(PaperValidationSymbol).filter(
+        PaperValidationSymbol.user_id == user_id,
+        PaperValidationSymbol.validation_run == run_key,
+    ).order_by(PaperValidationSymbol.session_date.asc(), PaperValidationSymbol.symbol.asc()).all()
+    previous = ""
+    chain = []
+    for day in rows:
+        symbol_hashes = [_symbol_fingerprint(r) for r in symbols if r.session_date == day.session_date]
+        day_payload = {
+            "validation_run": run_key,
+            "session_date": day.session_date.isoformat(),
+            "day_fingerprint": _fingerprint(day),
+            "symbol_fingerprints": symbol_hashes,
+            "previous_hash": previous,
+        }
+        current = _canonical_hash(day_payload)
+        chain.append({**day_payload, "chain_hash": current})
+        previous = current
+    report = build_validation_report(db, user_id, run_key)
+    manifest = {
+        "validation_run": run_key,
+        "schema_version": "P10.7",
+        "calendar": report["progress"]["calendar"],
+        "symbols": report["symbols"],
+        "required_sessions": VALIDATION_DAYS,
+        "completed_sessions": report["progress"]["completed_sessions"],
+        "days": chain,
+        "evidence_is_descriptive": True,
+        "live_execution_enabled": False,
+    }
+    root_hash = _canonical_hash(manifest)
+    manifest["root_hash"] = root_hash
+    return manifest
+
+def persist_validation_manifest(db: Session, user_id: int, run_key: str) -> PaperValidationManifest:
+    manifest = build_validation_manifest(db, user_id, run_key)
+    row = db.query(PaperValidationManifest).filter(
+        PaperValidationManifest.user_id == user_id,
+        PaperValidationManifest.validation_run == run_key,
+    ).first()
+    if row is None:
+        row = PaperValidationManifest(user_id=user_id, validation_run=run_key)
+        db.add(row)
+    row.status = "COMPLETE" if manifest["completed_sessions"] >= VALIDATION_DAYS else "PENDING"
+    row.manifest_json = json.dumps(manifest, sort_keys=True, separators=(",", ":"))
+    row.root_hash = manifest["root_hash"]
+    db.commit()
+    db.refresh(row)
+    return row
+
+def verify_validation_manifest(db: Session, user_id: int, run_key: str) -> dict:
+    row = db.query(PaperValidationManifest).filter(
+        PaperValidationManifest.user_id == user_id,
+        PaperValidationManifest.validation_run == run_key,
+    ).first()
+    if row is None:
+        return {"exists": False, "valid": False, "validation_run": run_key}
+    current = build_validation_manifest(db, user_id, run_key)
+    return {
+        "exists": True,
+        "valid": current["root_hash"] == row.root_hash,
+        "validation_run": run_key,
+        "stored_root_hash": row.root_hash,
+        "current_root_hash": current["root_hash"],
+        "status": row.status,
+        "evidence_is_descriptive": True,
+        "live_execution_enabled": False,
+    }
 
 def build_validation_report(db: Session, user_id: int, run_key: str) -> dict:
     rows = db.query(PaperValidationDay).filter(PaperValidationDay.user_id == user_id, PaperValidationDay.validation_run == run_key).order_by(PaperValidationDay.session_date.asc()).all()
