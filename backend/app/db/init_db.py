@@ -17,6 +17,8 @@ from app.models.paper_ml_prediction import PaperMlPrediction
 from app.models.paper_market_state import PaperMarketState
 from app.models.operational_kill_switch import OperationalKillSwitch
 from app.models.operational_audit_event import OperationalAuditEvent
+from app.models.research_experiment import ResearchExperiment
+from app.models.corporate_action import CorporateAction
 
 from app.db.database import Base, engine
 from app.core.config import TRADEPILOT_AUTO_CREATE_SCHEMA
