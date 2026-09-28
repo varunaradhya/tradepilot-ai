@@ -1,6 +1,7 @@
 from app.services.fno_execution_evidence_service import (
     build_execution_grade_snapshots,
     normalize_execution_quotes,
+    validate_execution_quote_coverage,
 )
 
 
@@ -69,6 +70,16 @@ def test_execution_quotes_reject_duplicates():
 
     with pytest.raises(ValueError, match="duplicate"):
         normalize_execution_quotes([_row(), _row()])
+
+
+def test_execution_quote_coverage_reports_missing_without_repair():
+    rows = normalize_execution_quotes([
+        _row(timestamp=100),
+    ])
+    result = validate_execution_quote_coverage(rows, expected_timestamps={100, 160})
+    assert result["valid"] is False
+    assert result["missing_timestamps"] == [160]
+    assert result["unexpected_timestamps"] == []
 
 
 def test_execution_grade_snapshots_preserve_executable_quotes():
