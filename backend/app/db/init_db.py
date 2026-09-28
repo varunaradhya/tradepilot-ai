@@ -21,6 +21,7 @@ from app.models.research_experiment import ResearchExperiment
 from app.models.corporate_action import CorporateAction
 from app.models.paper_validation_day import PaperValidationDay
 from app.models.paper_validation_symbol import PaperValidationSymbol
+from app.models.paper_validation_manifest import PaperValidationManifest
 
 from app.db.database import Base, engine
 from app.core.config import TRADEPILOT_AUTO_CREATE_SCHEMA
