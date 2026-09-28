@@ -6,22 +6,22 @@ from app.services.intraday_strategy_v2 import (
 )
 
 
-def _series(final_close: float = 111.0, final_high: float = 112.0):
+def _series(final_close: float = 101.6, final_high: float = 101.9):
     opens = [99.8, 100.0, 100.2]
     highs = [100.5, 100.7, 101.0]
     lows = [99.5, 99.7, 99.9]
     closes = [100.2, 100.5, 100.8]
     volumes = [1000.0, 1000.0, 1000.0]
     for i in range(22):
-        base = 101.0 + i * 0.35
+        base = 100.7 + i * 0.01
         opens.append(base)
-        highs.append(base + 0.8)
-        lows.append(base - 0.2)
-        closes.append(base + 0.6)
+        highs.append(base + 0.45)
+        lows.append(base - 0.45)
+        closes.append(base + 0.25)
         volumes.append(1100.0)
-    opens.append(109.0)
+    opens.append(101.25)
     highs.append(final_high)
-    lows.append(108.5)
+    lows.append(100.9)
     closes.append(final_close)
     volumes.append(2200.0)
     return opens, highs, lows, closes, volumes
@@ -50,7 +50,7 @@ def test_v2a_accepts_strong_breakout_without_market_data():
 
 
 def test_v2a_rejects_extended_breakout():
-    opens, highs, lows, closes, volumes = _series(final_close=118.0, final_high=119.0)
+    opens, highs, lows, closes, volumes = _series(final_close=106.0, final_high=106.5)
     signal = generate_intraday_v2a_signal(
         opens,
         highs,
