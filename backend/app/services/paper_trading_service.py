@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
 import math
 
-from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.models.paper_trade import PaperTrade
@@ -84,6 +83,37 @@ def close_paper_trade(db: Session, trade: PaperTrade, exit_price: float, reason:
     db.refresh(trade)
     return trade
 
+
+def paper_trade_costs(trade: PaperTrade, exit_price: float | None = None) -> dict[str, float]:
+    """Return estimated round-trip costs without changing persisted trade state."""
+    if trade.asset_type != "OPTION":
+        return {"total": 0.0}
+    price = exit_price if exit_price is not None else trade.entry_price
+    return estimate_fno_option_costs(trade.entry_price, price, trade.quantity, FNOCostConfig())
+
+
+def list_paper_trades(db: Session, user_id: int, status: str | None = None) -> list[PaperTrade]:
+    query = db.query(PaperTrade).filter(PaperTrade.user_id == user_id)
+    if status:
+        query = query.filter(PaperTrade.status == status.upper())
+    return query.order_by(PaperTrade.created_at.desc()).all()
+
+
+def paper_summary(trades: list[PaperTrade]) -> dict:
+    closed = [trade for trade in trades if trade.status == "CLOSED"]
+    pnl = sum(float(trade.pnl) for trade in trades)
+    realized = sum(float(trade.pnl) for trade in closed)
+    wins = sum(1 for trade in closed if trade.pnl > 0)
+    return {"trades": len(trades), "open_trades": len(trades) - len(closed), "closed_trades": len(closed), "pnl": round(pnl, 2), "realized_pnl": round(realized, 2), "win_rate_percent": round(wins / len(closed) * 100, 2) if closed else 0.0}    if trade.asset_type == "OPTION":
+        trade.pnl, _ = estimate_net_pnl(trade.entry_price, exit_price, trade.quantity, FNOCostConfig())
+    else:
+        trade.pnl = (exit_price - trade.entry_price) * trade.quantity
+    trade.reason = reason
+    trade.status = "CLOSED"
+    trade.closed_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(trade)
+    return trade
 
 def paper_trade_costs(trade: PaperTrade, exit_price: float | None = None) -> dict[str, float]:
     """Return estimated round-trip costs without changing persisted trade state."""
