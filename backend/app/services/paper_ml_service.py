@@ -25,6 +25,7 @@ FEATURE_NAMES = (
 )
 MIN_TRAINING_SAMPLES = 30
 PAPER_FORWARD_SAMPLES = 30
+AUTO_RETRAIN_EVERY = 10
 DEFAULT_THRESHOLD = 0.60
 
 
@@ -121,6 +122,12 @@ def record_trade_outcome(
     db.add(event)
     db.commit()
     db.refresh(event)
+    event_count = db.query(PaperTradeLearningEvent).filter(
+        PaperTradeLearningEvent.user_id == user_id,
+        PaperTradeLearningEvent.strategy_version == strategy_version,
+    ).count()
+    if event_count >= MIN_TRAINING_SAMPLES and event_count % AUTO_RETRAIN_EVERY == 0:
+        train_model(db, user_id, strategy_version)
     return event
 
 
@@ -235,14 +242,10 @@ def train_model(db: Session, user_id: int, strategy_version: str = "V1") -> dict
     db.add(record)
     db.commit()
     db.refresh(record)
-    deployment = db.query(PaperMlDeployment).filter(
-        PaperMlDeployment.user_id == user_id,
-        PaperMlDeployment.strategy_version == strategy_version,
-    ).first()
-    if deployment is not None:
-        deployment.model_id = record.id
-        db.commit()
-        db.refresh(deployment)
+    deployment = get_deployment(db, user_id, strategy_version)
+    deployment.model_id = record.id
+    db.commit()
+    db.refresh(deployment)
     return {
         "trained": True,
         "model_id": record.id,
