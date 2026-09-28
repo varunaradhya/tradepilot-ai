@@ -67,3 +67,20 @@ def test_freeze_rejects_empty_quotes():
     )
     with pytest.raises(ValueError, match="empty"):
         freeze_execution_evidence(manifest=manifest, quotes=[])
+
+
+def test_frozen_package_round_trips_through_json():
+    package = _package()
+    raw = serialize_frozen_execution_evidence(package)
+    loaded = load_frozen_execution_evidence(raw)
+    assert loaded.package_sha256 == package.package_sha256
+    assert loaded.quotes == package.quotes
+    assert loaded.snapshots == package.snapshots
+
+
+def test_loader_rejects_tampered_json():
+    package = _package()
+    raw = serialize_frozen_execution_evidence(package).decode("utf-8")
+    raw = raw.replace('"bid":99.5', '"bid":1.0', 1)
+    with pytest.raises(ValueError, match="integrity verification"):
+        load_frozen_execution_evidence(raw.encode("utf-8"))
