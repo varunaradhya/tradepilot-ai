@@ -15,6 +15,8 @@ from app.models.paper_ml_prediction import PaperMlPrediction
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.models.watchlist import Watchlist
+from app.models.research_experiment import ResearchExperiment
+from app.models.corporate_action import CorporateAction
 
 config = context.config
 config.set_main_option("sqlalchemy.url", DATABASE_URL)
