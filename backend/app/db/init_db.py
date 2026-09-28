@@ -27,3 +27,5 @@ from app.core.config import TRADEPILOT_AUTO_CREATE_SCHEMA
 def init_db():
     if TRADEPILOT_AUTO_CREATE_SCHEMA:
         Base.metadata.create_all(bind=engine)
+
+from app.models.paper_validation_day import PaperValidationDay
