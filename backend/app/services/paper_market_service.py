@@ -52,6 +52,7 @@ class PaperMarketCoordinator:
         volume: float,
         opening_high: float | None = None,
         opening_low: float | None = None,
+        ml_decider: Any | None = None,
     ) -> dict[str, Any]:
         if not session.strip() or not symbol.strip():
             raise ValueError("session and symbol are required")
@@ -71,7 +72,21 @@ class PaperMarketCoordinator:
 
         routed: dict[str, Any] | None = None
         if position is None and signal.get("action") == "BUY":
-            routed = self.orchestrator.on_signal(session, {**signal, "symbol": normalized_symbol})
+            routed_signal = {**signal, "symbol": normalized_symbol}
+            if ml_decider is not None:
+                assessment = ml_decider(normalized_symbol, routed_signal)
+                routed_signal["ml_assessment"] = assessment
+                if assessment.get("decision") == "BLOCK":
+                    routed = {
+                        "accepted": False,
+                        "reason": "ML_FILTER_BLOCKED",
+                        "ml_assessment": assessment,
+                        **self.orchestrator.engine.snapshot(),
+                    }
+                else:
+                    routed = self.orchestrator.on_signal(session, routed_signal)
+            else:
+                routed = self.orchestrator.on_signal(session, routed_signal)
         elif has_position_for_symbol:
             routed = self.orchestrator.on_bar(session, high, low, close)
 

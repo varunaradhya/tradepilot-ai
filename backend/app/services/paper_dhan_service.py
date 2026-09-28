@@ -12,6 +12,7 @@ from app.services.broker_service import get_access_token, get_user_broker
 from app.services.dhan_historical_service import HistoricalRequest, fetch_intraday_history
 from app.services.instrument_master_service import InstrumentMaster, instrument_master
 from app.services.paper_market_service import PaperMarketCoordinator
+from app.services.paper_ml_service import record_trade_outcome
 
 
 def run_dhan_paper_session(
@@ -125,6 +126,7 @@ def run_dhan_paper_session(
 
     persisted = 0
     for trade in runner.orchestrator.trades():
+        record_trade_outcome(db, user_id, session, trade, strategy_version=strategy_version, model_version=str(trade.get("model_version") or "RULES_V1"))
         record = PaperTrade(
             user_id=user_id,
             symbol=instrument.symbol,

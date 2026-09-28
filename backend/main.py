@@ -17,6 +17,7 @@ from app.api.v1.paper_monitoring import router as paper_monitoring_router
 from app.api.v1.market_scheduler import router as market_scheduler_router
 from app.api.v1.operations import router as operations_router
 from app.api.v1.observability import router as observability_router
+from app.api.v1.paper_ml import router as paper_ml_router
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from time import perf_counter
@@ -52,7 +53,7 @@ async def request_observability(request: Request, call_next):
         OBSERVABILITY.observe((perf_counter() - started) * 1000, failed=failed)
 
 for router in [users_router,auth_router,portfolio_router,valuation_router,transactions_router,analytics_router,watchlist_router,brokers_router,market_router]: app.include_router(router,prefix="/api/v1")
-for router in [reconciliation_router,advanced_analytics_router,signals_router,intelligence_router,alerts_router,trading_general_router,algo_router,market_risk_router,research_router,intraday_router,strategy_builder_router,paper_trading_router,paper_evidence_router,trade_decision_router,fno_router,paper_monitoring_router,market_scheduler_router,operations_router,observability_router]: app.include_router(router,prefix="/api/v1")
+for router in [reconciliation_router,advanced_analytics_router,signals_router,intelligence_router,alerts_router,trading_general_router,algo_router,market_risk_router,research_router,intraday_router,strategy_builder_router,paper_trading_router,paper_evidence_router,trade_decision_router,fno_router,paper_monitoring_router,market_scheduler_router,operations_router,observability_router,paper_ml_router]: app.include_router(router,prefix="/api/v1")
 @app.on_event("startup")
 def startup_event(): init_db()
 @app.get("/")

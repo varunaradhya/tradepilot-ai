@@ -105,5 +105,10 @@ def generate_intraday_signal(
         "risk_reward": config.reward_multiple,
         "quality_score": quality.score,
         "regime": quality.regime,
+        "ema_fast": round(fast, 6),
+        "ema_slow": round(slow, 6),
+        "opening_high": round(opening_high, 6),
+        "opening_low": round(opening_low, 6),
+        "gap_percent": round(gap, 4),
         "quality_components": {"trend": quality.trend_score, "momentum": quality.momentum_score, "volume": quality.volume_score, "volatility": quality.volatility_score},
     }

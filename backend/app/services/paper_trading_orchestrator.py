@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from app.services.paper_ml_service import learning_features
 from app.services.paper_trading import PaperRiskConfig, PaperTradingEngine
 
 
@@ -49,7 +50,6 @@ class PaperTradingOrchestrator:
         ))
 
     def reset(self) -> None:
-        """Reset simulation state while retaining the server-granted authorization."""
         self.engine = self._new_engine()
         self.session_trades = 0
         self.last_signal = None
@@ -111,8 +111,11 @@ class PaperTradingOrchestrator:
         before = self.engine.position
         trade = self.engine.on_bar(session, high, low, close)
         snapshot = self.engine.snapshot()
-        snapshot["last_event"] = "EXIT" if trade else ("POSITION_OPEN" if before is not None and self.engine.position is not None else "MARK")
-        if trade: snapshot["trade"] = trade
+        snapshot["last_event"] = "EXIT" if trade else (
+            "POSITION_OPEN" if before is not None and self.engine.position is not None else "MARK"
+        )
+        if trade:
+            snapshot["trade"] = trade
         return snapshot
 
     def on_tick(self, session: str, price: float) -> dict[str, Any]:
@@ -121,31 +124,52 @@ class PaperTradingOrchestrator:
         trade = self.engine.on_tick(session, float(price))
         snapshot = self.engine.snapshot()
         snapshot["last_event"] = "EXIT" if trade else ("POSITION_OPEN" if before is not None else "MARK")
-        if trade: snapshot["trade"] = trade
+        if trade:
+            snapshot["trade"] = trade
         return snapshot
 
     def on_signal(self, session: str, signal: dict[str, Any]) -> dict[str, Any]:
         self._sync_session(session)
         self.last_signal = dict(signal)
-        if signal.get("action") != "BUY": return {"accepted": False, "reason": "SIGNAL_NOT_BUY", **self.engine.snapshot()}
-        if not self._strategy_ready: return {"accepted": False, "reason": "STRATEGY_NOT_QUALIFIED", **self.engine.snapshot()}
-        if self.config.trade_direction != "LONG_ONLY": return {"accepted": False, "reason": "UNSUPPORTED_DIRECTION", **self.engine.snapshot()}
-        if self.session_trades >= self.config.max_trades_per_session: return {"accepted": False, "reason": "MAX_TRADES_REACHED", **self.engine.snapshot()}
-        if not self.engine.can_trade(): return {"accepted": False, "reason": "RISK_GATE_BLOCKED", **self.engine.snapshot()}
-        entry = float(signal["entry"]); stop = float(signal["stop"]); target = float(signal["target"])
-        if not (stop < entry < target): return {"accepted": False, "reason": "INVALID_RISK_LEVELS", **self.engine.snapshot()}
+        if signal.get("action") != "BUY":
+            return {"accepted": False, "reason": "SIGNAL_NOT_BUY", **self.engine.snapshot()}
+        if not self._strategy_ready:
+            return {"accepted": False, "reason": "STRATEGY_NOT_QUALIFIED", **self.engine.snapshot()}
+        if self.config.trade_direction != "LONG_ONLY":
+            return {"accepted": False, "reason": "UNSUPPORTED_DIRECTION", **self.engine.snapshot()}
+        if self.session_trades >= self.config.max_trades_per_session:
+            return {"accepted": False, "reason": "MAX_TRADES_REACHED", **self.engine.snapshot()}
+        if not self.engine.can_trade():
+            return {"accepted": False, "reason": "RISK_GATE_BLOCKED", **self.engine.snapshot()}
+        entry = float(signal["entry"])
+        stop = float(signal["stop"])
+        target = float(signal["target"])
+        if not (stop < entry < target):
+            return {"accepted": False, "reason": "INVALID_RISK_LEVELS", **self.engine.snapshot()}
         lot_size = int(signal.get("lot_size") or self.config.lot_size)
         accepted = self.engine.enter(entry, stop, target, "LONG", lot_size=lot_size, symbol=signal.get("symbol"))
-        if not accepted: return {"accepted": False, "reason": "ORDER_REJECTED_OR_ALLOCATION_TOO_SMALL", **self.engine.snapshot()}
+        if not accepted:
+            return {"accepted": False, "reason": "ORDER_REJECTED_OR_ALLOCATION_TOO_SMALL", **self.engine.snapshot()}
+        self.engine.position["learning_features"] = learning_features(signal, entry=entry)
+        self.engine.position["model_version"] = str(
+            (signal.get("ml_assessment") or {}).get("model_version") or "RULES_V1"
+        )
         self.session_trades += 1
-        return {"accepted": True, "reason": "PAPER_ORDER_OPENED", "strategy_fingerprint": self._strategy_fingerprint, **self.engine.snapshot()}
+        return {
+            "accepted": True,
+            "reason": "PAPER_ORDER_OPENED",
+            "strategy_fingerprint": self._strategy_fingerprint,
+            "ml_assessment": signal.get("ml_assessment"),
+            **self.engine.snapshot(),
+        }
 
     def close_session(self, session: str, close: float) -> dict[str, Any]:
         self._sync_session(session)
         trade = self.engine.close(float(close), "SESSION_CLOSE")
         return {"mode": "SIMULATION_ONLY", "trade": trade, **self.engine.snapshot()}
 
-    def trades(self) -> list[dict[str, Any]]: return [dict(trade) for trade in self.engine.trades]
+    def trades(self) -> list[dict[str, Any]]:
+        return [dict(trade) for trade in self.engine.trades]
 
     def summary(self) -> dict[str, Any]:
         snapshot = self.engine.snapshot()

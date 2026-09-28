@@ -12,6 +12,7 @@ from app.services.paper_trading_service import close_paper_trade, list_paper_tra
 from app.services.paper_trading_orchestrator import PaperOrchestratorConfig, PaperTradingOrchestrator
 from app.services.paper_market_service import PaperMarketCoordinator
 from app.services.paper_dhan_service import run_dhan_paper_session
+from app.services.paper_ml_service import predict, record_trade_outcome
 from app.services.paper_live_dhan_service import mark_dhan_paper_position
 from app.services.intraday_evidence_aggregation import aggregate_paper_performance
 from app.services.strategy_readiness import build_strategy_readiness
@@ -201,7 +202,20 @@ def paper_session_signal(payload: PaperSignalRequest, current_user: User = Depen
         if replay is None:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Signal request is already being processed")
         return {**replay, "idempotent_replay": True, "request_id": request_id}
-    response = {"mode": "SIMULATION_ONLY", **_orchestrator(current_user.id, db).on_signal(payload.session, signal)}
+    ml_assessment = predict(
+        db, current_user.id, payload.symbol, payload.strategy_version, signal, persist=True,
+    )
+    signal["ml_assessment"] = ml_assessment
+    if ml_assessment.get("decision") == "BLOCK":
+        response = {
+            "mode": "SIMULATION_ONLY",
+            "accepted": False,
+            "reason": "ML_FILTER_BLOCKED",
+            "ml_assessment": ml_assessment,
+            **_orchestrator(current_user.id, db).summary(),
+        }
+    else:
+        response = {"mode": "SIMULATION_ONLY", **_orchestrator(current_user.id, db).on_signal(payload.session, signal)}
     _persist_orchestrator(db, current_user.id)
     complete_request(db, record, response)
     return {**response, "idempotent_replay": False, "request_id": request_id}
@@ -210,6 +224,8 @@ def paper_session_signal(payload: PaperSignalRequest, current_user: User = Depen
 def paper_session_bar(payload: PaperBarRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict[str, Any]:
     if payload.low > payload.high: raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="low cannot exceed high")
     result = _orchestrator(current_user.id, db).on_bar(payload.session,payload.high,payload.low,payload.close)
+    if result.get("trade"):
+        record_trade_outcome(db, current_user.id, payload.session, result["trade"], strategy_version="V1", model_version=str(result["trade"].get("model_version") or "RULES_V1"))
     _persist_orchestrator(db, current_user.id)
     return {"mode":"SIMULATION_ONLY",**result}
 
@@ -248,7 +264,20 @@ def paper_market_bar(payload: MarketBarRequest, current_user: User = Depends(get
     if not _load_authorization(db, current_user.id, payload.symbol, payload.interval, "V1"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No active qualified strategy authorization for this symbol and interval")
     try:
-        result = _market_coordinator(current_user.id, db).on_bar(payload.session,payload.symbol,payload.open,payload.high,payload.low,payload.close,payload.volume,payload.opening_high,payload.opening_low)
+        def ml_decider(symbol: str, signal: dict[str, Any]) -> dict[str, Any]:
+            return predict(db, current_user.id, symbol, "V1", signal, persist=True)
+
+        result = _market_coordinator(current_user.id, db).on_bar(
+            payload.session, payload.symbol, payload.open, payload.high, payload.low, payload.close,
+            payload.volume, payload.opening_high, payload.opening_low, ml_decider=ml_decider,
+        )
+        execution = result.get("execution") or {}
+        if execution.get("trade"):
+            record_trade_outcome(
+                db, current_user.id, payload.session, execution["trade"],
+                strategy_version="V1",
+                model_version=str(execution["trade"].get("model_version") or "RULES_V1"),
+            )
         _persist_orchestrator(db, current_user.id)
         return result
     except ValueError as exc: raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
