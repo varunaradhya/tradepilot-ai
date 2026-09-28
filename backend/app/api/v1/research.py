@@ -20,6 +20,8 @@ from app.services.intraday_scorecard import build_intraday_scorecard, ScorecardC
 from app.services.intraday_performance_report import build_intraday_performance_report
 from app.services.intraday_evidence_aggregation import aggregate_scorecards
 from app.services.intraday_backtest import IntradayBacktestConfig
+from app.services.intraday_walk_forward import run_fixed_parameter_walk_forward
+from app.services.research_data_quality import analyze_intraday_quality
 
 router = APIRouter(prefix="/research", tags=["Research"])
 
@@ -80,6 +82,32 @@ def backtest_research_intraday(symbol: str=Query(min_length=1,max_length=30), in
     del current_user
     try: return backtest_intraday_dataset(symbol,interval)
     except ValueError as exc: raise HTTPException(status_code=422,detail=str(exc)) from exc
+
+@router.get("/intraday/data-quality")
+def intraday_data_quality(symbol: str=Query(min_length=1,max_length=30), interval: str=Query(default="5",pattern="^(1|5|15|25|60)$"), current_user: User=Depends(get_current_user)):
+    del current_user
+    dataset, rows = _dataset_rows(symbol, interval)
+    if not rows: raise HTTPException(status_code=404, detail=f"Intraday dataset not found: {dataset}")
+    return {"symbol": symbol.strip().upper(), "interval": interval, "dataset": dataset, **analyze_intraday_quality(rows)}
+
+
+@router.get("/intraday/walk-forward")
+def intraday_walk_forward(
+    symbol: str=Query(min_length=1,max_length=30),
+    interval: str=Query(default="5",pattern="^(1|5|15|25|60)$"),
+    train_bars: int=Query(default=60,ge=20,le=100000),
+    validation_bars: int=Query(default=20,ge=5,le=100000),
+    current_user: User=Depends(get_current_user),
+):
+    del current_user
+    dataset, rows = _dataset_rows(symbol, interval)
+    if not rows: raise HTTPException(status_code=404, detail=f"Intraday dataset not found: {dataset}")
+    try:
+        result = run_fixed_parameter_walk_forward(rows, train_size=train_bars, validation_size=validation_bars)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"symbol": symbol.strip().upper(), "interval": interval, "dataset": dataset, **result}
+
 
 @router.get("/intraday/performance")
 def intraday_performance(symbol: str=Query(min_length=1,max_length=30), interval: str=Query(default="5",pattern="^(1|5|15|25|60)$"), current_user: User=Depends(get_current_user)):
