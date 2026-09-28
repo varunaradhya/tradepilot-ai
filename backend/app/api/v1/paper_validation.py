@@ -9,7 +9,7 @@ from app.models.user import User
 from app.services.paper_validation_job import run_daily_dhan_validation
 from app.services.paper_validation_service import (
     DEFAULT_VALIDATION_SYMBOLS, validation_run_key, build_validation_report,
-    capture_day_from_ledger, complete_validation_day, validation_progress,
+    capture_day_from_ledger, complete_validation_day, validation_progress, build_validation_manifest, persist_validation_manifest, verify_validation_manifest,
 )
 from app.services.nse_equity_calendar import DEFAULT_NSE_EQUITY_CALENDAR, nse_equity_holidays
 
@@ -70,6 +70,22 @@ def complete_day(payload: ValidationCaptureRequest, current_user: User = Depends
     report = build_validation_report(db, current_user.id, key)
     latest = report["days"][-1] if report["days"] else {}
     return {"mode": "SIMULATION_ONLY", "status": row.status, "validation_run": key, "report_status": report["status"], "fingerprint": latest.get("fingerprint")}
+
+@router.get("/manifest")
+def validation_manifest(start: date, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict[str, Any]:
+    try:
+        key = validation_run_key(start)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return persist_validation_manifest(db, current_user.id, key).manifest_json and build_validation_manifest(db, current_user.id, key)
+
+@router.get("/manifest/verify")
+def verify_manifest(start: date, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict[str, Any]:
+    try:
+        key = validation_run_key(start)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return verify_validation_manifest(db, current_user.id, key)
 
 @router.get("/progress")
 def validation_progress_report(start: date, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict[str, Any]:
