@@ -114,6 +114,13 @@ Status: **IN PROGRESS — QUALIFICATION EVIDENCE REQUIRED**
 - No historical market data was fabricated or promoted by this change. Real timestamp-aligned executable bid/ask evidence remains required.
 - Metadata parsing now fails closed for ambiguous execution-grade values; string `false` cannot accidentally become truthy.
 
+### Historical import contract hardening — 2026-09-28
+
+- Execution-grade quotes now preserve optional expiry, security ID and exchange segment metadata into replay snapshots.
+- Explicitly supplied blank contract identity fields are rejected rather than normalized into apparently valid contracts.
+- Added timestamp-coverage reporting that identifies missing/unexpected timestamps without filling or repairing the dataset.
+- Real historical evidence remains external; this layer only validates and preserves it.
+
 ## Critical limitation
 
 We still do **not** have evidence that the strategy is profitable. The historical evidence service is a validation boundary; it does not create historical data. We must ingest sufficiently large, timestamp-aligned historical expired-option datasets with realistic bid/ask evolution before calling the strategy qualified. Synthetic fixtures are for software tests only and must never be presented as performance evidence.
