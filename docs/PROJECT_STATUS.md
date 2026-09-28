@@ -112,6 +112,7 @@ Status: **IN PROGRESS — QUALIFICATION EVIDENCE REQUIRED**
 - Dataset validation now fails closed when validated timestamps fall outside the declared manifest coverage.
 - The manifest does not claim that the checksum matches an external file unless that checksum was supplied by the data-ingestion process; this remains an evidence-import responsibility.
 - No historical market data was fabricated or promoted by this change. Real timestamp-aligned executable bid/ask evidence remains required.
+- Metadata parsing now fails closed for ambiguous execution-grade values; string `false` cannot accidentally become truthy.
 
 ## Critical limitation
 
