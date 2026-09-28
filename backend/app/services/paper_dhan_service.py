@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
+
+from sqlalchemy.exc import IntegrityError
 from typing import Any
 
 from app.brokers.dhan import DhanClient
+from app.models.paper_historical_run import PaperHistoricalRun
 from app.models.paper_trade import PaperTrade
 from app.services.broker_service import get_access_token, get_user_broker
 from app.services.dhan_historical_service import HistoricalRequest, fetch_intraday_history
@@ -91,13 +94,23 @@ def run_dhan_paper_session(
     runner.close_session(session, instrument.symbol, last_close)
 
     marker = f"DHAN:{session}:{interval}"
-    existing = db.query(PaperTrade).filter(
-        PaperTrade.user_id == user_id,
-        PaperTrade.symbol == instrument.symbol,
-        PaperTrade.reason == marker,
-    ).count()
+    strategy_version = "V1"
     persisted = 0
-    if existing == 0:
+    try:
+        # The unique database key is the cross-worker idempotency boundary.
+        # The run record and its trades are committed together, so a retry
+        # cannot create a second copy of the same historical session.
+        db.add(
+            PaperHistoricalRun(
+                user_id=user_id,
+                symbol=instrument.symbol,
+                session=session,
+                interval=interval,
+                strategy_version=strategy_version,
+            )
+        )
+        db.flush()
+
         for trade in runner.orchestrator.trades():
             record = PaperTrade(
                 user_id=user_id,
@@ -111,12 +124,14 @@ def run_dhan_paper_session(
                 exit_price=float(trade["exit"]),
                 pnl=float(trade["pnl"]),
                 reason=marker,
-                strategy_version="V1",
+                strategy_version=strategy_version,
             )
             db.add(record)
             persisted += 1
-        if persisted:
-            db.commit()
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        persisted = 0
 
     return {
         "mode": "SIMULATION_ONLY",
