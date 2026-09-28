@@ -40,3 +40,9 @@ def test_daily_validation_finalizes_one_day_across_symbols(monkeypatch):
     assert finalized["symbols"] == ["TCS", "INFY"]
     assert result["day_status"] == "COMPLETE"
     assert result["broker_orders_enabled"] is False
+
+
+def test_daily_validation_rejects_nse_holiday():
+    import pytest
+    with pytest.raises(ValueError, match="not an NSE equity regular trading session"):
+        job.run_daily_dhan_validation(object(), 7, ["TCS", "INFY", "RELIANCE"], date(2026, 10, 2), "5")
