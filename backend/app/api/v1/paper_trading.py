@@ -28,6 +28,7 @@ from app.services.strategy_paper_authorization import authorize_strategy, get_ac
 from app.services.paper_signal_request_service import claim_request, complete_request, replay_response, request_fingerprint
 from app.brokers.dhan import DhanAPIError
 from app.services.paper_session_state_service import load_paper_session_state, save_paper_session_state
+from app.services.paper_market_state_service import load_market_state, save_market_state, clear_market_state
 
 router = APIRouter(prefix="/paper-trading", tags=["Paper Trading"])
 _sessions: dict[int, PaperTradingOrchestrator] = {}
@@ -264,12 +265,22 @@ def paper_market_bar(payload: MarketBarRequest, current_user: User = Depends(get
     if not _load_authorization(db, current_user.id, payload.symbol, payload.interval, "V1"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No active qualified strategy authorization for this symbol and interval")
     try:
+        coordinator = _market_coordinator(current_user.id, db)
+        persisted = load_market_state(db, current_user.id, payload.session, payload.symbol, payload.interval, "V1")
+        if persisted:
+            coordinator.restore_state(payload.session, payload.symbol, persisted)
+
         def ml_decider(symbol: str, signal: dict[str, Any]) -> dict[str, Any]:
             return predict(db, current_user.id, symbol, "V1", signal, persist=True)
 
-        result = _market_coordinator(current_user.id, db).on_bar(
+        result = coordinator.on_bar(
             payload.session, payload.symbol, payload.open, payload.high, payload.low, payload.close,
             payload.volume, payload.opening_high, payload.opening_low, ml_decider=ml_decider,
+        )
+        save_market_state(
+            db, current_user.id, payload.session, payload.symbol,
+            coordinator.export_state(payload.session, payload.symbol),
+            payload.interval, "V1",
         )
         execution = result.get("execution") or {}
         if execution.get("trade"):
