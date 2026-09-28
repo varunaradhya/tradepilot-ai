@@ -1,6 +1,6 @@
 # TradePilot AI — Persistent Project Status
 
-Last updated: 2026-09-24
+Last updated: 2026-09-28
 
 ## How to use this file
 
@@ -105,6 +105,13 @@ Status: **IN PROGRESS — QUALIFICATION EVIDENCE REQUIRED**
 - Corrected the F&O expiry helper type annotation so the backend test suite can collect under Python 3.12.
 - Strengthened the replay future-invariance guard: the previous comparison window could be empty for normal fixtures; the guard now checks the first decision before the mutation boundary and mutates both future underlying bars and future option-chain quotes.
 - Live execution remains locked; these changes only affect research/replay QA.
+
+### Evidence provenance boundary — 2026-09-28
+
+- Added `backend/app/services/fno_evidence_manifest_service.py` to bind execution-grade historical evidence to explicit provenance metadata: source, license, coverage window, timezone, sampling interval, contract universe, SHA-256 checksum and execution-grade status.
+- Dataset validation now fails closed when validated timestamps fall outside the declared manifest coverage.
+- The manifest does not claim that the checksum matches an external file unless that checksum was supplied by the data-ingestion process; this remains an evidence-import responsibility.
+- No historical market data was fabricated or promoted by this change. Real timestamp-aligned executable bid/ask evidence remains required.
 
 ## Critical limitation
 
