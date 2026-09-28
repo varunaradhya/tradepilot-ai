@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 import math
 
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.models.paper_trade import PaperTrade
@@ -59,14 +60,25 @@ def close_paper_trade(db: Session, trade: PaperTrade, exit_price: float, reason:
     reason = reason.strip().upper()
     if not reason:
         raise ValueError("Exit reason is required")
-    trade.exit_price = exit_price
     if trade.asset_type == "OPTION":
-        trade.pnl, _ = estimate_net_pnl(trade.entry_price, exit_price, trade.quantity, FNOCostConfig())
+        pnl, _ = estimate_net_pnl(trade.entry_price, exit_price, trade.quantity, FNOCostConfig())
     else:
-        trade.pnl = (exit_price - trade.entry_price) * trade.quantity
-    trade.reason = reason
-    trade.status = "CLOSED"
-    trade.closed_at = datetime.now(timezone.utc)
+        pnl = (exit_price - trade.entry_price) * trade.quantity
+    closed_at = datetime.now(timezone.utc)
+
+    # Close atomically so two concurrent requests cannot both transition the
+    # same OPEN trade and overwrite its exit reason/price.
+    result = db.execute(
+        update(PaperTrade)
+        .where(PaperTrade.id == trade.id, PaperTrade.status == "OPEN")
+        .values(
+            exit_price=exit_price,
+            pnl=pnl,
+            reason=reason,
+            status="CLOSED",
+            closed_at=closed_at,
+        )
+    )
     db.commit()
     db.refresh(trade)
     return trade
