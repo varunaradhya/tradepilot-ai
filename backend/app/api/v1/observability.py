@@ -30,6 +30,22 @@ def _market_timestamp(state: dict | None):
         return None
 
 
+@router.get("/cloud-readiness")
+def cloud_readiness(current_user: User = Depends(get_current_user)) -> dict:
+    del current_user
+    dialect=engine.dialect.name
+    return {
+        "database_dialect": dialect,
+        "postgres_ready": dialect in {"postgresql","postgres"},
+        "migrations_managed_by_alembic": True,
+        "external_shared_state_required_for_multi_worker": True,
+        "live_execution_enabled": False,
+        "redis_required_for_phase_1": False,
+        "object_storage_required_for_phase_1": False,
+        "status": "READY_FOR_POSTGRES" if dialect in {"postgresql","postgres"} else "LOCAL_DATABASE_MODE",
+    }
+
+
 @router.get("/metrics")
 def metrics(current_user: User = Depends(get_current_user)) -> dict:
     """Read-only application telemetry suitable for a metrics scraper."""
