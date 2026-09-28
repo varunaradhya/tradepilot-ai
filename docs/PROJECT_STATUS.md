@@ -246,3 +246,21 @@ Never mark a milestone green merely because code was committed. A milestone beco
 - F&O UI/UX hardening: option-enabled stock underlying search, stock historical instrument-type routing, explicit market/evidence/qualification/live readiness states, stale-search failure handling. Regression coverage: `5208b4db`; latest implementation batch: `b98adc91` through `f652b2f6`.
 
 - UI safety-state hardening: shared readiness UI now shows paper availability and live-execution lock explicitly; runtime error boundary no longer exposes browser stack traces and fully clears authentication on session reset. Commit batch: `f66d8438`, `99dff446`, `204cb0f4`.
+
+
+### Current QA batch — Indian market boundary, stale search UX, and F&O stop-race hardening — 2026-09-28
+
+- Hardened the authenticated general trade-decision API so both paper decision paths validate the requested symbol against the Indian NSE/BSE equity universe server-side before the strategy engine runs.
+- Provider-unavailable symbol validation now fails closed with HTTP 503; unknown/non-Indian symbols return HTTP 422. This prevents a UI/client bypass from feeding an arbitrary foreign symbol into the decision engine.
+- Added API regression coverage for non-Indian rejection, `.NS` normalization, and validation-provider outage behavior.
+- Stock search now clears stale suggestions immediately when a non-empty query begins, preventing a previous popular/typed result from remaining visible while the new search is pending.
+- F&O autonomous monitoring now re-checks that the session is still active after an in-flight scan returns QUALIFIED; stopping the session during the request can no longer cause a virtual position to open from the late response.
+- Live broker execution remains hard-locked; these changes only tighten paper/research boundaries and UI state safety.
+
+Current commits for this batch:
+- e9bc0326 — Enforce Indian equity boundary in trade decision API
+- 2a716025 — Clear stale stock suggestions while searching
+- 738820b5 — Prevent stopped F&O session from opening a trade
+- d0a86f9b — Add trade decision Indian-symbol boundary tests
+
+CI verification is being used as the execution gate for this batch.
