@@ -40,6 +40,6 @@ def complete_day(payload:ValidationCaptureRequest,current_user:User=Depends(get_
         raise HTTPException(409,"Day cannot be completed while data-quality or provider failures are present")
     try:key=validation_run_key(payload.start)
     except ValueError as exc:raise HTTPException(422,str(exc)) from exc
-    row=complete_validation_day(db,current_user.id,key,payload.session_date,0,0.0,{"valid":True,"bars":payload.bars})
+    row=complete_validation_day(db,current_user.id,key,payload.session_date,{"valid":True,"bars":payload.bars})
     report=build_validation_report(db,current_user.id,key)
     return {"mode":"SIMULATION_ONLY","status":row.status,"validation_run":key,"report_status":report["status"],"fingerprint":report["days"][-1]["fingerprint"]}
