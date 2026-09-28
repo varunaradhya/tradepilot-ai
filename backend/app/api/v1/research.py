@@ -106,12 +106,13 @@ def intraday_walk_forward(
     train_bars: int=Query(default=60,ge=20,le=100000),
     validation_bars: int=Query(default=20,ge=5,le=100000),
     current_user: User=Depends(get_current_user),
+    db: Session=Depends(get_db),
 ):
-    del current_user
     dataset, rows = _dataset_rows(symbol, interval)
     if not rows: raise HTTPException(status_code=404, detail=f"Intraday dataset not found: {dataset}")
     try:
         result = run_fixed_parameter_walk_forward(rows, train_size=train_bars, validation_size=validation_bars)
+        record_experiment(db,current_user.id,dataset,"WALK_FORWARD_V1",{"train_bars":train_bars,"validation_bars":validation_bars},result)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return {"symbol": symbol.strip().upper(), "interval": interval, "dataset": dataset, **result}
