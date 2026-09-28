@@ -52,8 +52,6 @@ def test_close_does_not_overwrite_trade_already_closed_by_another_request():
     db.execute(update(PaperTrade).where(PaperTrade.id == trade.id).values(
         status="CLOSED", exit_price=105, pnl=5, reason="MANUAL"
     ))
-    db.commit()
-
     result = close_paper_trade(db, trade, 109, "TARGET")
 
     assert result.status == "CLOSED"
