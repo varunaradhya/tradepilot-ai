@@ -137,6 +137,9 @@ def verify_frozen_execution_evidence(
         return False
     if tuple(normalized) != tuple(package.quotes):
         return False
+    expected_snapshots = tuple(build_execution_grade_snapshots(package.quotes))
+    if tuple(package.snapshots) != expected_snapshots:
+        return False
     if not package.snapshots or any(
         snapshot.get("execution_grade") is not True for snapshot in package.snapshots
     ):
