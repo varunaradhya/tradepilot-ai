@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { logout } from "../services/auth";
 
 type Props = { children: ReactNode };
 
@@ -20,7 +21,7 @@ export default class AppErrorBoundary extends Component<Props, State> {
   };
 
   resetSession = () => {
-    localStorage.removeItem("access_token");
+    logout();
     window.location.reload();
   };
 
@@ -40,10 +41,7 @@ export default class AppErrorBoundary extends Component<Props, State> {
               </p>
             </div>
           </div>
-          <details className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-4">
-            <summary className="cursor-pointer text-xs font-bold text-slate-400">Technical details</summary>
-            <pre className="mt-3 max-h-40 overflow-auto whitespace-pre-wrap break-words text-[11px] leading-5 text-rose-200">{this.state.error?.stack ?? this.state.error?.message ?? "Unknown UI error"}</pre>
-          </details>
+          <div className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-4 text-xs leading-5 text-slate-400">For security, browser stack traces and internal error details are not shown in the production UI.</div>
           <div className="mt-6 flex flex-wrap gap-3">
             <button type="button" onClick={this.retry} className="rounded-xl bg-white px-5 py-3 text-xs font-black text-slate-950 hover:bg-slate-200">Try again</button>
             <button type="button" onClick={this.resetSession} className="rounded-xl border border-white/10 bg-white/[.04] px-5 py-3 text-xs font-black text-slate-200 hover:bg-white/[.08]">Reset session & reload</button>
