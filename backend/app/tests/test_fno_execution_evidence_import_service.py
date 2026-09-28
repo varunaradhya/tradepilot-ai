@@ -70,7 +70,7 @@ def test_import_never_fabricates_bid_ask_from_close():
         "timestamp,strike,option_type,bid,ask,close\n"
         "100,25000,CE,,,100\n"
     ).encode()
-    with pytest.raises(ValueError, match="positive bid and ask"):
+    with pytest.raises(ValueError, match="unexpected CSV columns"):
         parse_execution_quote_csv(raw)
 
 
