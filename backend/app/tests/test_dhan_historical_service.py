@@ -83,3 +83,42 @@ def test_inconsistent_dhan_arrays_raise_api_error():
             date(2024, 1, 1),
             date(2024, 2, 1),
         )
+
+
+def test_intraday_rejects_non_finite_ohlc():
+    import math
+    bad = payload()
+    bad["close"] = [101, math.nan]
+    with pytest.raises(ValueError, match="finite"):
+        fetch_intraday_history(
+            FakeDhanClient([bad]),
+            HistoricalRequest("1333", interval="15"),
+            date(2024, 1, 1),
+            date(2024, 2, 1),
+        )
+
+
+def test_intraday_rejects_negative_volume():
+    bad = payload()
+    bad["volume"] = [1000, -1]
+    with pytest.raises(ValueError, match="non-negative"):
+        fetch_intraday_history(
+            FakeDhanClient([bad]),
+            HistoricalRequest("1333", interval="15"),
+            date(2024, 1, 1),
+            date(2024, 2, 1),
+        )
+
+
+def test_intraday_diagnostics_are_not_silent_when_timestamps_duplicate():
+    bad = payload()
+    bad["timestamp"] = [1704067200, 1704067200]
+    bars, diagnostics = fetch_intraday_history(
+        FakeDhanClient([bad]),
+        HistoricalRequest("1333", interval="15"),
+        date(2024, 1, 1),
+        date(2024, 2, 1),
+    )
+    assert len(bars) == 2
+    assert diagnostics["valid"] is False
+    assert diagnostics["duplicates"] == 1
