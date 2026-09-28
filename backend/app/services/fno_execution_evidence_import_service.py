@@ -65,7 +65,7 @@ def parse_execution_quote_csv(
     if missing:
         raise ValueError(f"execution evidence CSV missing columns: {missing}")
     if unexpected:
-        raise ValueError(f"execution evidence CSV has unexpected columns: {unexpected}")
+        raise ValueError(f"execution evidence CSV has unexpected CSV columns: {unexpected}")
 
     rows: list[dict[str, Any]] = []
     for line_number, row in enumerate(reader, start=2):
@@ -126,7 +126,12 @@ def import_execution_evidence_csv(
         created_at=created_at,
     )
     try:
-        validate_execution_evidence_manifest(manifest)
+        manifest_result = validate_execution_evidence_manifest(manifest)
     except (TypeError, ValueError) as exc:
         raise ValueError("invalid execution evidence manifest") from exc
+    if not manifest_result["valid"]:
+        raise ValueError(
+            "invalid execution evidence manifest: "
+            f"{manifest_result["errors"]}"
+        )
     return manifest, quotes
