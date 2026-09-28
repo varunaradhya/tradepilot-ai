@@ -45,7 +45,13 @@ def validate(rows: list[dict]) -> dict:
 
         keys = [x.isoformat() for x in times]
         duplicates += len(keys) - len(set(keys))
-        if len(items) == EXPECTED and min(times).time() == OPEN and max(times).time() >= time(15, 25):
+        full_session = (
+            len(items) in {EXPECTED, EXPECTED + 1}
+            and min(times).time() == OPEN
+            and max(times).time() >= time(15, 25)
+            and (len(items) == EXPECTED or max(times).time() >= CLOSE)
+        )
+        if full_session:
             complete += 1
         else:
             partial += 1
