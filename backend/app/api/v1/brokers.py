@@ -15,6 +15,7 @@ from app.services.broker_service import (
     get_user_broker,
     save_broker_connection,
 )
+from app.services.broker_capabilities import BROKER_CAPABILITIES
 from app.services.portfolio_sync_service import (
     sync_dhan_portfolio,
 )
@@ -24,6 +25,12 @@ router = APIRouter(
     prefix="/brokers",
     tags=["Brokers"],
 )
+
+
+@router.get("/capabilities")
+def broker_capabilities(current_user: User = Depends(get_current_user)):
+    del current_user
+    return {name: {**caps.__dict__, "live_orders": False} for name, caps in BROKER_CAPABILITIES.items()}
 
 
 @router.post(
