@@ -4,7 +4,7 @@ import argparse
 import hashlib
 import json
 import sqlite3
-from collections import Counter
+from collections import Counter, defaultdict
 from datetime import datetime, time
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -45,47 +45,72 @@ def _is_full_session(rows: list[tuple]) -> bool:
     )
 
 
+def _valid_ohlc(row: tuple) -> bool:
+    return (
+        row[2] > 0
+        and row[3] > 0
+        and row[4] > 0
+        and row[5] > 0
+        and row[4] <= row[2] <= row[3]
+        and row[4] <= row[5] <= row[3]
+    )
+
+
+def _bar_payload(row: tuple, dt: datetime) -> dict:
+    return {
+        "timestamp": dt.isoformat(),
+        "open": row[2],
+        "high": row[3],
+        "low": row[4],
+        "close": row[5],
+        "volume": row[6],
+    }
+
+
 def build_research_dataset(
     db_path: Path,
     output_dir: Path,
     dataset_id: str = "equity_nse_discovery_5m",
 ) -> dict:
     output_dir.mkdir(parents=True, exist_ok=True)
-    clean_path = output_dir / "equity_nse_discovery_5m_clean.jsonl"
-    quarantine_path = output_dir / "equity_nse_discovery_5m_quarantine.jsonl"
+    clean_dir = output_dir / "dhan_equity_clean"
+    quarantine_dir = output_dir / "dhan_equity_quarantine"
     manifest_path = output_dir / "equity_nse_discovery_5m_manifest.json"
+    clean_dir.mkdir(parents=True, exist_ok=True)
+    quarantine_dir.mkdir(parents=True, exist_ok=True)
 
     conn = sqlite3.connect(db_path)
-    cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT symbol, timestamp, open, high, low, close, volume
-        FROM equity_bars
-        WHERE dataset_id = ?
-        ORDER BY symbol, timestamp
-        """,
-        (dataset_id,),
-    )
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT symbol, timestamp, open, high, low, close, volume
+            FROM equity_bars
+            WHERE dataset_id = ?
+            ORDER BY symbol, timestamp
+            """,
+            (dataset_id,),
+        )
+        rows = cur.fetchall()
+    finally:
+        conn.close()
 
-    rows = cur.fetchall()
-    conn.close()
-
-    sessions: dict[tuple[str, str], list[tuple]] = {}
+    sessions: dict[tuple[str, str], list[tuple[tuple, datetime]]] = defaultdict(list)
     for row in rows:
-        symbol, ts = row[0], row[1]
-        dt = datetime.fromtimestamp(ts, IST)
-        sessions.setdefault((symbol, dt.date().isoformat()), []).append((row, dt))
+        dt = datetime.fromtimestamp(row[1], IST)
+        sessions[(row[0], dt.date().isoformat())].append((row, dt))
 
-    clean = []
-    quarantine = []
+    clean_by_symbol: dict[str, list[dict]] = defaultdict(list)
+    quarantine_by_symbol: dict[str, list[dict]] = defaultdict(list)
     reason_counts = Counter()
     session_counts = Counter()
+    complete_sessions: dict[str, int] = Counter()
+    partial_sessions: dict[str, int] = Counter()
 
     for (symbol, session_date), session_rows in sorted(sessions.items()):
         regular_rows = [(row, dt) for row, dt in session_rows if _is_regular(dt)]
 
-        # Entire non-weekday / non-regular sessions are excluded, but retained
-        # in the quarantine ledger. No source row is modified or synthesized.
+        session_bad = False
         for row, dt in session_rows:
             reasons = []
             if dt.weekday() >= 5:
@@ -94,73 +119,89 @@ def build_research_dataset(
                 reasons.append("OUTSIDE_REGULAR_SESSION")
             if row[6] is not None and row[6] < 0:
                 reasons.append("NEGATIVE_VOLUME")
-            if not (row[2] > 0 and row[3] > 0 and row[4] > 0 and row[5] > 0 and row[4] <= row[2] <= row[3] and row[4] <= row[5] <= row[3]):
+            if not _valid_ohlc(row):
                 reasons.append("INVALID_OHLC")
-
             if reasons:
-                quarantine.append({
+                session_bad = True
+                payload = {
                     "symbol": symbol,
                     "session_date": session_date,
-                    "timestamp": datetime.fromtimestamp(row[1], IST).isoformat(),
+                    **_bar_payload(row, dt),
                     "timestamp_epoch": row[1],
-                    "open": row[2], "high": row[3], "low": row[4], "close": row[5],
-                    "volume": row[6],
                     "reasons": reasons,
-                })
-                for reason in reasons:
-                    reason_counts[reason] += 1
+                }
+                quarantine_by_symbol[symbol].append(payload)
+                reason_counts.update(reasons)
 
         if not regular_rows:
             session_counts["EXCLUDED_NO_REGULAR_BARS"] += 1
             continue
 
-        # A normal research session must contain the expected opening and
-        # terminal coverage. Partial sessions are not filled or interpolated.
         if not _is_full_session(regular_rows):
+            partial_sessions[symbol] += 1
             session_counts["EXCLUDED_PARTIAL_SESSION"] += 1
             for row, dt in regular_rows:
-                if not any(q["timestamp_epoch"] == row[1] and q["symbol"] == symbol for q in quarantine):
-                    quarantine.append({
-                        "symbol": symbol,
-                        "session_date": session_date,
-                        "timestamp": dt.isoformat(),
-                        "timestamp_epoch": row[1],
-                        "open": row[2], "high": row[3], "low": row[4], "close": row[5],
-                        "volume": row[6],
-                        "reasons": ["PARTIAL_SESSION"],
-                    })
+                if not any(
+                    item["timestamp_epoch"] == row[1] and item["symbol"] == symbol
+                    for item in quarantine_by_symbol[symbol]
+                ):
+                    quarantine_by_symbol[symbol].append(
+                        {
+                            "symbol": symbol,
+                            "session_date": session_date,
+                            **_bar_payload(row, dt),
+                            "timestamp_epoch": row[1],
+                            "reasons": ["PARTIAL_SESSION"],
+                        }
+                    )
             continue
 
+        if session_bad:
+            session_counts["EXCLUDED_INVALID_SESSION"] += 1
+            continue
+
+        complete_sessions[symbol] += 1
         for row, dt in regular_rows:
-            if row[6] is not None and row[6] < 0:
-                continue
-            if not (row[2] > 0 and row[3] > 0 and row[4] > 0 and row[5] > 0 and row[4] <= row[2] <= row[3] and row[4] <= row[5] <= row[3]):
-                continue
-            clean.append({
-                "symbol": symbol,
-                "session_date": session_date,
-                "timestamp": dt.isoformat(),
-                "timestamp_epoch": row[1],
-                "open": row[2], "high": row[3], "low": row[4], "close": row[5],
-                "volume": row[6],
-            })
+            clean_by_symbol[symbol].append(_bar_payload(row, dt))
 
-    clean.sort(key=lambda x: (x["symbol"], x["timestamp_epoch"]))
-    quarantine.sort(key=lambda x: (x["symbol"], x["timestamp_epoch"], x["reasons"]))
+    clean_rows = 0
+    quarantine_rows = 0
+    symbol_manifest: dict[str, dict] = {}
 
-    with clean_path.open("w", encoding="utf-8") as handle:
-        for row in clean:
-            handle.write(_canonical(row) + "\n")
-    with quarantine_path.open("w", encoding="utf-8") as handle:
-        for row in quarantine:
-            handle.write(_canonical(row) + "\n")
+    for symbol in sorted(set(clean_by_symbol) | set(quarantine_by_symbol)):
+        clean_path = clean_dir / f"{symbol}.jsonl"
+        quarantine_path = quarantine_dir / f"{symbol}.jsonl"
+        clean_rows += len(clean_by_symbol[symbol])
+        quarantine_rows += len(quarantine_by_symbol[symbol])
+
+        with clean_path.open("w", encoding="utf-8") as handle:
+            for row in clean_by_symbol[symbol]:
+                handle.write(_canonical(row) + "\n")
+
+        quarantine_by_symbol[symbol].sort(
+            key=lambda x: (x["timestamp_epoch"], x["reasons"])
+        )
+        with quarantine_path.open("w", encoding="utf-8") as handle:
+            for row in quarantine_by_symbol[symbol]:
+                handle.write(_canonical(row) + "\n")
+
+        symbol_manifest[symbol] = {
+            "clean_rows": len(clean_by_symbol[symbol]),
+            "quarantine_rows": len(quarantine_by_symbol[symbol]),
+            "complete_sessions": complete_sessions[symbol],
+            "partial_sessions": partial_sessions[symbol],
+            "clean_fingerprint": _fingerprint(clean_by_symbol[symbol]),
+            "quarantine_fingerprint": _fingerprint(quarantine_by_symbol[symbol]),
+        }
 
     manifest = {
-        "schema_version": "1.0",
+        "schema_version": "1.1",
+        "bar_schema": "MarketBar",
         "dataset_id": dataset_id,
         "source": str(db_path),
         "source_unchanged": True,
         "timezone": "Asia/Kolkata",
+        "symbol_partitioned": True,
         "session_policy": {
             "regular_open": "09:15",
             "regular_close": "15:30",
@@ -169,21 +210,27 @@ def build_research_dataset(
             "open_tolerance_seconds": OPEN_TOLERANCE_SECONDS,
             "no_interpolation": True,
             "no_timestamp_rounding": True,
+            "no_cross_symbol_mixing": True,
         },
         "input_rows": len(rows),
-        "clean_rows": len(clean),
-        "quarantine_rows": len(quarantine),
+        "clean_rows": clean_rows,
+        "quarantine_rows": quarantine_rows,
         "quarantine_reasons": dict(reason_counts),
         "session_exclusions": dict(session_counts),
-        "clean_fingerprint": _fingerprint(clean),
-        "quarantine_fingerprint": _fingerprint(quarantine),
+        "symbols": symbol_manifest,
     }
-    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    manifest["manifest_fingerprint"] = _fingerprint(manifest)
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     return manifest
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Build a non-destructive NSE equity research dataset from the local Dhan SQLite store.")
+    parser = argparse.ArgumentParser(
+        description="Build a non-destructive NSE equity research dataset from the local Dhan SQLite store."
+    )
     parser.add_argument("--db", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--dataset", default="equity_nse_discovery_5m")
