@@ -1,10 +1,17 @@
 from __future__ import annotations
 
 import json
+import sys
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+# The runner is stored under /scripts while the application package is under /backend.
+# Add the backend root explicitly so the same command works from the repository backend directory.
+BACKEND_ROOT = Path(__file__).resolve().parents[1] / "backend"
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.services.intraday_backtest import IntradayBacktestConfig, run_intraday_backtest
 
