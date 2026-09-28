@@ -81,3 +81,25 @@ def test_v2a_does_not_require_market_or_sector_context():
 
     assert signal["action"] in {"BUY", "NEUTRAL"}
     assert "checks" in signal
+
+
+def test_v2a_handles_zero_range_breakout_bar_without_key_error():
+    opens = [100.0] * 25
+    highs = [101.0] * 25
+    lows = [99.0] * 25
+    closes = [100.5] * 25
+    volumes = [1000.0] * 25
+    opens[-1] = highs[-1] = lows[-1] = closes[-1] = 102.0
+
+    signal = generate_intraday_v2a_signal(
+        opens,
+        highs,
+        lows,
+        closes,
+        volumes,
+        opening_high=101.0,
+    )
+
+    assert signal["action"] == "NEUTRAL"
+    assert "checks" in signal
+    assert signal["breakout_quality"]["bullish_body"] is False
