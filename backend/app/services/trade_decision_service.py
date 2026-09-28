@@ -10,6 +10,7 @@ from app.services.execution_guard import ExecutionContext, authorize_order
 from app.services.intraday_signal_engine import IntradaySignal, generate_long_intraday_signal
 from app.services.paper_risk_guard import PaperRiskConfig, PaperRiskState, evaluate_paper_entry
 from app.services.position_risk import PositionRiskConfig, calculate_long_position
+from app.services.portfolio_risk import PortfolioPosition, PortfolioRiskConfig, evaluate_new_position
 
 
 @dataclass(frozen=True)
@@ -62,6 +63,10 @@ def build_paper_trade_decision(
     position_config: PositionRiskConfig | None = None,
     opening_high: float | None = None,
     min_confidence: float = 65.0,
+    existing_portfolio_positions: Sequence[PortfolioPosition] | None = None,
+    portfolio_risk_config: PortfolioRiskConfig | None = None,
+    proposed_sector: str | None = None,
+    portfolio_drawdown_fraction: float = 0.0,
 ) -> TradeDecision:
     """Create one auditable BUY/NEUTRAL paper-trade decision.
 
@@ -104,6 +109,10 @@ def build_paper_trade_decision(
         return TradeDecision(signal_id, normalized_symbol, "BUY", "BLOCKED", plan.reason, signal.confidence, signal.entry, signal.stop, signal.target, plan.risk_reward, plan.quantity, plan.capital_required, plan.max_loss, broker.upper())
 
     risk_reward = round(plan.risk_reward, 2) if plan.risk_reward is not None else None
+    if existing_portfolio_positions is not None:
+        portfolio_gate = evaluate_new_position(capital=equity, proposed_market_value=plan.capital_required, proposed_risk_value=plan.max_loss, proposed_sector=proposed_sector, existing_positions=existing_portfolio_positions, config=portfolio_risk_config or PortfolioRiskConfig(), current_drawdown_fraction=portfolio_drawdown_fraction)
+        if not portfolio_gate.allowed:
+            return TradeDecision(signal_id, normalized_symbol, "BUY", "BLOCKED", portfolio_gate.reason, signal.confidence, plan.entry, plan.stop, plan.target, risk_reward, plan.quantity, plan.capital_required, plan.max_loss, broker.upper())
     position_config = position_config or PositionRiskConfig()
     execution = authorize_order(
         ExecutionContext(
