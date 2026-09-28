@@ -21,6 +21,7 @@ class ExecutionQuote:
     spot: float | None = None
     expiry: str | None = None
     security_id: str | None = None
+    exchange_segment: str | None = None
     source: str = "external_historical_quotes"
 
 
@@ -71,6 +72,20 @@ def normalize_execution_quotes(
         if expected_timestamps is not None and timestamp not in expected_timestamps:
             raise ValueError(f"historical execution quote is not timestamp-aligned: {timestamp}")
 
+        expiry = str(row["expiry"]).strip() if row.get("expiry") is not None else None
+        security_id = str(row["security_id"]).strip() if row.get("security_id") is not None else None
+        exchange_segment = (
+            str(row["exchange_segment"]).strip().upper()
+            if row.get("exchange_segment") is not None
+            else None
+        )
+        if row.get("expiry") is not None and not expiry:
+            raise ValueError("historical execution quote expiry cannot be empty")
+        if row.get("security_id") is not None and not security_id:
+            raise ValueError("historical execution quote security_id cannot be empty")
+        if row.get("exchange_segment") is not None and not exchange_segment:
+            raise ValueError("historical execution quote exchange_segment cannot be empty")
+
         key = (timestamp, strike, option_type)
         if key in seen:
             raise ValueError(f"duplicate historical execution quote: {key}")
@@ -84,8 +99,9 @@ def normalize_execution_quotes(
                 bid=bid,
                 ask=ask,
                 spot=_number(row.get("spot")),
-                expiry=str(row["expiry"]) if row.get("expiry") is not None else None,
-                security_id=str(row["security_id"]) if row.get("security_id") is not None else None,
+                expiry=expiry,
+                security_id=security_id,
+                exchange_segment=exchange_segment,
                 source=str(row.get("source") or "external_historical_quotes"),
             )
         )
@@ -111,6 +127,7 @@ def build_execution_grade_snapshots(
             "spot": quote.spot,
             "expiry": quote.expiry,
             "security_id": quote.security_id,
+            "exchange_segment": quote.exchange_segment,
             "source": quote.source,
             "execution_grade": True,
         }
