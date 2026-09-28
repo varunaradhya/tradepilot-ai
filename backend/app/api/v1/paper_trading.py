@@ -25,6 +25,7 @@ from app.services.intraday_scorecard import build_intraday_scorecard, ScorecardC
 from app.services.intraday_evidence_aggregation import aggregate_scorecards
 from app.services.strategy_paper_authorization import authorize_strategy, get_active_authorization, revoke_strategy
 from app.services.paper_signal_request_service import claim_request, complete_request, replay_response, request_fingerprint
+from app.brokers.dhan import DhanAPIError
 from app.services.paper_session_state_service import load_paper_session_state, save_paper_session_state
 
 router = APIRouter(prefix="/paper-trading", tags=["Paper Trading"])
@@ -220,7 +221,13 @@ def paper_live_ltp(current_user: User = Depends(get_current_user), db: Session =
         _persist_orchestrator(db, current_user.id)
         return result
     except ValueError as exc: raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
-    except Exception as exc: raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    except DhanAPIError as exc:
+        if exc.status_code == 401:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Dhan authentication expired or is invalid. Reconnect Dhan and retry.") from exc
+        if exc.status_code == 429:
+            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Dhan rate limit reached. Retry after a short delay.") from exc
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Dhan market-data request failed.") from exc
+    except Exception as exc: raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Dhan market-data request failed.") from exc
 
 @router.post("/session/reset")
 def paper_session_reset(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict[str, Any]:
@@ -255,7 +262,13 @@ def paper_dhan_session(payload: DhanPaperRequest, current_user: User = Depends(g
         _persist_orchestrator(db, current_user.id)
         return result
     except ValueError as exc: raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
-    except Exception as exc: raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    except DhanAPIError as exc:
+        if exc.status_code == 401:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Dhan authentication expired or is invalid. Reconnect Dhan and retry.") from exc
+        if exc.status_code == 429:
+            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Dhan rate limit reached. Retry after a short delay.") from exc
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Dhan historical-data request failed.") from exc
+    except Exception as exc: raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Dhan historical-data request failed.") from exc
 
 @router.post("/session/market-reset")
 def paper_market_reset(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict[str, Any]:
