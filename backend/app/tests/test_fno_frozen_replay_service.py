@@ -8,7 +8,7 @@ from app.services.fno_frozen_replay_service import replay_frozen_execution_evide
 def _package(count=60):
     rows = [
         {
-            "timestamp": index * 60,
+            "timestamp": (index + 1) * 60,
             "strike": 25000,
             "option_type": "CE",
             "bid": 99.0,
@@ -30,28 +30,29 @@ def _package(count=60):
         )
         + "\n"
     ).encode()
+    timestamps = {r["timestamp"] for r in rows}
     manifest, quotes = import_execution_evidence_csv(
         raw,
         source="vendor_x",
         license_name="commercial-research",
-        coverage_start=0,
-        coverage_end=(count - 1) * 60,
+        coverage_start=60,
+        coverage_end=count * 60,
         timezone="Asia/Kolkata",
         sampling_seconds=60,
         contract_universe="NIFTY weekly options",
-        expected_timestamps={r["timestamp"] for r in rows},
+        expected_timestamps=timestamps,
     )
     return freeze_execution_evidence(
         manifest=manifest,
         quotes=quotes,
-        expected_timestamps={r["timestamp"] for r in rows},
+        expected_timestamps=timestamps,
     )
 
 
 def _bars(count=60):
     return [
         {
-            "timestamp": index * 60,
+            "timestamp": (index + 1) * 60,
             "open": 25000.0,
             "high": 25020.0,
             "low": 24980.0,
