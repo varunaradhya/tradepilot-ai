@@ -7,6 +7,11 @@ from app.models.alert import Alert
 from app.models.broker_connection import BrokerConnection
 from app.models.holding import Holding
 from app.models.paper_historical_run import PaperHistoricalRun
+from app.models.paper_market_state import PaperMarketState
+from app.models.paper_trade_learning import PaperTradeLearningEvent
+from app.models.paper_ml_model import PaperMlModel
+from app.models.paper_ml_deployment import PaperMlDeployment
+from app.models.paper_ml_prediction import PaperMlPrediction
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.models.watchlist import Watchlist
