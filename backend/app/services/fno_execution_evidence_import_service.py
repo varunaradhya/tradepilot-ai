@@ -57,8 +57,12 @@ def parse_execution_quote_csv(
     reader = csv.DictReader(io.StringIO(text, newline=""))
     fieldnames = tuple(reader.fieldnames or ())
     missing = [name for name in REQUIRED_COLUMNS if name not in fieldnames]
+    allowed = set(REQUIRED_COLUMNS) | set(OPTIONAL_COLUMNS)
+    unexpected = [name for name in fieldnames if name not in allowed]
     if missing:
         raise ValueError(f"execution evidence CSV missing columns: {missing}")
+    if unexpected:
+        raise ValueError(f"execution evidence CSV has unexpected columns: {unexpected}")
 
     rows: list[dict[str, Any]] = []
     for line_number, row in enumerate(reader, start=2):
