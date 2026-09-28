@@ -13,6 +13,11 @@ REGULAR_OPEN = time(9, 15)
 LAST_EXPECTED_BAR = time(15, 25)
 REGULAR_CLOSE = time(15, 30)
 EXPECTED_REGULAR_BARS = 75
+OPEN_TOLERANCE_SECONDS = 5
+
+
+def _seconds_since_midnight(value: time) -> int:
+    return value.hour * 3600 + value.minute * 60 + value.second
 
 
 def audit(db_path: Path, dataset_id: str) -> dict:
@@ -59,7 +64,6 @@ def audit(db_path: Path, dataset_id: str) -> dict:
             )
 
     incomplete_sessions = []
-    special_or_partial_sessions = []
     for (symbol, day), values in sorted(sessions.items()):
         regular = [
             x for x in values
@@ -72,28 +76,35 @@ def audit(db_path: Path, dataset_id: str) -> dict:
         last = max(regular)
         bars = len(regular)
 
-        normal_full = (
-            first.time() <= REGULAR_OPEN
-            and last.time() >= LAST_EXPECTED_BAR
-            and bars in {EXPECTED_REGULAR_BARS, EXPECTED_REGULAR_BARS + 1}
+        first_seconds = _seconds_since_midnight(first.time())
+        last_seconds = _seconds_since_midnight(last.time())
+        open_seconds = _seconds_since_midnight(REGULAR_OPEN)
+        expected_last_seconds = _seconds_since_midnight(LAST_EXPECTED_BAR)
+
+        first_is_open = (
+            open_seconds <= first_seconds <= open_seconds + OPEN_TOLERANCE_SECONDS
         )
+        last_is_expected = last_seconds >= expected_last_seconds
+        normal_full = first_is_open and last_is_expected and bars in {
+            EXPECTED_REGULAR_BARS,
+            EXPECTED_REGULAR_BARS + 1,
+        }
 
         if not normal_full:
-            item = {
-                "symbol": symbol,
-                "date": day.isoformat(),
-                "bars": bars,
-                "first": first.isoformat(),
-                "last": last.isoformat(),
-            }
-            incomplete_sessions.append(item)
-            if bars < EXPECTED_REGULAR_BARS or first.time() > REGULAR_OPEN:
-                special_or_partial_sessions.append(item)
+            incomplete_sessions.append(
+                {
+                    "symbol": symbol,
+                    "date": day.isoformat(),
+                    "bars": bars,
+                    "first": first.isoformat(),
+                    "last": last.isoformat(),
+                }
+            )
 
     conn.close()
 
     return {
-        "schema_version": "1.1",
+        "schema_version": "1.2",
         "dataset_id": dataset_id,
         "database": str(db_path),
         "timezone": "Asia/Kolkata",
@@ -102,6 +113,8 @@ def audit(db_path: Path, dataset_id: str) -> dict:
             "close": "15:30",
             "bar_timestamp_convention": "start_of_5m_bar",
             "normal_full_session_bars": 75,
+            "accepted_terminal_bar_count": 76,
+            "open_timestamp_tolerance_seconds": OPEN_TOLERANCE_SECONDS,
         },
         "total_bars": total,
         "symbols": dict(sorted(by_symbol.items())),
@@ -114,8 +127,6 @@ def audit(db_path: Path, dataset_id: str) -> dict:
         "outside_regular_session_examples": outside_regular_session[:100],
         "incomplete_session_count": len(incomplete_sessions),
         "incomplete_session_examples": incomplete_sessions[:100],
-        "special_or_partial_session_count": len(special_or_partial_sessions),
-        "special_or_partial_session_examples": special_or_partial_sessions[:100],
         "source_unchanged": True,
     }
 
