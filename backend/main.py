@@ -14,6 +14,7 @@ from app.api.v1.paper_evidence import router as paper_evidence_router
 from app.api.v1.trade_decision import router as trade_decision_router
 from app.api.v1.fno import router as fno_router
 from app.api.v1.paper_monitoring import router as paper_monitoring_router
+from app.api.v1.paper_validation import router as paper_validation_router
 from app.api.v1.market_scheduler import router as market_scheduler_router
 from app.api.v1.operations import router as operations_router
 from app.api.v1.observability import router as observability_router
