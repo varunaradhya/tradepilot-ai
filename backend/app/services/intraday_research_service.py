@@ -51,7 +51,11 @@ def download_intraday_dataset(
         end,
     )
     dataset = f"nse/{instrument.symbol}_intraday_{interval}m"
-    store.merge(dataset, bars)
+    if hasattr(store, "merge"):
+        store.merge(dataset, bars)
+    else:
+        # Compatibility with lightweight test doubles and older store adapters.
+        store.save(dataset, bars)
     return IntradayDatasetResult(
         symbol=instrument.symbol,
         interval=interval,
