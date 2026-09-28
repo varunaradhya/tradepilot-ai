@@ -68,6 +68,8 @@ def _breakout_quality(
             "breakout_distance_atr": 0.0,
             "close_location": 0.0,
             "range_expansion": 0.0,
+            "body_ratio": 0.0,
+            "bullish_body": False,
             "breakout_quality": False,
         }
 
