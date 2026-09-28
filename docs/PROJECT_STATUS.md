@@ -242,3 +242,5 @@ Never mark a milestone green merely because code was committed. A milestone beco
 - F&O backtest engine: `9bf31e1f5650bb112c8a624c1e0f6a1639eafbdb`
 - F&O backtest tests: `37feee987f1fd025abebcaa10ef16928492a639c`
 - QA plan checkpoint: `5bd9fcc7ec316fb990fe5aed41250701404c7a91`
+
+- F&O UI/UX hardening: option-enabled stock underlying search, stock historical instrument-type routing, explicit market/evidence/qualification/live readiness states, stale-search failure handling. Regression coverage: `5208b4db`; latest implementation batch: `b98adc91` through `f652b2f6`.
