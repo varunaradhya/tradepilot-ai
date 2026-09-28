@@ -244,3 +244,5 @@ Never mark a milestone green merely because code was committed. A milestone beco
 - QA plan checkpoint: `5bd9fcc7ec316fb990fe5aed41250701404c7a91`
 
 - F&O UI/UX hardening: option-enabled stock underlying search, stock historical instrument-type routing, explicit market/evidence/qualification/live readiness states, stale-search failure handling. Regression coverage: `5208b4db`; latest implementation batch: `b98adc91` through `f652b2f6`.
+
+- UI safety-state hardening: shared readiness UI now shows paper availability and live-execution lock explicitly; runtime error boundary no longer exposes browser stack traces and fully clears authentication on session reset. Commit batch: `f66d8438`, `99dff446`, `204cb0f4`.
