@@ -95,6 +95,21 @@ class PaperMarketCoordinator:
             "signal": signal, "execution": routed, "paper": self.orchestrator.summary(),
         }
 
+    def export_state(self, session: str, symbol: str) -> dict[str, Any]:
+        key = (session, symbol.strip().upper())
+        state = self._states.get(key, PaperMarketState())
+        return {"opens": list(state.opens), "highs": list(state.highs), "lows": list(state.lows), "closes": list(state.closes), "volumes": list(state.volumes)}
+
+    def restore_state(self, session: str, symbol: str, state: dict[str, Any]) -> None:
+        key = (session, symbol.strip().upper())
+        restored = PaperMarketState()
+        series = [state.get(name) or [] for name in ("opens", "highs", "lows", "closes", "volumes")]
+        if not all(len(values) == len(series[0]) for values in series):
+            raise ValueError("Persisted market state has inconsistent series lengths")
+        for values in zip(*series):
+            restored.append(*[float(value) for value in values])
+        self._states[key] = restored
+
     def close_session(self, session: str, symbol: str, close: float) -> dict[str, Any]:
         position = self.orchestrator.summary().get("open_position")
         normalized_symbol = symbol.strip().upper()
