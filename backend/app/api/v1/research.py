@@ -24,6 +24,7 @@ from app.services.intraday_walk_forward import run_fixed_parameter_walk_forward
 from app.services.research_data_quality import analyze_intraday_quality
 from app.services.research_experiment_service import list_experiments, record_experiment
 from app.services.corporate_action_service import CorporateActionFactor, cumulative_adjustment_factor, adjust_ohlcv
+from app.services.benchmark_research_service import download_intraday_benchmark_dataset
 from app.services.strategy_registry import list_strategies
 
 router = APIRouter(prefix="/research", tags=["Research"])
@@ -74,6 +75,46 @@ def download_research_daily(symbol: str = Query(min_length=1, max_length=30), st
     except (ValueError,InstrumentMasterError) as exc: raise HTTPException(status_code=422,detail=str(exc)) from exc
     except DhanAPIError as exc: raise HTTPException(status_code=502,detail=str(exc)) from exc
     return {"status":"stored","symbol":result.symbol,"dataset":result.dataset,"bars":result.bars,"start":result.start,"end":result.end,"valid":result.valid}
+
+@router.post("/intraday/benchmark")
+def download_research_benchmark(
+    benchmark: str = Query(default="NIFTY", min_length=2, max_length=30),
+    interval: str = Query(default="5", pattern="^(1|5|15|25|60)$"),
+    start: date | None = None,
+    end: date | None = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    end_date = end or date.today()
+    start_date = start or (end_date - timedelta(days=365 * 5))
+    if start_date >= end_date:
+        raise HTTPException(status_code=422, detail="start must be before end")
+    if (end_date - start_date).days > 365 * 5:
+        raise HTTPException(status_code=422, detail="Intraday research history is limited to 5 years per request")
+    try:
+        result = download_intraday_benchmark_dataset(
+            _dhan_client(db, current_user),
+            benchmark,
+            start_date,
+            end_date,
+            interval,
+        )
+    except (ValueError, InstrumentMasterError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except DhanAPIError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return {
+        "status": "stored",
+        "benchmark": result.benchmark,
+        "security_id": result.security_id,
+        "interval": result.interval,
+        "dataset": result.dataset,
+        "bars": result.bars,
+        "start": result.start,
+        "end": result.end,
+        "valid": result.valid,
+        "mode": "RESEARCH_ONLY",
+    }
 
 @router.post("/intraday")
 def download_research_intraday(symbol: str = Query(min_length=1,max_length=30), interval: str = Query(default="5",pattern="^(1|5|15|25|60)$"), start: date | None=None, end: date | None=None, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)):
