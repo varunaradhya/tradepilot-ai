@@ -13,6 +13,7 @@ from app.services.dhan_historical_service import HistoricalRequest, fetch_intrad
 from app.services.instrument_master_service import InstrumentMaster, instrument_master
 from app.services.paper_market_service import PaperMarketCoordinator
 from app.services.paper_ml_service import record_trade_outcome
+from app.services.paper_validation_service import validation_run_key, capture_day_from_ledger, record_validation_day
 
 
 def run_dhan_paper_session(
@@ -42,7 +43,9 @@ def run_dhan_paper_session(
     instrument = matches[0]
 
     client = DhanClient(connection.client_id, get_access_token(connection))
-    bars, diagnostics = fetch_intraday_history(
+    run_key = validation_run_key(trading_day)
+    try:
+        bars, diagnostics = fetch_intraday_history(
         client,
         HistoricalRequest(
             security_id=instrument.security_id,
@@ -51,12 +54,18 @@ def run_dhan_paper_session(
             interval=interval,
         ),
         trading_day,
-        trading_day + timedelta(days=1),
-    )
+            trading_day + timedelta(days=1),
+        )
+    except Exception as exc:
+        db.rollback()
+        record_validation_day(db, user_id, run_key, trading_day, "OPERATIONAL_FAILURE", 0, 0.0, {"valid": False, "provider_errors": 1, "error_type": type(exc).__name__})
+        raise
     if not diagnostics["valid"]:
+        record_validation_day(db, user_id, run_key, trading_day, "DATA_QUALITY_FAILED", 0, 0.0, diagnostics)
         raise ValueError(f"Historical dataset failed validation: {diagnostics.get('message', 'invalid dataset')}")
 
     if not bars:
+        record_validation_day(db, user_id, run_key, trading_day, "NO_DATA", 0, 0.0, diagnostics)
         return {
             "mode": "SIMULATION_ONLY",
             "symbol": instrument.symbol,
@@ -145,7 +154,7 @@ def run_dhan_paper_session(
         persisted += 1
 
     db.commit()
-
+    validation = capture_day_from_ledger(db, user_id, run_key, trading_day, diagnostics)
 
     return {
         "mode": "SIMULATION_ONLY",
@@ -158,4 +167,5 @@ def run_dhan_paper_session(
         "diagnostics": diagnostics,
         "last": last_result,
         "paper": runner.orchestrator.summary(),
+        "validation": {"run": run_key, "status": validation.status, "trades": validation.trades, "net_pnl": validation.net_pnl},
     }
