@@ -9,11 +9,13 @@ from typing import Any, Sequence
 
 from app.services.fno_evidence_manifest_service import (
     ExecutionEvidenceManifest,
+    manifest_from_mapping,
     validate_execution_evidence_manifest,
 )
 from app.services.fno_execution_evidence_service import (
     ExecutionQuote,
     build_execution_grade_snapshots,
+    normalize_execution_quotes,
     validate_execution_quote_coverage,
 )
 
@@ -126,6 +128,19 @@ def verify_frozen_execution_evidence(
     package: FrozenExecutionEvidencePackage,
 ) -> bool:
     """Verify the deterministic package hash before replay consumes it."""
+    manifest_result = validate_execution_evidence_manifest(package.manifest)
+    if not manifest_result["valid"]:
+        return False
+    try:
+        normalized = normalize_execution_quotes([_quote_payload(q) for q in package.quotes])
+    except ValueError:
+        return False
+    if tuple(normalized) != tuple(package.quotes):
+        return False
+    if not package.snapshots or any(
+        snapshot.get("execution_grade") is not True for snapshot in package.snapshots
+    ):
+        return False
     expected = hashlib.sha256(
         canonical_package_bytes(package.manifest, package.quotes)
     ).hexdigest()
@@ -166,6 +181,9 @@ def load_frozen_execution_evidence(raw_bytes: bytes) -> FrozenExecutionEvidenceP
     if not isinstance(raw_quotes, list):
         raise ValueError("frozen execution evidence quotes must be a list")
 
+    if not all(isinstance(item, dict) for item in raw_quotes):
+        raise ValueError("frozen execution evidence quotes must contain only objects")
+
     quotes = tuple(
         ExecutionQuote(
             timestamp=int(item["timestamp"]),
@@ -180,7 +198,6 @@ def load_frozen_execution_evidence(raw_bytes: bytes) -> FrozenExecutionEvidenceP
             source=str(item.get("source") or "external_historical_quotes"),
         )
         for item in raw_quotes
-        if isinstance(item, dict)
     )
     package = FrozenExecutionEvidencePackage(
         manifest=manifest,
