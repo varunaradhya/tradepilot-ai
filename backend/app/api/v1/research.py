@@ -24,8 +24,14 @@ from app.services.intraday_walk_forward import run_fixed_parameter_walk_forward
 from app.services.research_data_quality import analyze_intraday_quality
 from app.services.research_experiment_service import list_experiments, record_experiment
 from app.services.corporate_action_service import CorporateActionFactor, cumulative_adjustment_factor, adjust_ohlcv
+from app.services.strategy_registry import list_strategies
 
 router = APIRouter(prefix="/research", tags=["Research"])
+
+@router.get("/strategies")
+def strategy_catalog(current_user: User=Depends(get_current_user)):
+    del current_user
+    return {"strategies":list_strategies(),"live_execution_enabled":False}
 
 @router.get("/instruments")
 def search_research_instruments(q: str = Query(min_length=2, max_length=80), current_user: User = Depends(get_current_user)):
