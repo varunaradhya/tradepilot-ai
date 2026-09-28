@@ -94,3 +94,9 @@ def test_execution_grade_snapshots_preserve_executable_quotes():
     assert snapshots[0]["oc"]["25000"]["ce"]["top_bid_price"] == 99.5
     assert snapshots[0]["oc"]["25000"]["ce"]["top_ask_price"] == 100.0
     assert snapshots[0]["oc"]["25000"]["pe"]["top_bid_price"] == 101.0
+
+
+def test_execution_quotes_reject_non_positive_timestamp():
+    import pytest
+    with pytest.raises(ValueError, match="positive timestamp"):
+        normalize_execution_quotes([_row(timestamp=0)])
