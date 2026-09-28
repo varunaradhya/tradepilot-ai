@@ -48,6 +48,12 @@ class OperationalSnapshot:
         }
 
 
+def assert_simulation_only(mode: str) -> None:
+    """Reject unknown execution modes and any mode other than simulation."""
+    if str(mode).strip().upper() != ExecutionMode.SIMULATION_ONLY.value:
+        raise SafetyViolation("Only SIMULATION_ONLY execution mode is permitted")
+
+
 def assert_live_order_blocked() -> None:
     """Permanent P4 guard: no code path may place a live order yet."""
     raise SafetyViolation("Live order execution is locked by TradePilot P4 safety policy")
