@@ -56,7 +56,10 @@ def normalize_execution_quotes(
         except (KeyError, TypeError, ValueError):
             raise ValueError("historical execution quote requires integer timestamp")
 
-        if timestamp <= 0:\n            raise ValueError("historical execution quote requires positive timestamp")\n\n        strike = _number(row.get("strike"))
+        if timestamp <= 0:
+            raise ValueError("historical execution quote requires positive timestamp")
+
+        strike = _number(row.get("strike"))
         bid = _number(row.get("bid"))
         ask = _number(row.get("ask"))
         option_type = str(row.get("option_type") or "").strip().upper()
