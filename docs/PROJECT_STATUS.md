@@ -192,7 +192,7 @@ Do not re-implement or re-test as a new feature without first checking this file
 
 Never mark a milestone green merely because code was committed. A milestone becomes green only after relevant automated tests pass and, where applicable, real/replay evidence is captured.
 
-## Latest implementation commits\n\n- Execution evidence CSV importer: `9efe5a65` + `6d5c7458`; importer regression tests: `0c892cb7`\n- Frozen evidence package + persistence verification: `cee9284e` + `b6e27207` + `beba992e` + `fb650e2d` + `98e25297` + `c6179695`\n- Qualification now requires verified frozen evidence: `b9006cd3` + `1662a985`\n- Frozen replay boundary: `c926e8f8` + `75c126dc`\n- Frozen evidence integrity revalidation: `c252f1cf`\n\n## Latest implementation commits
+## Latest implementation commits\n\n- Execution evidence CSV importer: `9efe5a65` + `6d5c7458`; importer regression tests: `0c892cb7`\n- Frozen evidence package + persistence verification: `cee9284e` + `b6e27207` + `beba992e` + `fb650e2d` + `98e25297` + `c6179695`\n- Qualification now requires verified frozen evidence: `b9006cd3` + `1662a985`\n- Frozen replay boundary: `c926e8f8` + `75c126dc`\n- Frozen evidence integrity revalidation: `1cc39feb` + `0f5f7e84` + `e5c30b4f`\n\n## Latest implementation commits
 
 - F&O idempotency/candle identity: `ab6ae24ebc9acae11c9074e3a78256b4fbcb05a6`, `b47be9fe18377433a4de23b9ba0941bcff39eb99`
 - F&O quote outage hardening: `cd8c65774c8c6dd442403bf4aadbf61217573c22`
