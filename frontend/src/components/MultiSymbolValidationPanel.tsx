@@ -13,10 +13,11 @@ export default function MultiSymbolValidationPanel() {
   const [report, setReport] = useState<Report | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [readiness, setReadiness] = useState<{ ready: boolean; manifest_valid: boolean; reasons: string[] } | null>(null);
 
   async function load() {
     setLoading(true); setError("");
-    try { setReport(await api.get<Report>(`/paper-validation/report?start=${encodeURIComponent(start)}`)); }
+    try { const encoded = encodeURIComponent(start); const [nextReport, nextReadiness] = await Promise.all([api.get<Report>(`/paper-validation/report?start=${encoded}`), api.get<{ ready: boolean; manifest_valid: boolean; reasons: string[] }>(`/paper-validation/readiness?start=${encoded}`)]); setReport(nextReport); setReadiness(nextReadiness); }
     catch (err) { setReport(null); setError(err instanceof Error ? err.message : "Paper validation evidence is unavailable."); }
     finally { setLoading(false); }
   }
@@ -27,7 +28,7 @@ export default function MultiSymbolValidationPanel() {
       <div className="flex gap-2"><input aria-label="Validation start date" type="date" value={start} onChange={e => setStart(e.target.value)} className="rounded-lg border px-3 py-2 text-sm" /><button type="button" onClick={() => void load()} disabled={loading || !start} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{loading ? "Loading…" : "Load evidence"}</button></div>
     </div>
     {error && <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-    {report && <><div className="mt-4 grid gap-3 sm:grid-cols-4">{[
+    {report && <><div className="mt-4 rounded-xl border p-3 text-sm"><span className="font-semibold">Evidence gate:</span> {readiness?.ready ? "30-session evidence complete" : "Evidence pending"} · manifest {readiness?.manifest_valid ? "verified" : "not verified"}{readiness?.reasons?.length ? ` · ${readiness.reasons.join(", ")}` : ""}</div><div className="mt-4 grid gap-3 sm:grid-cols-4">{[
       ["Status", report.status], ["Symbols", String(report.symbols.length)], ["Completed sessions", `${report.progress.completed_sessions}/${report.progress.required_sessions}`], ["Remaining", String(report.progress.remaining_sessions)]
     ].map(([key, value]) => <div key={key} className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">{key}</p><p className="mt-1 font-bold">{value}</p></div>)}</div>
     <div className="mt-4 flex flex-wrap gap-2">{report.symbols.map(symbol => <span key={symbol} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold">{symbol}</span>)}</div>
