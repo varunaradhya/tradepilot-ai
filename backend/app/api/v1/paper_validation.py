@@ -11,6 +11,7 @@ from app.services.paper_validation_service import (
     DEFAULT_VALIDATION_SYMBOLS, validation_run_key, build_validation_report,
     capture_day_from_ledger, complete_validation_day, validation_progress,
 )
+from app.services.nse_equity_calendar import DEFAULT_NSE_EQUITY_CALENDAR, nse_equity_holidays
 
 router = APIRouter(prefix="/paper-validation", tags=["Paper Validation"])
 
@@ -28,6 +29,10 @@ class MultiSymbolValidationRequest(BaseModel):
     session_date: date
     symbols: list[str] = Field(default_factory=lambda: list(DEFAULT_VALIDATION_SYMBOLS))
     interval: str = "5"
+
+@router.get("/calendar")
+def validation_calendar() -> dict[str, Any]:
+    return {"mode": "SIMULATION_ONLY", "market": DEFAULT_NSE_EQUITY_CALENDAR.market, "source": DEFAULT_NSE_EQUITY_CALENDAR.source, "source_version": DEFAULT_NSE_EQUITY_CALENDAR.source_version, "year": DEFAULT_NSE_EQUITY_CALENDAR.calendar_year, "holidays": sorted(day.isoformat() for day in nse_equity_holidays(DEFAULT_NSE_EQUITY_CALENDAR.calendar_year))}
 
 @router.get("/universe")
 def validation_universe() -> dict[str, Any]:
