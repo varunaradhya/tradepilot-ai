@@ -95,12 +95,70 @@ class FNOInstrumentMaster:
         return 0
 
     def search(self, q, limit=20):
+        """Search NSE F&O underlyings, including option-enabled stocks.
+
+        The lightweight index master contains only index instruments. For
+        stock options, derive the underlying identity from the detailed option
+        master and expose it only when a valid underlying security id exists.
+        This keeps the UI search aligned with the contracts the F&O engine can
+        actually resolve.
+        """
         q = q.strip().upper()
         if not q:
             return []
-        items = self.load()
+
+        items = list(self.load())
+        seen = {item.symbol for item in items}
+
+        try:
+            option_rows = self._load_options()
+        except (httpx.HTTPError, RuntimeError, ValueError):
+            option_rows = []
+
+        for row in option_rows:
+            instrument = (
+                row.get("INSTRUMENT")
+                or row.get("SEM_INSTRUMENT_NAME")
+                or ""
+            ).strip().upper()
+            if instrument != "OPTSTK":
+                continue
+
+            symbol = (
+                row.get("UNDERLYING_SYMBOL")
+                or row.get("SYMBOL_NAME")
+                or row.get("SM_SYMBOL_NAME")
+                or ""
+            ).strip().upper()
+            security_id = (
+                row.get("UNDERLYING_SECURITY_ID")
+                or row.get("UNDERLYING_SEC_ID")
+                or row.get("UNDERLYING_SECURITYID")
+                or ""
+            ).strip()
+            if not symbol or not security_id or symbol in seen:
+                continue
+
+            items.append(
+                FNOUnderlying(
+                    security_id=security_id,
+                    exchange_segment="NSE_EQ",
+                    symbol=symbol,
+                    name=(
+                        row.get("UNDERLYING_CUSTOM_SYMBOL")
+                        or row.get("CUSTOM_SYMBOL")
+                        or symbol
+                    ).strip()
+                    or symbol,
+                )
+            )
+            seen.add(symbol)
+
         exact = [x for x in items if x.symbol == q]
-        rest = [x for x in items if x.symbol != q and (q in x.symbol or q in x.name.upper())]
+        rest = [
+            x for x in items
+            if x.symbol != q and (q in x.symbol or q in x.name.upper())
+        ]
         return (exact + rest)[: max(1, min(limit, 50))]
 
 
