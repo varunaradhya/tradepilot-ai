@@ -75,6 +75,47 @@ class InstrumentMaster:
         self._loaded_at = time.time()
         return self._items
 
+    def index_lookup(self, query: str) -> list[IndianInstrument]:
+        """Resolve NSE index instruments from Dhan's IDX_I security master."""
+        needle = query.strip().upper()
+        if not needle:
+            return []
+        try:
+            response = httpx.get("https://api.dhan.co/v2/instrument/IDX_I", timeout=30.0)
+            response.raise_for_status()
+            reader = csv.DictReader(io.StringIO(response.text))
+            matches: list[IndianInstrument] = []
+            for row in reader:
+                exchange = _first(row, "EXCH_ID", "SEM_EXM_EXCH_ID").upper()
+                segment = _first(row, "SEGMENT", "SEM_SEGMENT").upper()
+                instrument = _first(row, "INSTRUMENT", "SEM_INSTRUMENT_NAME").upper()
+                security_id = _first(row, "SECURITY_ID", "SEM_SMST_SECURITY_ID")
+                symbol = _first(
+                    row, "SYMBOL_NAME", "SM_SYMBOL_NAME",
+                    "SEM_TRADING_SYMBOL", "SEM_CUSTOM_SYMBOL",
+                ).upper()
+                name = _first(
+                    row, "DISPLAY_NAME", "SEM_CUSTOM_SYMBOL",
+                    "SYMBOL_NAME", "SM_SYMBOL_NAME",
+                )
+                if segment not in {"I", "IDX_I"} or instrument != "INDEX":
+                    continue
+                if exchange and exchange != "NSE":
+                    continue
+                if not security_id or not symbol:
+                    continue
+                if needle == symbol or needle in symbol or needle in name.upper():
+                    matches.append(
+                        IndianInstrument(
+                            security_id, "IDX_I", symbol, name or symbol, None, None
+                        )
+                    )
+            return matches
+        except (httpx.HTTPError, csv.Error, UnicodeError) as exc:
+            raise InstrumentMasterError(
+                f"Unable to load Dhan index instrument master: {exc}"
+            ) from exc
+
     def search(self, query: str, limit: int = 20) -> list[IndianInstrument]:
         query = query.strip().upper()
         if len(query) < 2:
