@@ -78,6 +78,7 @@ def close_paper_trade(db: Session, trade: PaperTrade, exit_price: float, reason:
             status="CLOSED",
             closed_at=closed_at,
         )
+        .execution_options(synchronize_session=False)
     )
     db.commit()
     db.refresh(trade)
