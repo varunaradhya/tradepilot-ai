@@ -5,6 +5,8 @@ from app.services.fno_execution_evidence_import_service import import_execution_
 from app.services.fno_execution_evidence_freeze_service import (
     canonical_package_bytes,
     freeze_execution_evidence,
+    load_frozen_execution_evidence,
+    serialize_frozen_execution_evidence,
     verify_frozen_execution_evidence,
 )
 
