@@ -49,6 +49,9 @@ def run_dhan_paper_session(
         trading_day,
         trading_day + timedelta(days=1),
     )
+    if not diagnostics["valid"]:
+        raise ValueError(f"Historical dataset failed validation: {diagnostics.get('message', 'invalid dataset')}")
+
     if not bars:
         return {
             "mode": "SIMULATION_ONLY",
