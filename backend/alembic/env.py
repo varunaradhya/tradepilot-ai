@@ -6,6 +6,7 @@ from app.models.ai_analysis_history import AIAnalysisHistory
 from app.models.alert import Alert
 from app.models.broker_connection import BrokerConnection
 from app.models.holding import Holding
+from app.models.paper_historical_run import PaperHistoricalRun
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.models.watchlist import Watchlist
