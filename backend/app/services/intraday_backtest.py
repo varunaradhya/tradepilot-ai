@@ -5,7 +5,12 @@ from typing import Sequence
 
 from app.services.execution_model import ExecutionModelConfig
 from app.services.intraday_strategy import IntradayConfig, generate_intraday_signal
-from app.services.intraday_strategy_v2 import IntradayV2Config, generate_intraday_v2_signal
+from app.services.intraday_strategy_v2 import (
+    IntradayV2AConfig,
+    IntradayV2Config,
+    generate_intraday_v2_signal,
+    generate_intraday_v2a_signal,
+)
 from app.services.strategy_identity import strategy_fingerprint
 
 @dataclass(frozen=True)
@@ -33,7 +38,7 @@ def _metrics(initial_capital: float, ending_capital: float, trades: list[dict]) 
 def run_intraday_backtest(rows: Sequence[dict], config: IntradayBacktestConfig = IntradayBacktestConfig()) -> dict:
     """Single-position intraday research backtest with explicit executable-fill assumptions."""
     if config.strategy.trade_direction not in {"LONG_ONLY","LONG_SHORT"}: raise ValueError("trade_direction must be LONG_ONLY or LONG_SHORT")
-    if config.strategy_version not in {"V1","V2"}: raise ValueError("strategy_version must be V1 or V2")
+    if config.strategy_version not in {"V1","V2","V2A"}: raise ValueError("strategy_version must be V1, V2, or V2A")
     execution=ExecutionModelConfig(config.brokerage_rate,config.slippage_rate,config.spread_bps,config.market_impact_bps,config.impact_reference_value,config.max_volume_participation)
     identity=strategy_fingerprint(config.strategy,strategy_version=config.strategy_version,execution={"initial_capital":config.initial_capital,"max_daily_loss_percent":config.max_daily_loss_percent,"max_trades_per_session":config.max_trades_per_session,**execution.fingerprint_dict()})
     if not rows: return _metrics(config.initial_capital,config.initial_capital,[])|{"trades_detail":[],"strategy_version":config.strategy_version,"trade_direction":config.strategy.trade_direction,"strategy_fingerprint":identity}
@@ -68,6 +73,9 @@ def run_intraday_backtest(rows: Sequence[dict], config: IntradayBacktestConfig =
         if config.strategy_version=="V2":
             v2=config.strategy if isinstance(config.strategy,IntradayV2Config) else IntradayV2Config(**config.strategy.__dict__)
             signal=generate_intraday_v2_signal(o,h,l,c,v,market_closes=[float(x["market_close"]) for x in session_rows] if all("market_close" in x for x in session_rows) else None,sector_closes=[float(x["sector_close"]) for x in session_rows] if all("sector_close" in x for x in session_rows) else None,opening_high=max(float(x["high"]) for x in opening),opening_low=min(float(x["low"]) for x in opening),config=v2)
+        elif config.strategy_version=="V2A":
+            v2a=config.strategy if isinstance(config.strategy,IntradayV2AConfig) else IntradayV2AConfig(**config.strategy.__dict__)
+            signal=generate_intraday_v2a_signal(o,h,l,c,v,opening_high=max(float(x["high"]) for x in opening),opening_low=min(float(x["low"]) for x in opening),config=v2a)
         else: signal=generate_intraday_signal(o,h,l,c,v,opening_high=max(float(x["high"]) for x in opening),opening_low=min(float(x["low"]) for x in opening),config=config.strategy)
         if signal["action"]!="BUY":continue
         signal_entry=float(signal["entry"]); provisional=execution.fill_price(signal_entry,"BUY",cash*config.strategy.max_position_percent); risk=provisional-float(signal["stop"]); risk_budget=cash*config.strategy.risk_per_trade; max_value=cash*config.strategy.max_position_percent
