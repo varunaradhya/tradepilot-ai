@@ -8,7 +8,6 @@ strategy performance.
 """
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from typing import Any, Sequence
 
 
@@ -96,6 +95,24 @@ def validate_execution_dataset(
         }
 
     from app.services.fno_historical_data_service import validate_historical_dataset
+
+    timestamps = []
+    for bar in bars:
+        try:
+            timestamps.append(int(float(bar.get("timestamp"))))
+        except (TypeError, ValueError):
+            return {
+                "valid": False,
+                "reason": "INVALID_DATASET_TIMESTAMP",
+                "manifest": manifest_result,
+            }
+    if timestamps and (min(timestamps) < manifest.coverage_start or max(timestamps) > manifest.coverage_end):
+        return {
+            "valid": False,
+            "reason": "DATASET_OUTSIDE_MANIFEST_COVERAGE",
+            "manifest": manifest_result,
+            "dataset_timestamps": {"start": min(timestamps), "end": max(timestamps)},
+        }
 
     dataset_result = validate_historical_dataset(bars=bars, snapshots=snapshots)
     if not dataset_result["valid"]:
