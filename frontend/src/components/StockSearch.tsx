@@ -67,6 +67,8 @@ export default function StockSearch({
     }
 
     const currentRequest = ++requestId.current;
+    setMatches([]);
+    setHighlighted(0);
     const timer = window.setTimeout(async () => {
       setLoading(true);
       setSearchError("");
