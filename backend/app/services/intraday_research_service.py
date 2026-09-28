@@ -51,7 +51,7 @@ def download_intraday_dataset(
         end,
     )
     dataset = f"nse/{instrument.symbol}_intraday_{interval}m"
-    store.save(dataset, bars)
+    store.merge(dataset, bars)
     return IntradayDatasetResult(
         symbol=instrument.symbol,
         interval=interval,
