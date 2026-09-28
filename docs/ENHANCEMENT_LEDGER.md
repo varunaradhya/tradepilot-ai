@@ -1,3 +1,5 @@
+| 2026-09-28 | F&O UI/UX + instrument-search hardening | Expanded underlying search from index-only to NSE option-enabled stocks using the detailed instrument master; corrected stock historical-candle instrument type; removed the UI fallback that falsely reinserted NIFTY when a search had no results; made market-data, evidence, qualification and live-lock readiness explicit; cleared stale suggestions on search failure | Added F&O instrument-master regression coverage; frontend production build is the UI regression gate | PARTIAL — UI/software path improved; real licensed executable bid/ask evidence remains the qualification blocker | b98adc91 + 5208b4db + a419b901 + 5792f38 + 090759e1 + 7e902239 + f652b2f6 |
+
 # TradePilot AI — Enhancement & QA Ledger
 
 Last updated: 2026-09-28
