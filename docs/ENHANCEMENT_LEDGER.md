@@ -161,3 +161,20 @@ A feature can move from PARTIAL/BLOCKED to qualification-ready only when:
 **LOCKED.** No qualification shortcut or synthetic test can unlock live broker execution.
 
 | 2026-09-24 | Execution-grade historical evidence boundary | Added explicit external bid/ask import/normalization with timestamp, contract, provenance and duplicate/inverted-quote validation; qualification now fails closed without execution-grade evidence | Execution quote import tests + qualification evidence-gate tests | DONE (software boundary); external dataset still required | 239c6fe0 + 05ac7c51 + f18fcf74 + df1f07bf |
+
+### Current QA batch — Indian market boundary, stale search UX, and F&O stop-race hardening — 2026-09-28
+
+- Hardened the authenticated general trade-decision API so both paper decision paths validate the requested symbol against the Indian NSE/BSE equity universe server-side before the strategy engine runs.
+- Provider-unavailable symbol validation now fails closed with HTTP 503; unknown/non-Indian symbols return HTTP 422. This prevents a UI/client bypass from feeding an arbitrary foreign symbol into the decision engine.
+- Added API regression coverage for non-Indian rejection, `.NS` normalization, and validation-provider outage behavior.
+- Stock search now clears stale suggestions immediately when a non-empty query begins, preventing a previous popular/typed result from remaining visible while the new search is pending.
+- F&O autonomous monitoring now re-checks that the session is still active after an in-flight scan returns QUALIFIED; stopping the session during the request can no longer cause a virtual position to open from the late response.
+- Live broker execution remains hard-locked; these changes only tighten paper/research boundaries and UI state safety.
+
+Current commits for this batch:
+- e9bc0326 — Enforce Indian equity boundary in trade decision API
+- 2a716025 — Clear stale stock suggestions while searching
+- 738820b5 — Prevent stopped F&O session from opening a trade
+- d0a86f9b — Add trade decision Indian-symbol boundary tests
+
+CI verification is being used as the execution gate for this batch.
