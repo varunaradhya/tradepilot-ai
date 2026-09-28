@@ -10,7 +10,9 @@ from zoneinfo import ZoneInfo
 
 IST = ZoneInfo("Asia/Kolkata")
 REGULAR_OPEN = time(9, 15)
+LAST_EXPECTED_BAR = time(15, 25)
 REGULAR_CLOSE = time(15, 30)
+EXPECTED_REGULAR_BARS = 75
 
 
 def audit(db_path: Path, dataset_id: str) -> dict:
@@ -33,7 +35,6 @@ def audit(db_path: Path, dataset_id: str) -> dict:
     weekend_rows = []
     by_symbol = Counter()
     sessions = defaultdict(list)
-    previous = {}
 
     for symbol, ts, o, h, l, c, volume in cur.fetchall():
         total += 1
@@ -48,9 +49,7 @@ def audit(db_path: Path, dataset_id: str) -> dict:
             )
 
         if not (o > 0 and h > 0 and l > 0 and c > 0 and l <= o <= h and l <= c <= h):
-            invalid_ohlc.append(
-                {"symbol": symbol, "timestamp": dt.isoformat()}
-            )
+            invalid_ohlc.append({"symbol": symbol, "timestamp": dt.isoformat()})
 
         if dt.weekday() >= 5:
             weekend_rows.append({"symbol": symbol, "timestamp": dt.isoformat()})
@@ -59,14 +58,8 @@ def audit(db_path: Path, dataset_id: str) -> dict:
                 {"symbol": symbol, "timestamp": dt.isoformat()}
             )
 
-        previous_key = (symbol, session_date)
-        if previous_key in previous:
-            delta = (dt - previous[previous_key]).total_seconds()
-            if delta <= 0:
-                pass
-        previous[previous_key] = dt
-
     incomplete_sessions = []
+    special_or_partial_sessions = []
     for (symbol, day), values in sorted(sessions.items()):
         regular = [
             x for x in values
@@ -74,27 +67,42 @@ def audit(db_path: Path, dataset_id: str) -> dict:
         ]
         if not regular:
             continue
+
         first = min(regular)
         last = max(regular)
-        if first.time() > REGULAR_OPEN or last.time() < REGULAR_CLOSE:
-            incomplete_sessions.append(
-                {
-                    "symbol": symbol,
-                    "date": day.isoformat(),
-                    "bars": len(regular),
-                    "first": first.isoformat(),
-                    "last": last.isoformat(),
-                }
-            )
+        bars = len(regular)
+
+        normal_full = (
+            first.time() <= REGULAR_OPEN
+            and last.time() >= LAST_EXPECTED_BAR
+            and bars in {EXPECTED_REGULAR_BARS, EXPECTED_REGULAR_BARS + 1}
+        )
+
+        if not normal_full:
+            item = {
+                "symbol": symbol,
+                "date": day.isoformat(),
+                "bars": bars,
+                "first": first.isoformat(),
+                "last": last.isoformat(),
+            }
+            incomplete_sessions.append(item)
+            if bars < EXPECTED_REGULAR_BARS or first.time() > REGULAR_OPEN:
+                special_or_partial_sessions.append(item)
 
     conn.close()
 
     return {
-        "schema_version": "1.0",
+        "schema_version": "1.1",
         "dataset_id": dataset_id,
         "database": str(db_path),
         "timezone": "Asia/Kolkata",
-        "regular_session": {"open": "09:15", "close": "15:30"},
+        "regular_session": {
+            "open": "09:15",
+            "close": "15:30",
+            "bar_timestamp_convention": "start_of_5m_bar",
+            "normal_full_session_bars": 75,
+        },
         "total_bars": total,
         "symbols": dict(sorted(by_symbol.items())),
         "negative_volume_count": len(negative_volume),
@@ -106,6 +114,8 @@ def audit(db_path: Path, dataset_id: str) -> dict:
         "outside_regular_session_examples": outside_regular_session[:100],
         "incomplete_session_count": len(incomplete_sessions),
         "incomplete_session_examples": incomplete_sessions[:100],
+        "special_or_partial_session_count": len(special_or_partial_sessions),
+        "special_or_partial_session_examples": special_or_partial_sessions[:100],
         "source_unchanged": True,
     }
 
