@@ -19,13 +19,12 @@ from app.models.operational_kill_switch import OperationalKillSwitch
 from app.models.operational_audit_event import OperationalAuditEvent
 from app.models.research_experiment import ResearchExperiment
 from app.models.corporate_action import CorporateAction
+from app.models.paper_validation_day import PaperValidationDay
+from app.models.paper_validation_symbol import PaperValidationSymbol
 
 from app.db.database import Base, engine
 from app.core.config import TRADEPILOT_AUTO_CREATE_SCHEMA
 
-
 def init_db():
     if TRADEPILOT_AUTO_CREATE_SCHEMA:
         Base.metadata.create_all(bind=engine)
-
-from app.models.paper_validation_day import PaperValidationDay
