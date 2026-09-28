@@ -31,6 +31,7 @@ def run_symbol_research(
     symbol: str,
     *,
     initial_capital: float = 100000.0,
+    strategy_version: str = "V1",
 ) -> dict[str, Any]:
     rows = load_symbol_dataset(root, symbol)
     by_session: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -41,7 +42,10 @@ def run_symbol_research(
     for session, session_rows in sorted(by_session.items()):
         result = run_intraday_backtest(
             session_rows,
-            IntradayBacktestConfig(initial_capital=initial_capital),
+            IntradayBacktestConfig(
+                initial_capital=initial_capital,
+                strategy_version=strategy_version,
+            ),
         )
         session_results.append({
             "session": session,
@@ -57,12 +61,16 @@ def run_symbol_research(
 
     aggregate = run_intraday_backtest(
         rows,
-        IntradayBacktestConfig(initial_capital=initial_capital),
+        IntradayBacktestConfig(
+            initial_capital=initial_capital,
+            strategy_version=strategy_version,
+        ),
     )
     return {
         "status": "OK",
         "mode": "SIMULATION_ONLY",
         "symbol": symbol.strip().upper(),
+        "strategy_version": strategy_version,
         "dataset": f"dhan_equity_clean/{symbol.strip().upper()}.jsonl",
         "sessions": len(session_results),
         "bars": len(rows),
@@ -73,6 +81,7 @@ def run_symbol_research(
             "The source universe is survivorship-biased until historical membership is available.",
             "Corporate-action adjustment status of the source data must be established before long-horizon conclusions.",
             "No parameter optimization is performed by this runner.",
+            f"Strategy version under test: {strategy_version}.",
         ],
     }
 
@@ -80,13 +89,18 @@ def run_symbol_research(
 def main() -> None:
     import argparse
 
-    parser = argparse.ArgumentParser(description="Run descriptive V1 ORB research on one clean Dhan equity symbol.")
+    parser = argparse.ArgumentParser(description="Run descriptive clean Dhan equity research for a selected strategy version.")
     parser.add_argument("--root", required=True, type=Path)
     parser.add_argument("--symbol", required=True)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--strategy-version", choices=["V1", "V2A"], default="V1")
     args = parser.parse_args()
 
-    result = run_symbol_research(args.root, args.symbol)
+    result = run_symbol_research(
+        args.root,
+        args.symbol,
+        strategy_version=args.strategy_version,
+    )
     args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps({
         "symbol": result["symbol"],
