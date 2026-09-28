@@ -313,5 +313,6 @@ def paper_dhan_session(payload: DhanPaperRequest, current_user: User = Depends(g
 @router.post("/session/market-reset")
 def paper_market_reset(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict[str, Any]:
     _market[current_user.id] = PaperMarketCoordinator(orchestrator=_orchestrator(current_user.id, db))
+    cleared = clear_market_state(db, current_user.id)
     _persist_orchestrator(db, current_user.id)
-    return {"mode":"SIMULATION_ONLY","reset":True}
+    return {"mode":"SIMULATION_ONLY","reset":True,"cleared_market_states":cleared}
