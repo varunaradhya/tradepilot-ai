@@ -12,6 +12,7 @@ from app.services.paper_validation_service import (
     capture_day_from_ledger, complete_validation_day, validation_progress, build_validation_manifest, persist_validation_manifest, verify_validation_manifest,
 )
 from app.services.nse_equity_calendar import DEFAULT_NSE_EQUITY_CALENDAR, nse_equity_holidays
+from app.services.paper_validation_gate import validation_readiness
 
 router = APIRouter(prefix="/paper-validation", tags=["Paper Validation"])
 
@@ -94,6 +95,14 @@ def validation_progress_report(start: date, current_user: User = Depends(get_cur
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     return {"mode": "SIMULATION_ONLY", "validation_run": key, **validation_progress(db, current_user.id, key, start)}
+
+@router.get("/readiness")
+def validation_readiness_report(start: date, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict[str, Any]:
+    try:
+        key = validation_run_key(start)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return {"validation_run": key, **validation_readiness(db, current_user.id, key)}
 
 @router.post("/daily-dhan")
 def daily_dhan_validation(payload: MultiSymbolValidationRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict[str, Any]:
