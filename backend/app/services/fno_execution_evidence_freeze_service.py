@@ -149,3 +149,45 @@ def serialize_frozen_execution_evidence(
         sort_keys=True,
         separators=(",", ":"),
     ).encode("utf-8")
+
+
+def load_frozen_execution_evidence(raw_bytes: bytes) -> FrozenExecutionEvidencePackage:
+    """Load and verify a serialized package before it can enter replay."""
+    try:
+        payload = json.loads(raw_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("invalid frozen execution evidence JSON") from exc
+
+    if not isinstance(payload, dict):
+        raise ValueError("frozen execution evidence root must be an object")
+
+    manifest = manifest_from_mapping(payload.get("manifest") or {})
+    raw_quotes = payload.get("quotes")
+    if not isinstance(raw_quotes, list):
+        raise ValueError("frozen execution evidence quotes must be a list")
+
+    quotes = tuple(
+        ExecutionQuote(
+            timestamp=int(item["timestamp"]),
+            strike=float(item["strike"]),
+            option_type=str(item["option_type"]),
+            bid=float(item["bid"]),
+            ask=float(item["ask"]),
+            spot=float(item["spot"]) if item.get("spot") is not None else None,
+            expiry=item.get("expiry"),
+            security_id=item.get("security_id"),
+            exchange_segment=item.get("exchange_segment"),
+            source=str(item.get("source") or "external_historical_quotes"),
+        )
+        for item in raw_quotes
+        if isinstance(item, dict)
+    )
+    package = FrozenExecutionEvidencePackage(
+        manifest=manifest,
+        quotes=quotes,
+        snapshots=tuple(build_execution_grade_snapshots(quotes)),
+        package_sha256=str(payload.get("package_sha256") or ""),
+    )
+    if not verify_frozen_execution_evidence(package):
+        raise ValueError("frozen execution evidence integrity verification failed")
+    return package
