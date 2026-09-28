@@ -36,6 +36,44 @@ def upgrade():
     op.create_index("ix_paper_historical_runs_user_id", "paper_historical_runs", ["user_id"], unique=False)
     op.create_index("ix_paper_historical_runs_symbol", "paper_historical_runs", ["symbol"], unique=False)
 
+    bind = op.get_bind()
+    rows = bind.execute(
+        sa.text(
+            "SELECT user_id, symbol, reason, strategy_version "
+            "FROM paper_trades WHERE reason LIKE 'DHAN:%'"
+        )
+    ).mappings()
+    seen = set()
+    for row in rows:
+        reason = row["reason"] or ""
+        parts = reason.split(":")
+        if len(parts) != 3 or not parts[1] or not parts[2]:
+            continue
+        key = (
+            row["user_id"],
+            row["symbol"],
+            parts[1],
+            parts[2],
+            row["strategy_version"] or "V1",
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        bind.execute(
+            sa.text(
+                "INSERT INTO paper_historical_runs "
+                "(user_id, symbol, session, interval, strategy_version, created_at) "
+                "VALUES (:user_id, :symbol, :session, :interval, :strategy_version, CURRENT_TIMESTAMP)"
+            ),
+            {
+                "user_id": key[0],
+                "symbol": key[1],
+                "session": key[2],
+                "interval": key[3],
+                "strategy_version": key[4],
+            },
+        )
+
 
 def downgrade():
     op.drop_table("paper_historical_runs")
