@@ -132,6 +132,6 @@ def import_execution_evidence_csv(
     if not manifest_result["valid"]:
         raise ValueError(
             "invalid execution evidence manifest: "
-            f"{manifest_result["errors"]}"
+            f"{manifest_result['errors']}"
         )
     return manifest, quotes
