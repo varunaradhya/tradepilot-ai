@@ -12,7 +12,7 @@ import hashlib
 import io
 from typing import Any, Iterable
 
-from app.services.fno_evidence_manifest_service import ExecutionEvidenceManifest
+from app.services.fno_evidence_manifest_service import (\n    ExecutionEvidenceManifest,\n    validate_execution_evidence_manifest,\n)
 from app.services.fno_execution_evidence_service import (
     ExecutionQuote,
     normalize_execution_quotes,
