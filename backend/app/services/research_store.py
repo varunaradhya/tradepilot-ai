@@ -41,6 +41,13 @@ class ResearchStore:
         os.replace(temp_path, path)
         return {"dataset": dataset, **diagnostics, "path": str(path)}
 
+    def merge(self, dataset: str, bars: list[MarketBar]) -> dict:
+        existing=self.load(dataset)
+        merged={bar.timestamp:bar for bar in existing}
+        for bar in bars: merged[bar.timestamp]=bar
+        ordered=sorted(merged.values(), key=lambda item:item.timestamp)
+        return self.save(dataset, ordered)
+
     def load(self, dataset: str) -> list[MarketBar]:
         path = self._path(dataset)
         if not path.exists():
