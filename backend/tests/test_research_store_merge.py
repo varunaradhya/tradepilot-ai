@@ -4,7 +4,7 @@ from app.services.historical_data_service import MarketBar
 from app.services.research_store import ResearchStore
 
 def bar(ts,close):
-    return MarketBar(datetime.fromisoformat(ts).replace(tzinfo=timezone.utc),100,101,99,close,1000)
+    return MarketBar(datetime.fromisoformat(ts).replace(tzinfo=timezone.utc),close-0.5,close+0.5,close-1,close,1000)
 
 def test_incremental_merge_replaces_overlap_and_preserves_history(tmp_path: Path):
     store=ResearchStore(tmp_path)
