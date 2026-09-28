@@ -150,6 +150,17 @@ def main() -> None:
         "V2A_minus_V1_net_pnl": aggregate["delta_V2A_minus_V1"]["net_pnl"],
         "V1_trade_count": aggregate["V1"]["independent_trade_count"],
         "V2A_trade_count": aggregate["V2A"]["independent_trade_count"],
+        "trade_reduction_percent": round(
+            (1 - aggregate["V2A"]["independent_trade_count"] / aggregate["V1"]["independent_trade_count"]) * 100,
+            2,
+        ) if aggregate["V1"]["independent_trade_count"] else 0.0,
+        "V1_gross_pnl_sum": aggregate["V1"]["independent_gross_pnl_sum"],
+        "V2A_gross_pnl_sum": aggregate["V2A"]["independent_gross_pnl_sum"],
+        "V1_cost_sum": aggregate["V1"]["independent_cost_sum"],
+        "V2A_cost_sum": aggregate["V2A"]["independent_cost_sum"],
+        "gross_pnl_delta": aggregate["delta_V2A_minus_V1"]["gross_pnl"],
+        "cost_delta": aggregate["delta_V2A_minus_V1"]["costs"],
+        "win_rate_delta_percentage_points": aggregate["delta_V2A_minus_V1"]["pooled_win_rate_percentage_points"],
         "output": str(args.output),
     }, indent=2, sort_keys=True))
 
