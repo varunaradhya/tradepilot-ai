@@ -86,3 +86,21 @@ def test_loader_rejects_tampered_json():
     raw = raw.replace('"bid":99.5', '"bid":1.0', 1)
     with pytest.raises(ValueError, match="integrity verification"):
         load_frozen_execution_evidence(raw.encode("utf-8"))
+
+
+def test_frozen_package_verification_detects_snapshot_tampering():
+    package = _package()
+    tampered_snapshot = dict(package.snapshots[0])
+    tampered_snapshot["oc"] = {
+        "25000": {
+            "ce": {
+                "top_bid_price": 1.0,
+                "top_ask_price": 1.0,
+            }
+        }
+    }
+    tampered = replace(
+        package,
+        snapshots=(tampered_snapshot,) + package.snapshots[1:],
+    )
+    assert verify_frozen_execution_evidence(tampered) is False
