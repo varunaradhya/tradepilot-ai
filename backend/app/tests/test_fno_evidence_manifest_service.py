@@ -77,6 +77,23 @@ def test_execution_dataset_binds_manifest_and_historical_validation():
     assert result["dataset"]["invalid_count"] == 0
 
 
+def test_manifest_mapping_treats_string_false_as_false():
+    manifest = manifest_from_mapping({
+        "source": "vendor_x",
+        "license": "commercial-research",
+        "coverage_start": 1000,
+        "coverage_end": 2000,
+        "timezone": "Asia/Kolkata",
+        "sampling_seconds": 60,
+        "contract_universe": "NIFTY weekly options",
+        "checksum_sha256": "a" * 64,
+        "execution_grade": "false",
+    })
+    result = validate_execution_evidence_manifest(manifest)
+    assert result["valid"] is False
+    assert "NOT_EXECUTION_GRADE" in result["errors"]
+
+
 def test_execution_dataset_fails_closed_on_bad_manifest():
     bars, snapshots = _bars_and_snapshots()
     result = validate_execution_dataset(
