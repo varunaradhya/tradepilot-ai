@@ -1,7 +1,11 @@
 import json
 
-from app.services.paper_ml_service import learning_features, set_deployment
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
+
+from app.db.database import Base
 from app.models.paper_trade_learning import PaperTradeLearningEvent
+from app.services.paper_ml_service import learning_features, set_deployment
 
 
 def test_learning_features_are_deterministic():
@@ -18,22 +22,25 @@ def test_learning_features_are_deterministic():
     assert features["stop_distance_pct"] == 2.0
 
 
-def test_ml_deployment_rejects_live_mode(db_session):
+def test_ml_deployment_rejects_live_mode():
     try:
-        set_deployment(db_session, 1, "V1", "LIVE")
+        set_deployment(None, 1, "V1", "LIVE")
     except ValueError as exc:
         assert "live mode is disabled" in str(exc)
     else:
         raise AssertionError("LIVE ML deployment must remain disabled")
 
 
-def test_learning_event_has_json_features(db_session):
-    event = PaperTradeLearningEvent(
-        user_id=1, symbol="RELIANCE", session="2026-09-28",
-        strategy_version="V1", model_version="RULES_V1",
-        fingerprint="a" * 64, features_json=json.dumps({"volume_ratio": 1.5}),
-        label=1, pnl=100.0, r_multiple=1.0, exit_reason="TARGET",
-    )
-    db_session.add(event)
-    db_session.commit()
-    assert json.loads(event.features_json)["volume_ratio"] == 1.5
+def test_learning_event_has_json_features():
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine, tables=[PaperTradeLearningEvent.__table__])
+    with Session(engine) as db:
+        event = PaperTradeLearningEvent(
+            user_id=1, symbol="RELIANCE", session="2026-09-28",
+            strategy_version="V1", model_version="RULES_V1",
+            fingerprint="a" * 64, features_json=json.dumps({"volume_ratio": 1.5}),
+            label=1, pnl=100.0, r_multiple=1.0, exit_reason="TARGET",
+        )
+        db.add(event)
+        db.commit()
+        assert json.loads(event.features_json)["volume_ratio"] == 1.5
