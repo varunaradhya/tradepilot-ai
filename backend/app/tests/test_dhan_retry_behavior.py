@@ -59,3 +59,18 @@ def test_retry_exhaustion_preserves_final_http_status(monkeypatch):
         assert "after 2 attempts" in str(exc)
     else:
         raise AssertionError("expected DhanAPIError")
+
+
+def test_authentication_failure_is_not_retried_and_preserves_401(monkeypatch):
+    client = DhanClient("cid", "token", max_retries=5)
+    calls = []
+    monkeypatch.setattr(httpx, "request", lambda *args, **kwargs: (calls.append(1) or FakeResponse(401, {"error": "expired"})))
+
+    try:
+        client._request("GET", "/profile")
+    except DhanAPIError as exc:
+        assert exc.status_code == 401
+        assert "expired" in str(exc).lower()
+        assert len(calls) == 1
+    else:
+        raise AssertionError("expected DhanAPIError")
