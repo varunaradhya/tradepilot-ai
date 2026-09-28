@@ -88,6 +88,18 @@ def test_execution_dataset_fails_closed_on_bad_manifest():
     assert result["reason"] == "INVALID_EVIDENCE_MANIFEST"
 
 
+def test_execution_dataset_fails_closed_when_data_is_outside_manifest_coverage():
+    bars, snapshots = _bars_and_snapshots()
+    bars[0]["timestamp"] = 900
+    result = validate_execution_dataset(
+        manifest=_manifest(),
+        bars=bars,
+        snapshots=snapshots,
+    )
+    assert result["valid"] is False
+    assert result["reason"] == "DATASET_OUTSIDE_MANIFEST_COVERAGE"
+
+
 def test_execution_dataset_fails_closed_on_misaligned_snapshot():
     bars, snapshots = _bars_and_snapshots()
     snapshots[1]["timestamp"] = 1059
