@@ -10,6 +10,7 @@ def test_search_returns_index_matches_without_option_master():
     master.loaded_at = 10**12
     master.option_rows = []
     master.option_loaded_at = 10**12
+    master._load_options = lambda force=False: []
 
     results = master.search("BANK")
     assert [item.symbol for item in results] == ["BANKNIFTY"]
