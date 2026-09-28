@@ -130,3 +130,22 @@ def verify_frozen_execution_evidence(
         canonical_package_bytes(package.manifest, package.quotes)
     ).hexdigest()
     return expected == package.package_sha256
+
+
+def serialize_frozen_execution_evidence(
+    package: FrozenExecutionEvidencePackage,
+) -> bytes:
+    """Serialize a frozen package with its integrity hash for durable storage."""
+    if not verify_frozen_execution_evidence(package):
+        raise ValueError("cannot serialize tampered frozen execution evidence")
+    payload = {
+        "manifest": _manifest_payload(package.manifest),
+        "quotes": [_quote_payload(q) for q in package.quotes],
+        "package_sha256": package.package_sha256,
+    }
+    return json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
