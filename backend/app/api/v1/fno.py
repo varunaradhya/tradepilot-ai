@@ -215,7 +215,8 @@ def _historical_rows(client: DhanClient, security_id: int, segment: str, interva
     if now < session_start: return []
     from_date = session_start.strftime("%Y-%m-%d %H:%M:%S")
     to_date = now.strftime("%Y-%m-%d %H:%M:%S")
-    response = client.historical_intraday(str(security_id), segment, "INDEX", interval, from_date, to_date)
+    instrument_type = "INDEX" if segment == "IDX_I" else "EQUITY"
+    response = client.historical_intraday(str(security_id), segment, instrument_type, interval, from_date, to_date)
     data = response.get("data") if isinstance(response, dict) else None
     if not isinstance(data, dict): return []
     opens, highs, lows, closes = data.get("open") or [], data.get("high") or [], data.get("low") or [], data.get("close") or []
