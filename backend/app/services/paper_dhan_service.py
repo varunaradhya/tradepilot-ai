@@ -95,11 +95,8 @@ def run_dhan_paper_session(
 
     marker = f"DHAN:{session}:{interval}"
     strategy_version = "V1"
-    persisted = 0
+
     try:
-        # The unique database key is the cross-worker idempotency boundary.
-        # The run record and its trades are committed together, so a retry
-        # cannot create a second copy of the same historical session.
         db.add(
             PaperHistoricalRun(
                 user_id=user_id,
@@ -110,28 +107,43 @@ def run_dhan_paper_session(
             )
         )
         db.flush()
-
-        for trade in runner.orchestrator.trades():
-            record = PaperTrade(
-                user_id=user_id,
-                symbol=instrument.symbol,
-                side="BUY",
-                status="CLOSED",
-                quantity=int(trade["quantity"]),
-                entry_price=float(trade["entry"]),
-                stop_price=float(trade["stop"]),
-                target_price=float(trade["target"]),
-                exit_price=float(trade["exit"]),
-                pnl=float(trade["pnl"]),
-                reason=marker,
-                strategy_version=strategy_version,
-            )
-            db.add(record)
-            persisted += 1
-        db.commit()
     except IntegrityError:
         db.rollback()
-        persisted = 0
+        return {
+            "mode": "SIMULATION_ONLY",
+            "symbol": instrument.symbol,
+            "interval": interval,
+            "processed_bars": processed,
+            "buy_entries": buys,
+            "persisted_trades": 0,
+            "dataset_valid": diagnostics["valid"],
+            "diagnostics": diagnostics,
+            "last": last_result,
+            "paper": runner.orchestrator.summary(),
+            "idempotent_replay": True,
+        }
+
+    persisted = 0
+    for trade in runner.orchestrator.trades():
+        record = PaperTrade(
+            user_id=user_id,
+            symbol=instrument.symbol,
+            side="BUY",
+            status="CLOSED",
+            quantity=int(trade["quantity"]),
+            entry_price=float(trade["entry"]),
+            stop_price=float(trade["stop"]),
+            target_price=float(trade["target"]),
+            exit_price=float(trade["exit"]),
+            pnl=float(trade["pnl"]),
+            reason=marker,
+            strategy_version=strategy_version,
+        )
+        db.add(record)
+        persisted += 1
+
+    db.commit()
+
 
     return {
         "mode": "SIMULATION_ONLY",
