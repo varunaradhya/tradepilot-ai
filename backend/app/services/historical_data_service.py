@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from datetime import datetime
 from typing import Iterable, Sequence
 
@@ -36,6 +37,8 @@ def normalize_bars(rows: Iterable[dict]) -> list[MarketBar]:
             raise ValueError("Each market bar requires a valid timestamp")
 
         values = {key: float(row[key]) for key in ("open", "high", "low", "close")}
+        if not all(math.isfinite(value) for value in values.values()):
+            raise ValueError("OHLC prices must be finite")
         if min(values.values()) <= 0:
             raise ValueError("OHLC prices must be positive")
         if values["high"] < max(values["open"], values["close"]) or values["low"] > min(values["open"], values["close"]):
@@ -44,7 +47,11 @@ def normalize_bars(rows: Iterable[dict]) -> list[MarketBar]:
             raise ValueError("High cannot be below low")
 
         volume = row.get("volume")
-        normalized.append(MarketBar(timestamp=timestamp, **values, volume=None if volume is None else float(volume)))
+        if volume is not None:
+            volume = float(volume)
+            if not math.isfinite(volume) or volume < 0:
+                raise ValueError("Volume must be finite and non-negative")
+        normalized.append(MarketBar(timestamp=timestamp, **values, volume=volume))
 
     return sorted(normalized, key=lambda item: item.timestamp)
 
