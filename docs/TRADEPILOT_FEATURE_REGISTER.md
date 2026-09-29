@@ -117,3 +117,9 @@
 - F&O paper-entry authorization reads can now be explicitly locked; the F&O entry path uses the lock before its duplicate open-position check.
 - Paper trade close detects lost conditional updates and returns refreshed canonical state instead of implying that its own mutation won.
 - Status: IMPLEMENTED — CI PENDING.
+
+
+### 2026-09-29 — Broker order retry safety
+- Disabled automatic retries specifically for broker order placement while retaining retries for other Dhan API operations.
+- This preserves the paper/live safety boundary against future duplicate-order risk.
+- Status: IMPLEMENTED — CI PENDING.
