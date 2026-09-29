@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { api } from "../services/api";
 
 export type StockInstrument = {
@@ -55,7 +55,7 @@ export default function StockSearch({
   const rootRef = useRef<HTMLDivElement>(null);
   const requestId = useRef(0);
   const query = value.trim();
-  const listId = "tradepilot-stock-search-results";
+  const listId = `tradepilot-stock-search-results-${useId().replace(/:/g, "")}`;
 
   useEffect(() => {
     if (query.length < 2) {
