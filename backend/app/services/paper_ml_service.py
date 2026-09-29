@@ -173,6 +173,15 @@ def _metrics(y_true, y_prob) -> dict[str, float]:
     return metrics
 
 
+def _qualification_gate(metrics: dict[str, float]) -> bool:
+    """Qualify from validation evidence only; final test metrics are report-only."""
+    return (
+        metrics["accuracy"] >= 0.50
+        and metrics["brier"] < 0.25
+        and metrics["roc_auc"] >= 0.50
+    )
+
+
 def train_model(db: Session, user_id: int, strategy_version: str = "V1") -> dict[str, Any]:
     from sklearn.linear_model import LogisticRegression
     from sklearn.preprocessing import StandardScaler
