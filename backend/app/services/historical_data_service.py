@@ -138,7 +138,7 @@ def validate_nse_equity_dataset(
         and outside_session_bars == 0
         and not missing_session_dates
         and session_interval_gaps == 0
-        and len(offsets) <= 1
+        and len(source_offsets) <= 1
     )
     return {
         **base,
