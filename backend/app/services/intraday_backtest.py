@@ -86,6 +86,10 @@ def run_intraday_backtest(
     if config.dataset_fingerprint is not None:
         if len(config.dataset_fingerprint) != 64 or any(ch not in "0123456789abcdefABCDEF" for ch in config.dataset_fingerprint):
             raise ValueError("dataset_fingerprint must be a 64-character SHA-256 hex digest")
+        if config.corporate_action_adjusted is None:
+            raise ValueError("corporate_action_adjusted must be explicit when dataset_fingerprint is provided")
+    if config.corporate_action_adjusted is not None and not isinstance(config.corporate_action_adjusted, bool):
+        raise ValueError("corporate_action_adjusted must be boolean or None")
 
     execution = ExecutionModelConfig(
         config.brokerage_rate,
