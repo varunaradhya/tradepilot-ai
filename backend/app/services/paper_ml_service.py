@@ -37,7 +37,7 @@ def _feature_schema_fingerprint() -> str:
 
 def _training_dataset_fingerprint(events: list[PaperTradeLearningEvent]) -> str | None:
     fingerprints = sorted({event.dataset_fingerprint for event in events if event.dataset_fingerprint})
-    if not fingerprints or len(fingerprints) != sum(1 for event in events if event.dataset_fingerprint):
+    if not fingerprints or any(event.dataset_fingerprint is None for event in events):
         return None
     raw = json.dumps(fingerprints, separators=(",", ":"), ensure_ascii=True)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
