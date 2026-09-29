@@ -6,6 +6,8 @@ from app.core.security import hash_password
 from app.db.database import get_db
 from app.schemas.auth import ForgotPasswordRequest, LoginRequest, RefreshRequest, ResetPasswordRequest, TokenResponse, UserCreate
 from app.schemas.user import UserResponse
+from datetime import datetime, timezone
+
 from app.services.auth_service import (
     authenticate_user,
     create_access_token,
@@ -13,7 +15,7 @@ from app.services.auth_service import (
     create_refresh_token,
     create_user,
     decode_password_reset_token,
-    decode_refresh_token,
+    decode_refresh_token, decode_refresh_token_payload,
     get_user_by_email,
     get_user_by_id,
 )
@@ -47,12 +49,20 @@ def login(credentials: LoginRequest, db: Session = Depends(get_db)):
 @router.post("/refresh", response_model=TokenResponse)
 def refresh(payload: RefreshRequest, db: Session = Depends(get_db)):
     try:
-        user_id = decode_refresh_token(payload.refresh_token)
+        refresh_payload = decode_refresh_token_payload(payload.refresh_token)
+        user_id = int(refresh_payload["sub"])
     except (ValueError, KeyError, TypeError, Exception):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired refresh token", headers={"WWW-Authenticate": "Bearer"})
     user = get_user_by_id(db, user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired refresh token", headers={"WWW-Authenticate": "Bearer"})
+    token_iat = refresh_payload.get("iat")
+    if isinstance(token_iat, (int, float)) and user.password_changed_at:
+        changed = user.password_changed_at
+        if changed.tzinfo is None:
+            changed = changed.replace(tzinfo=timezone.utc)
+        if datetime.fromtimestamp(float(token_iat), tz=timezone.utc) < changed:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired refresh token", headers={"WWW-Authenticate": "Bearer"})
     return _tokens(user.id)
 
 
@@ -77,5 +87,6 @@ def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db))
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired password reset token")
 
     user.password_hash = hash_password(payload.new_password)
+    user.password_changed_at = datetime.now(timezone.utc)
     db.add(user)
     db.commit()
