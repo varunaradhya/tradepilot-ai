@@ -52,6 +52,8 @@ def claim_request(
     user_id: int,
     request_id: str,
     signal: dict[str, Any],
+    *,
+    commit: bool = True,
 ) -> tuple[PaperSignalRequest, bool]:
     existing = get_request(db, user_id, request_id)
     if existing is not None:
@@ -72,7 +74,10 @@ def claim_request(
     )
     db.add(record)
     try:
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            db.flush()
     except IntegrityError:
         db.rollback()
         existing = get_request(db, user_id, request_id)
