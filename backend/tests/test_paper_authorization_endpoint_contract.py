@@ -83,3 +83,11 @@ def test_strategy_authorization_updates_are_concurrency_safe():
     assert "with_for_update()" in source
     assert "IntegrityError" in source
     assert "uq_paper_auth_user_strategy" not in source or "one()" in source
+
+
+def test_broker_connection_mutations_are_concurrency_safe_and_sync_messages_are_sanitized():
+    source = Path("app/services/broker_service.py").read_text(encoding="utf-8")
+    assert "with_for_update()" in source
+    assert "IntegrityError" in source
+    assert "str(exc)" not in source
+    assert "encrypted_access_token" in source
