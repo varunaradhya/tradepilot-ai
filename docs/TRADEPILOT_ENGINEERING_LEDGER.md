@@ -91,3 +91,10 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - Serialized paper market-state read/write boundaries with row locks and uniqueness-race recovery.
 - Added regression coverage for F&O authorization parity.
 - Status: IMPLEMENTED — CI PENDING.
+
+
+### 2026-09-29 — Mutation concurrency hardening
+- Locked owned `PaperTrade` rows before direct mark/close mutation.
+- Serialized strategy authorization upserts and added uniqueness-race recovery.
+- Added regression contracts for both boundaries.
+- Status: IMPLEMENTED — CI PENDING.
