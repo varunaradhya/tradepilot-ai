@@ -108,3 +108,19 @@ def test_fno_manual_close_locks_owned_option_position():
     section = source[start:] if end < 0 else source[start:end]
     assert ".with_for_update()" in section
     assert "PaperTrade.user_id==current_user.id" in section
+
+
+
+def test_fno_paper_entry_locks_strategy_authorization_for_duplicate_position_race():
+    source = Path("app/api/v1/fno.py").read_text(encoding="utf-8")
+    start = source.index('def open_option_paper_trade(')
+    end = source.index('\\n\\n@router.get("/paper/recovery")', start)
+    handler = source[start:end]
+    assert "lock=True" in handler
+
+
+def test_active_strategy_authorization_supports_locked_reads():
+    source = Path("app/services/strategy_paper_authorization.py").read_text(encoding="utf-8")
+    assert "lock: bool = False" in source
+    assert "if lock:" in source
+    assert "query.with_for_update()" in source
