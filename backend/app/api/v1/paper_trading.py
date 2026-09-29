@@ -87,7 +87,7 @@ def _persist_orchestrator(
     orchestrator: PaperTradingOrchestrator | None = None,
 ) -> None:
     current = orchestrator or _orchestrator(user_id, db)
-    save_paper_session_state(db, user_id, current.export_state())
+    save_paper_session_state(db, user_id, current.export_state(), commit=False)
 
 
 def _market_coordinator(
