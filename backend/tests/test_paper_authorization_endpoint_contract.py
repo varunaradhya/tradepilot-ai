@@ -114,7 +114,7 @@ def test_fno_manual_close_locks_owned_option_position():
 def test_fno_paper_entry_locks_strategy_authorization_for_duplicate_position_race():
     source = Path("app/api/v1/fno.py").read_text(encoding="utf-8")
     start = source.index('def open_option_paper_trade(')
-    end = source.index('\\n\\n@router.get("/paper/recovery")', start)
+    end = source.index('\n\n@router.get("/paper/recovery")', start)
     handler = source[start:end]
     assert "lock=True" in handler or "lock = True" in handler
 
