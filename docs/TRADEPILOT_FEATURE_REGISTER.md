@@ -129,3 +129,10 @@
 - Dhan portfolio synchronization now uses a durable broker-connection row lock to serialize concurrent syncs.
 - Malformed broker-supplied trade timestamps are rejected instead of generating unstable local identities.
 - Status: IMPLEMENTED — CI PENDING.
+
+
+### 2026-09-29 — Portfolio holding uniqueness hardening
+- Identified a concrete duplicate-position risk in the manual holding path: no database constraint enforced one holding per `(user_id, symbol)`.
+- Added the unique database boundary plus controlled conflict handling for concurrent/manual duplicate creation.
+- Existing duplicate rows are not silently merged by the migration; explicit reconciliation is required if they exist.
+- Status: IMPLEMENTED — CI PENDING.
