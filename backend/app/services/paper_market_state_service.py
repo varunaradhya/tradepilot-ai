@@ -41,6 +41,7 @@ def save_market_state(
     state: dict[str, Any],
     interval: str = "5",
     strategy_version: str = "V1",
+    commit: bool = True,
 ) -> PaperMarketState:
     normalized = symbol.strip().upper()
     encoded = json.dumps(state, separators=(",", ":"))
@@ -63,7 +64,8 @@ def save_market_state(
                 state_json=encoded,
             )
             db.add(row)
-            db.commit()
+            if commit:
+                db.commit()
             db.refresh(row)
             return row
         except IntegrityError:
@@ -77,7 +79,8 @@ def save_market_state(
             ).with_for_update().one()
 
     row.state_json = encoded
-    db.commit()
+    if commit:
+        db.commit()
     db.refresh(row)
     return row
 
