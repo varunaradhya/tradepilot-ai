@@ -226,10 +226,12 @@ def train_model(db: Session, user_id: int, strategy_version: str = "V1") -> dict
     test_prob = model.predict_proba(scaler.transform(X[validation_end:]))[:, 1]
     validation_metrics = _metrics(y[train_end:validation_end], validation_prob)
     test_metrics = _metrics(y[validation_end:], test_prob)
+    # Qualification is decided only from the validation slice.
+    # The final test slice is report-only and must not influence promotion.
     validated = (
-        test_metrics["accuracy"] >= 0.50
-        and test_metrics["brier"] < 0.25
-        and test_metrics["roc_auc"] >= 0.50
+        validation_metrics["accuracy"] >= 0.50
+        and validation_metrics["brier"] < 0.25
+        and validation_metrics["roc_auc"] >= 0.50
     )
 
     previous = db.query(PaperMlModel).filter(
@@ -253,6 +255,8 @@ def train_model(db: Session, user_id: int, strategy_version: str = "V1") -> dict
         "test_samples": n - validation_end,
         "temporal_split": [0.60, 0.20, 0.20],
         "validated": validated,
+        "qualification_source": "validation_only",
+        "test_set_role": "report_only",
     }
     db.query(PaperMlModel).filter(
         PaperMlModel.user_id == user_id,
