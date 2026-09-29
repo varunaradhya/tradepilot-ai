@@ -164,3 +164,10 @@ The production Docker deployment required a JWT secret but did not explicitly se
 ### AUDIT-046 — Durable paper-state helpers could independently commit inside a mutation
 **Priority:** P1
 The multi-worker refactor removed process-local state, but independent helper commits could still split a request across multiple durable writes. Session-state, signal-completion, ML prediction and market-state paths now support deferred commits, and the primary signal/market-bar request paths commit at the request boundary. This reduces crash windows between simulator state and its supporting ledger records.
+
+
+### AUDIT-047 — Paper authorization and Dhan replay could still split the durable mutation transaction — FIX IMPLEMENTED, CI PENDING
+**Priority:** P1
+The paper mutation routes now acquire the same user-row lock before authorization state is loaded or changed, and authorization/revocation endpoints share that serialization boundary. The signal request claim now supports deferred commit so the idempotency record, ML prediction, simulator snapshot and terminal response can commit together. Dhan historical replay now defers successful validation evidence commits until the persisted paper trades and validation result are ready, reducing partial-success crash windows.
+
+Regression contracts were added for these transaction boundaries. Runtime execution remains pending because the repository currently has no reported GitHub Actions run for the latest commits.
