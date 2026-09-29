@@ -27,6 +27,8 @@ class IntradayBacktestConfig:
     max_trades_per_session: int = 3
     strategy: IntradayConfig = IntradayConfig()
     strategy_version: str = "V1"
+    dataset_fingerprint: str | None = None
+    corporate_action_adjusted: bool | None = None
 
 
 def _metrics(initial_capital: float, ending_capital: float, trades: list[dict]) -> dict:
@@ -81,6 +83,9 @@ def run_intraday_backtest(
         raise ValueError("trade_direction must be LONG_ONLY or LONG_SHORT")
     if config.strategy_version not in {"V1", "V2", "V2A"}:
         raise ValueError("strategy_version must be V1, V2, or V2A")
+    if config.dataset_fingerprint is not None:
+        if len(config.dataset_fingerprint) != 64 or any(ch not in "0123456789abcdefABCDEF" for ch in config.dataset_fingerprint):
+            raise ValueError("dataset_fingerprint must be a 64-character SHA-256 hex digest")
 
     execution = ExecutionModelConfig(
         config.brokerage_rate,
@@ -107,6 +112,8 @@ def run_intraday_backtest(
             "trade_direction": config.strategy.trade_direction,
             "strategy_fingerprint": identity,
             "signal_execution": "NEXT_BAR_OPEN",
+            "dataset_fingerprint": config.dataset_fingerprint,
+            "corporate_action_adjusted": config.corporate_action_adjusted,
         }
 
     cash = float(config.initial_capital)
@@ -148,6 +155,9 @@ def run_intraday_backtest(
             "total_costs": costs,
             "reason": reason,
             "direction": "LONG",
+            "strategy_fingerprint": identity,
+            "dataset_fingerprint": config.dataset_fingerprint,
+            "corporate_action_adjusted": config.corporate_action_adjusted,
         }
         if position.get("signal_time") is not None:
             trade["signal_time"] = position["signal_time"]
@@ -356,4 +366,6 @@ def run_intraday_backtest(
         "strategy_fingerprint": identity,
         "execution_model": execution.fingerprint_dict(),
         "signal_execution": "NEXT_BAR_OPEN",
+        "dataset_fingerprint": config.dataset_fingerprint,
+        "corporate_action_adjusted": config.corporate_action_adjusted,
     }
