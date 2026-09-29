@@ -97,3 +97,9 @@
 - Strategy authorization updates now handle concurrent upsert races safely.
 - Added regression coverage.
 - Status: IMPLEMENTED — CI PENDING.
+
+### 2026-09-29 — Broker security hardening
+- Broker connection mutation path is concurrency-safe.
+- Disabled F&O execution no longer decrypts broker credentials.
+- Regression coverage added.
+- Status: IMPLEMENTED — CI PENDING.
