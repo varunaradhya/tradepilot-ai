@@ -159,3 +159,8 @@ Request-scoped reconstruction alone prevents stale in-memory state but does not 
 ### AUDIT-045 — Deployment environment was implicit
 **Priority:** P1
 The production Docker deployment required a JWT secret but did not explicitly set the application environment to production. The compose backend now sets `TRADEPILOT_ENV=production`, ensuring production-only configuration guards are actually active.
+
+
+### AUDIT-046 — Durable paper-state helpers could independently commit inside a mutation
+**Priority:** P1
+The multi-worker refactor removed process-local state, but independent helper commits could still split a request across multiple durable writes. Session-state, signal-completion, ML prediction and market-state paths now support deferred commits, and the primary signal/market-bar request paths commit at the request boundary. This reduces crash windows between simulator state and its supporting ledger records.
