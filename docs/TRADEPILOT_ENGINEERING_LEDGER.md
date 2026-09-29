@@ -168,3 +168,12 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - Crash-left pending signal recovery now covers both equity and option paper trades.
 - Recovery is evidence-based and fail-closed: zero or multiple matching trades do not trigger creation/retry.
 - Regression coverage added for repeated completion, exact equity recovery, and ambiguous equity recovery.
+
+
+## Latest multi-worker hardening — 2026-09-29
+- Removed process-global `_sessions`, `_market`, and `_restored` paper-state caches.
+- Paper simulator state is reconstructed from durable DB state per request.
+- Paper signal and market-bar mutation paths acquire a user-row lock.
+- ML prediction persistence and market-state persistence support deferred commits so state can be committed with the durable session snapshot.
+- Added regression contracts for request-scoped state and mutation serialization.
+- PostgreSQL runtime concurrency behavior remains to be certified in an executable environment.
