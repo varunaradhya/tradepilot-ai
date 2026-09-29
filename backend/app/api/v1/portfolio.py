@@ -48,13 +48,16 @@ def add_holding(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return create_holding(
-        db=db,
-        user_id=current_user.id,
-        symbol=holding_data.symbol,
-        quantity=holding_data.quantity,
-        average_buy_price=holding_data.average_buy_price,
-    )
+    try:
+        return create_holding(
+            db=db,
+            user_id=current_user.id,
+            symbol=holding_data.symbol,
+            quantity=holding_data.quantity,
+            average_buy_price=holding_data.average_buy_price,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
 
 @router.put(
