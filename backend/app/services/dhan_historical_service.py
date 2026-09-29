@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from app.brokers.dhan import DhanAPIError, DhanClient
-from app.services.historical_data_service import MarketBar, normalize_bars, validate_dataset
+from app.services.historical_data_service import MarketBar, normalize_bars, validate_dataset, validate_nse_equity_dataset
 
 
 @dataclass(frozen=True)
@@ -21,7 +21,7 @@ def _parse_epoch_seconds(value: Any) -> datetime:
     if isinstance(value, datetime):
         return value
     if isinstance(value, (int, float)):
-        return datetime.fromtimestamp(value)
+        return datetime.fromtimestamp(value, tz=timezone.utc)
     return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
 
 
@@ -113,5 +113,5 @@ def fetch_intraday_history(
         rows.extend(_response_to_rows(payload))
 
     bars = normalize_bars(rows)
-    diagnostics = validate_dataset(bars, expected_interval_minutes=int(request.interval))
+    diagnostics = validate_nse_equity_dataset(bars, expected_interval_minutes=int(request.interval))
     return bars, diagnostics
