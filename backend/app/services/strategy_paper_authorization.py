@@ -65,9 +65,9 @@ def get_active_authorization(
     symbol: str,
     interval: str,
     strategy_version: str,
+    lock: bool = False,
 ) -> StrategyPaperAuthorization | None:
-    return (
-        db.query(StrategyPaperAuthorization)
+    query = db.query(StrategyPaperAuthorization)
         .filter(
             StrategyPaperAuthorization.user_id == user_id,
             StrategyPaperAuthorization.symbol == symbol.strip().upper(),
@@ -76,8 +76,10 @@ def get_active_authorization(
             StrategyPaperAuthorization.status == "AUTHORIZED",
             StrategyPaperAuthorization.revoked_at.is_(None),
         )
-        .first()
     )
+    if lock:
+        query = query.with_for_update()
+    return query.first()
 
 
 def revoke_strategy(
