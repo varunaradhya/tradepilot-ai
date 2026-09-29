@@ -3,7 +3,7 @@
 Repository: varunaradhya/tradepilot-ai
 Branch: main
 Last updated: 2026-09-29
-Current HEAD: 1c3388911a32da072eae91bc5e386800de16aa34
+Current HEAD: 2fb579e93897154ac5fb480085aa48967cfe512f
 
 ## Status
 - DONE — implementation complete and verified by available evidence
@@ -17,8 +17,8 @@ Current HEAD: 1c3388911a32da072eae91bc5e386800de16aa34
 | P0.1 | NSE session/calendar-aware historical validation | IMPLEMENTED | historical_data_service.py, nse_equity_calendar.py, dhan_historical_service.py | test_historical_data_service.py | 59ca4c9 | PENDING | Runtime/CI verification unavailable |
 | P0.2 | Trade → ML Learning → Validation reconciliation | IMPLEMENTED | paper_reconciliation_service.py | test_paper_reconciliation.py | 74fc25f | PENDING | Runtime/CI verification unavailable |
 | P0.3 | Fresh CI verification | PENDING | .github/workflows/ci.yml exists | N/A | 7fa7b7e | NOT OBSERVED | GitHub integration returned no workflow/status for current push |
-| P0.4 | Migration integrity | PARTIAL | SQLite-safe 0013 + unique-link 0014 | CI migration execution pending | 515293f | PENDING | Full chain fresh/upgrade/downgrade verification still required |
-| P1.1 | Historical ingestion hardening | PARTIAL | Dhan path normalized + session-aware | Existing + new regression tests | 9d2f110 | PENDING | Corporate actions/provenance/incremental evidence remain |
+| P0.4 | Migration integrity | IMPLEMENTED — CI PENDING | Linear 001→014 chain audited; 0013 SQLite batch alteration; 0014 unique-link constraint | Static chain regression added; runtime upgrade/downgrade not executed | c89e548 | PENDING | Fresh/upgrade/downgrade runtime verification still required |
+| P1.1 | Historical ingestion hardening | PARTIAL | Dhan path normalized + session-aware; portable import now reuses canonical contract | Import/provenance regression tests added; CI pending | 2fb579e | PENDING | Corporate-action treatment and runtime evidence remain |
 | P1.2 | Backtest audit | PLANNED | Existing engine | Existing tests | — | — | Leakage/cost/slippage/position constraints need expanded audit |
 | P1.3 | Walk-forward validation audit | PLANNED | Existing framework | Existing tests | — | — | Dataset fingerprint and fold lineage need verification |
 | P1.4 | Strategy framework audit | PLANNED | V1/V2/V2A registry exists | Existing tests | — | — | Parameter provenance/fingerprinting pending |
@@ -42,7 +42,7 @@ Current HEAD: 1c3388911a32da072eae91bc5e386800de16aa34
 | P2.1 | Dhan hardening | PARTIAL | Historical + paper integration | Existing tests | — | PENDING | Rate limits/retries/auth/symbol mapping audit |
 | P2.2 | Groww/AngelOne foundation | PARTIAL | Capability foundations | — | — | — | No live execution certification |
 | P2.3 | Broker abstraction | IMPLEMENTED | Broker capability boundary exists | Existing tests | — | PENDING | Leakage audit pending |
-| P2.4 | Portable historical-data import | PLANNED | — | — | — | — | Important because prior local dataset is unavailable |
+| P2.4 | Portable historical-data import | IMPLEMENTED — CI PENDING | CSV/Parquet/SQLite/PostgreSQL adapters → MarketBar → shared validation → NSE session validation → fingerprint → ResearchStore | Unit/contract tests added | 2fb579e | PENDING | Runtime/CI verification pending; PostgreSQL integration environment not available |
 | P2.5 | Real historical evidence | BLOCKED | — | — | — | — | Legitimate market dataset required |
 | P2.6 | 30-session real paper validation | BLOCKED | Existing validation framework | — | — | — | Real market data required |
 | P2.7 | Cloud readiness | PARTIAL | Docker/PostgreSQL/Alembic configuration exists | Compose CI configured | — | PENDING | Deployment environment verification pending |
