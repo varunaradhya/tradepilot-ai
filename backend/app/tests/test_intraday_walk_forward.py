@@ -22,8 +22,8 @@ def _rows(n=120):
 
 
 def test_fixed_parameter_walk_forward_is_chronological_and_oos():
-    result = run_fixed_parameter_walk_forward(_rows(), train_size=60, validation_size=20)
-    assert result["parameter_selection"] is False
+    result = run_fixed_parameter_walk_forward(_rows(), train_size=60, validation_size=20, config=IntradayBacktestConfig(dataset_fingerprint="a" * 64))
+    assert result["parameter_selection"] is False\n    assert result["dataset_fingerprint"] == "a" * 64
     assert result["windows"] == 3
     windows = result["v1"]["windows"]
     assert windows[0]["train_end"] == windows[0]["validation_start"]
