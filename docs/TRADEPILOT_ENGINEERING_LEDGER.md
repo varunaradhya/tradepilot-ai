@@ -183,3 +183,10 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - F&O position reads are now observational; quote-based paper marking uses an explicit POST mutation endpoint.
 - F&O provider errors at the position-read boundary are sanitized.
 - Docker deployment explicitly sets `TRADEPILOT_ENV=production`, activating production configuration guards.
+
+
+## Latest transaction-boundary hardening — 2026-09-29
+- Durable paper session state supports deferred commits.
+- Signal completion supports deferred commits and is committed at the request boundary.
+- Market-bar ML/learning/state writes can remain in the same transaction until request completion.
+- Added regression contracts for the atomic mutation boundary.
