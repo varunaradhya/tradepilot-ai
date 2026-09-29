@@ -107,8 +107,9 @@ def run_dhan_paper_session(
         total_pnl += float(trade["pnl"])
 
     db.commit()
-    symbol_row = record_validation_symbol(db, user_id, run_key, trading_day, instrument.symbol, "COMPLETE", len(bars), persisted, total_pnl, diagnostics)
-    validation = complete_validation_day(db, user_id, run_key, trading_day, diagnostics) if finalize_validation else symbol_row
+    symbol_row = record_validation_symbol(db, user_id, run_key, trading_day, instrument.symbol, "COMPLETE", len(bars), persisted, total_pnl, diagnostics, commit=False)
+    validation = complete_validation_day(db, user_id, run_key, trading_day, diagnostics, commit=False) if finalize_validation else symbol_row
+    db.commit()
 
     return {
         "mode": "SIMULATION_ONLY", "symbol": instrument.symbol, "interval": interval, "processed_bars": processed,
