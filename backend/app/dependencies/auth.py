@@ -65,6 +65,10 @@ def get_current_user(
             changed = user.password_changed_at
             if changed.tzinfo is None:
                 changed = changed.replace(tzinfo=timezone.utc)
+            # JWT NumericDate values have second precision. Compare against
+            # the same precision so a token issued in the same second as a
+            # password update is not rejected because of DB microseconds.
+            changed = changed.replace(microsecond=0)
             if datetime.fromtimestamp(float(token_iat), tz=timezone.utc) < changed:
                 raise credentials_exception
 
