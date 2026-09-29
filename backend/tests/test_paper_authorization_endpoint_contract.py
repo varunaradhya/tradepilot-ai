@@ -67,3 +67,12 @@ def test_fno_paper_entry_requires_persisted_strategy_authorization():
     assert "No active qualified strategy authorization" in handler
     assert "decision_fingerprint" in handler
     assert "authorization.fingerprint" in handler
+
+
+def test_direct_paper_trade_mutations_lock_owned_rows():
+    source = Path("app/api/v1/paper_trading.py").read_text(encoding="utf-8")
+    start = source.index("def _owned(")
+    end = source.index("\n\n\ndef _orchestrator", start)
+    owned = source[start:end]
+    assert ".with_for_update()" in owned
+    assert "PaperTrade.user_id == user_id" in owned
