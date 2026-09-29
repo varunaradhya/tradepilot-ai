@@ -27,7 +27,7 @@ def validate_fno_order(decision: dict[str, Any]) -> dict[str, Any]:
 
 
 def execute_fno_decision(
-    client: DhanClient,
+    client: DhanClient | None,
     decision: dict[str, Any],
     correlation_id: str,
 ) -> dict[str, Any]:
