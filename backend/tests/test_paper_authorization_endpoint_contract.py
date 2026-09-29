@@ -76,3 +76,10 @@ def test_direct_paper_trade_mutations_lock_owned_rows():
     owned = source[start:end]
     assert ".with_for_update()" in owned
     assert "PaperTrade.user_id == user_id" in owned
+
+
+def test_strategy_authorization_updates_are_concurrency_safe():
+    source = Path("app/services/strategy_paper_authorization.py").read_text(encoding="utf-8")
+    assert "with_for_update()" in source
+    assert "IntegrityError" in source
+    assert "uq_paper_auth_user_strategy" not in source or "one()" in source
