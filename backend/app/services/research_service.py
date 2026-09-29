@@ -5,6 +5,7 @@ from datetime import date
 
 from app.brokers.dhan import DhanClient
 from app.services.dhan_historical_service import HistoricalRequest, fetch_daily_history
+from app.services.dataset_provenance import DatasetProvenance, fingerprint_market_bars
 from app.services.instrument_master_service import IndianInstrument, InstrumentMaster, instrument_master
 from app.services.research_store import ResearchStore, research_store
 
@@ -51,7 +52,24 @@ def download_daily_dataset(
         end,
     )
     dataset = f"nse/{instrument.symbol}_daily"
-    store.save(dataset, bars)
+    fingerprint = fingerprint_market_bars(
+        bars,
+        symbol=instrument.symbol,
+        timeframe="1d",
+    )
+    provenance = DatasetProvenance.create(
+        dataset_id=dataset,
+        source="dhan",
+        symbol=instrument.symbol,
+        timeframe="1d",
+        bars=bars,
+        quality_status="VALID",
+        content_fingerprint=fingerprint,
+        source_version="dhan_historical_api",
+        import_method="dhan_api",
+        quality_diagnostics=diagnostics,
+    )
+    store.save_with_provenance(dataset, bars, provenance)
     return ResearchDatasetResult(
         symbol=instrument.symbol,
         dataset=dataset,
