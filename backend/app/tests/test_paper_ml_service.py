@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -44,3 +45,69 @@ def test_learning_event_has_json_features():
         db.add(event)
         db.commit()
         assert json.loads(event.features_json)["volume_ratio"] == 1.5
+
+
+def test_learning_event_requires_feature_event_time():
+    from app.services.paper_ml_service import record_trade_outcome
+
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine, tables=[PaperTradeLearningEvent.__table__])
+    with Session(engine) as db:
+        trade = {
+            "symbol": "TCS",
+            "entry": 100.0,
+            "stop": 98.0,
+            "quantity": 10,
+            "pnl": 50.0,
+            "learning_features": {"volume_ratio": 1.5},
+        }
+        try:
+            record_trade_outcome(db, 1, "2026-09-29", trade, commit=False)
+        except ValueError as exc:
+            assert "event timestamp" in str(exc)
+        else:
+            raise AssertionError("Learning event without feature-time must be rejected")
+
+
+def test_learning_event_persists_market_feature_time():
+    from app.services.paper_ml_service import record_trade_outcome
+
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine, tables=[PaperTradeLearningEvent.__table__])
+    with Session(engine) as db:
+        trade = {
+            "symbol": "TCS",
+            "entry": 100.0,
+            "stop": 98.0,
+            "quantity": 10,
+            "pnl": 50.0,
+            "entry_time": "2026-09-29T09:25:00+05:30",
+            "learning_features": {"volume_ratio": 1.5},
+        }
+        event = record_trade_outcome(db, 1, "2026-09-29", trade, commit=False)
+        assert event.event_at == datetime.fromisoformat("2026-09-29T09:25:00+05:30")
+
+
+def test_learning_events_are_ordered_by_feature_time_not_insert_id():
+    from app.services.paper_ml_service import _events
+
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine, tables=[PaperTradeLearningEvent.__table__])
+    with Session(engine) as db:
+        later = PaperTradeLearningEvent(
+            user_id=1, symbol="TCS", session="2026-09-29",
+            strategy_version="V1", model_version="RULES_V1", fingerprint="a" * 64,
+            features_json="{}", label=1, pnl=10.0, r_multiple=1.0,
+            exit_reason="TARGET", event_at=datetime(2026, 9, 29, 10, tzinfo=timezone.utc),
+        )
+        earlier = PaperTradeLearningEvent(
+            user_id=1, symbol="TCS", session="2026-09-29",
+            strategy_version="V1", model_version="RULES_V1", fingerprint="b" * 64,
+            features_json="{}", label=0, pnl=-10.0, r_multiple=-1.0,
+            exit_reason="STOP", event_at=datetime(2026, 9, 29, 9, tzinfo=timezone.utc),
+        )
+        db.add_all([later, earlier])
+        db.commit()
+        ordered = _events(db, 1, "V1")
+        assert ordered[0].event_at.hour == 9
+        assert ordered[1].event_at.hour == 10
