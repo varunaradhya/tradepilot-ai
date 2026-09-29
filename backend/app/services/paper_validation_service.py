@@ -39,7 +39,7 @@ def _symbol_fingerprint(row: PaperValidationSymbol) -> str:
     payload = {"run": row.validation_run, "date": row.session_date.isoformat(), "symbol": row.symbol, "status": row.status, "bars": row.bars, "trades": row.trades, "net_pnl": row.net_pnl, "quality": json.loads(row.data_quality_json)}
     return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
-def record_validation_symbol(db: Session, user_id: int, run_key: str, session_date: date, symbol: str, status: str, bars: int, trades: int, net_pnl: float, data_quality: dict) -> PaperValidationSymbol:
+def record_validation_symbol(db: Session, user_id: int, run_key: str, session_date: date, symbol: str, status: str, bars: int, trades: int, net_pnl: float, data_quality: dict, *, commit: bool = True) -> PaperValidationSymbol:
     status = status.upper()
     if status not in VALID_STATUSES:
         raise ValueError("invalid validation status")
@@ -60,7 +60,8 @@ def record_validation_symbol(db: Session, user_id: int, run_key: str, session_da
     row.trades = max(0, int(trades))
     row.net_pnl = float(net_pnl)
     row.data_quality_json = json.dumps(data_quality, sort_keys=True)
-    db.commit()
+    if commit:
+        db.commit()
     db.refresh(row)
     return row
 
@@ -99,7 +100,7 @@ def finalize_multi_symbol_validation_day(db: Session, user_id: int, run_key: str
     db.refresh(row)
     return row
 
-def record_validation_day(db: Session, user_id: int, run_key: str, session_date: date, status: str, trades: int, net_pnl: float, data_quality: dict) -> PaperValidationDay:
+def record_validation_day(db: Session, user_id: int, run_key: str, session_date: date, status: str, trades: int, net_pnl: float, data_quality: dict, *, commit: bool = True) -> PaperValidationDay:
     status = status.upper()
     if status not in VALID_STATUSES:
         raise ValueError("invalid validation status")
@@ -113,20 +114,22 @@ def record_validation_day(db: Session, user_id: int, run_key: str, session_date:
     row.trades = max(0, int(trades))
     row.net_pnl = float(net_pnl)
     row.data_quality_json = json.dumps(data_quality, sort_keys=True)
-    db.commit()
+    if commit:
+        db.commit()
     db.refresh(row)
     return row
 
-def complete_validation_day(db: Session, user_id: int, run_key: str, session_date: date, data_quality: dict) -> PaperValidationDay:
-    row = capture_day_from_ledger(db, user_id, run_key, session_date, data_quality)
+def complete_validation_day(db: Session, user_id: int, run_key: str, session_date: date, data_quality: dict, *, commit: bool = True) -> PaperValidationDay:
+    row = capture_day_from_ledger(db, user_id, run_key, session_date, data_quality, commit=commit)
     if row.status != "VALID":
         raise ValueError("validation day is not valid")
     row.status = "COMPLETE"
-    db.commit()
+    if commit:
+        db.commit()
     db.refresh(row)
     return row
 
-def capture_day_from_ledger(db: Session, user_id: int, run_key: str, session_date: date, data_quality: dict) -> PaperValidationDay:
+def capture_day_from_ledger(db: Session, user_id: int, run_key: str, session_date: date, data_quality: dict, *, commit: bool = True) -> PaperValidationDay:
     status = "VALID" if data_quality.get("valid", False) else "DATA_QUALITY_FAILED"
     # A valid market session with zero strategy trades is valid evidence; NO_DATA means no bars.
     bars = int(data_quality.get("bars") or 0)
@@ -135,7 +138,7 @@ def capture_day_from_ledger(db: Session, user_id: int, run_key: str, session_dat
     trades = db.query(PaperTrade).filter(PaperTrade.user_id == user_id).all()
     day_trades = [t for t in trades if t.created_at and t.created_at.astimezone(IST).date() == session_date]
     closed = [t for t in day_trades if str(t.status).upper() == "CLOSED"]
-    return record_validation_day(db, user_id, run_key, session_date, status, len(closed), sum(float(t.pnl or 0) for t in closed), data_quality)
+    return record_validation_day(db, user_id, run_key, session_date, status, len(closed), sum(float(t.pnl or 0) for t in closed), data_quality, commit=commit)
 
 def expected_trading_days(start: date, end: date, holidays=frozenset(), calendar: NSEEquityCalendar = DEFAULT_NSE_EQUITY_CALENDAR) -> list[date]:
     if end < start:
