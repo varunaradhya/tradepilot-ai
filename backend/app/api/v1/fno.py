@@ -421,7 +421,16 @@ def option_paper_positions(current_user: User = Depends(get_current_user), db=De
 
 @router.post("/paper/positions/{trade_id}/close")
 def close_option_paper_trade(trade_id:int,exit_price:float=Query(gt=0),current_user:User=Depends(get_current_user),db=Depends(get_db)):
-    trade=db.query(PaperTrade).filter(PaperTrade.id==trade_id,PaperTrade.user_id==current_user.id,PaperTrade.asset_type=="OPTION").first()
+    trade=(
+        db.query(PaperTrade)
+        .filter(
+            PaperTrade.id==trade_id,
+            PaperTrade.user_id==current_user.id,
+            PaperTrade.asset_type=="OPTION",
+        )
+        .with_for_update()
+        .first()
+    )
     if trade is None: raise HTTPException(status_code=404,detail="Option paper position not found")
     try:
         costs=paper_trade_costs(trade,exit_price)
