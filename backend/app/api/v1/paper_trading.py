@@ -188,12 +188,14 @@ def paper_readiness(symbol: str = Query(min_length=1, max_length=30), symbols: s
 
 @router.post("/readiness/authorize")
 def authorize_paper_readiness(symbol: str = Query(min_length=1, max_length=30), symbols: str = Query(default="", max_length=2000), strategy_version: str = Query(default="V1", pattern="^(V1|V2)$"), interval: str = Query(default="5", pattern="^(1|5|15|25|60)$"), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict[str, Any]:
+    _lock_paper_state(db, current_user.id)
     trades = list_paper_trades(db, current_user.id)
     filtered = [trade for trade in trades if trade.strategy_version == strategy_version]
     return {"mode": "SIMULATION_ONLY", **_authorize_from_research(db, current_user.id, symbol, symbols, interval, strategy_version, filtered)}
 
 @router.post("/readiness/revoke")
 def revoke_paper_readiness(symbol: str = Query(min_length=1, max_length=30), strategy_version: str = Query(default="V1", pattern="^(V1|V2)$"), interval: str = Query(default="5", pattern="^(1|5|15|25|60)$"), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict[str, Any]:
+    _lock_paper_state(db, current_user.id)
     revoked = revoke_strategy(db, current_user.id, symbol=symbol, interval=interval, strategy_version=strategy_version)
     _orchestrator(current_user.id, db).revoke_strategy()
     _persist_orchestrator(db, current_user.id)
@@ -224,6 +226,7 @@ def paper_session_signal(payload: PaperSignalRequest, current_user: User = Depen
     signal = payload.model_dump()
     request_id = payload.request_id or request_fingerprint(signal)
     signal["request_id"] = request_id
+    _lock_paper_state(db, current_user.id)
     if not _load_authorization(db, current_user.id, payload.symbol, payload.interval, payload.strategy_version):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No active qualified strategy authorization for this symbol and interval")
     record, owner = claim_request(db, current_user.id, request_id, signal)
@@ -244,8 +247,7 @@ def paper_session_signal(payload: PaperSignalRequest, current_user: User = Depen
                 )
             return {**recovered, "idempotent_replay": True, "request_id": request_id}
         return {**replay, "idempotent_replay": True, "request_id": request_id}
-    _lock_paper_state(db, current_user.id)
-    ml_assessment = predict(
+    # The user row remains locked for the entire mutation transaction.\n    ml_assessment = predict(
         db, current_user.id, payload.symbol, payload.strategy_version, signal, persist=True, commit=False,
     )
     signal["ml_assessment"] = ml_assessment
@@ -301,10 +303,10 @@ def paper_session_reset(current_user: User = Depends(get_current_user), db: Sess
 @router.post("/session/market-bar")
 def paper_market_bar(payload: MarketBarRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict[str, Any]:
     if payload.low > payload.high: raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="low cannot exceed high")
+    _lock_paper_state(db, current_user.id)
     if not _load_authorization(db, current_user.id, payload.symbol, payload.interval, "V1"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No active qualified strategy authorization for this symbol and interval")
     try:
-        _lock_paper_state(db, current_user.id)
         coordinator = _market_coordinator(current_user.id, db)
         persisted = load_market_state(db, current_user.id, payload.session, payload.symbol, payload.interval, "V1")
         if persisted:
