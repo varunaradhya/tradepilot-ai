@@ -229,7 +229,7 @@ def paper_session_signal(payload: PaperSignalRequest, current_user: User = Depen
     _lock_paper_state(db, current_user.id)
     if not _load_authorization(db, current_user.id, payload.symbol, payload.interval, payload.strategy_version):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No active qualified strategy authorization for this symbol and interval")
-    record, owner = claim_request(db, current_user.id, request_id, signal)
+    record, owner = claim_request(db, current_user.id, request_id, signal, commit=False)
     fingerprint = request_fingerprint(signal)
     if record.request_fingerprint != fingerprint:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="request_id was already used for a different signal")
