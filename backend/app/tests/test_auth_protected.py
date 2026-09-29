@@ -1,5 +1,5 @@
 from pathlib import Path
-﻿import jwt
+import jwt
 
 from fastapi.testclient import TestClient
 
