@@ -25,7 +25,7 @@ from app.services.research_store import research_store
 from app.services.intraday_scorecard import build_intraday_scorecard, ScorecardConfig
 from app.services.intraday_evidence_aggregation import aggregate_scorecards
 from app.services.strategy_paper_authorization import authorize_strategy, get_active_authorization, revoke_strategy
-from app.services.paper_signal_request_service import claim_request, complete_request, replay_response, request_fingerprint
+from app.services.paper_signal_request_service import claim_request, complete_request, replay_response, reconcile_pending_request, request_fingerprint
 from app.brokers.dhan import DhanAPIError
 from app.services.paper_session_state_service import load_paper_session_state, save_paper_session_state
 from app.services.paper_market_state_service import load_market_state, save_market_state, clear_market_state
@@ -209,7 +209,16 @@ def paper_session_signal(payload: PaperSignalRequest, current_user: User = Depen
     if not owner:
         replay = replay_response(record)
         if replay is None:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Signal request is already being processed")
+            # A previous worker may have crashed after creating the durable
+            # request but after the paper trade was committed. Recover only
+            # when the exact durable trade can be proven; never retry creation.
+            recovered = reconcile_pending_request(db, record, signal)
+            if recovered is None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Signal request is already being processed or requires reconciliation",
+                )
+            return {**recovered, "idempotent_replay": True, "request_id": request_id}
         return {**replay, "idempotent_replay": True, "request_id": request_id}
     ml_assessment = predict(
         db, current_user.id, payload.symbol, payload.strategy_version, signal, persist=True,
