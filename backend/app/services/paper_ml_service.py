@@ -36,11 +36,10 @@ def _feature_schema_fingerprint() -> str:
 
 
 def _training_dataset_fingerprint(events: list[PaperTradeLearningEvent]) -> str | None:
-    fingerprints = sorted({event.dataset_fingerprint for event in events if event.dataset_fingerprint})
-    if not fingerprints or any(event.dataset_fingerprint is None for event in events):
+    fingerprints = {event.dataset_fingerprint for event in events}
+    if len(fingerprints) != 1 or None in fingerprints:
         return None
-    raw = json.dumps(fingerprints, separators=(",", ":"), ensure_ascii=True)
-    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    return next(iter(fingerprints))
 
 
 def _finite(value: Any, default: float = 0.0) -> float:
@@ -245,6 +244,8 @@ def train_model(db: Session, user_id: int, strategy_version: str = "V1") -> dict
             "reason": "NON_CHRONOLOGICAL_FEATURE_EVENTS",
             "samples": len(events),
         }
+    if any(events[index].event_at == events[index + 1].event_at for index in range(len(events) - 1)):
+        return {"trained": False, "reason": "NON_UNIQUE_FEATURE_EVENT_TIME", "samples": len(events)}
     lineage_strategy = {event.strategy_fingerprint for event in events}
     if len(lineage_strategy) != 1 or None in lineage_strategy:
         return {"trained": False, "reason": "MIXED_OR_MISSING_STRATEGY_LINEAGE", "samples": len(events)}
