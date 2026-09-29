@@ -98,7 +98,7 @@ def test_backtest_requires_valid_dataset_fingerprint():
     try:
         run_intraday_backtest(
             rows,
-            IntradayBacktestConfig(dataset_fingerprint="not-a-sha256"),
+            IntradayBacktestConfig(dataset_fingerprint="not-a-sha256", corporate_action_adjusted=True),
         )
     except ValueError as exc:
         assert "dataset_fingerprint" in str(exc)
@@ -109,6 +109,18 @@ def test_backtest_requires_valid_dataset_fingerprint():
 def test_backtest_preserves_dataset_fingerprint():
     result = run_intraday_backtest(
         _rows(40),
-        IntradayBacktestConfig(dataset_fingerprint="b" * 64),
+        IntradayBacktestConfig(dataset_fingerprint="b" * 64, corporate_action_adjusted=False),
     )
     assert result["dataset_fingerprint"] == "b" * 64
+
+
+def test_backtest_rejects_unknown_corporate_action_state_for_lineage():
+    try:
+        run_intraday_backtest(
+            _rows(40),
+            IntradayBacktestConfig(dataset_fingerprint="c" * 64),
+        )
+    except ValueError as exc:
+        assert "corporate_action_adjusted" in str(exc)
+    else:
+        raise AssertionError("Lineage-backed research must declare corporate-action state")
