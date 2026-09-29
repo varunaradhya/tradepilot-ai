@@ -23,9 +23,26 @@ class NSEEquityCalendar:
     source: str = "NSE Market Timings & Holidays"
     source_version: str = "2026-equities"
     holidays: frozenset[date] = NSE_EQUITY_HOLIDAYS_2026
+    special_sessions: frozenset[date] = frozenset({date(2026, 11, 8)})
 
     def is_trading_day(self, day: date) -> bool:
         return day.weekday() < 5 and day not in self.holidays
+
+    def expected_sessions_between(self, start: date, end: date) -> list[date]:
+        if end < start:
+            raise ValueError("end must not be before start")
+        if start.year != self.calendar_year or end.year != self.calendar_year:
+            raise ValueError(
+                f"{self.market} validation calendar supports {self.calendar_year}; "
+                "load the applicable NSE holiday calendar before validating this window"
+            )
+        sessions: list[date] = []
+        current = start
+        while current <= end:
+            if self.is_trading_day(current):
+                sessions.append(current)
+            current = date.fromordinal(current.toordinal() + 1)
+        return sessions
 
     def expected_sessions(self, start: date, count: int) -> list[date]:
         if count < 1:
