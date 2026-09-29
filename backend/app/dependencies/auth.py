@@ -58,4 +58,14 @@ def get_current_user(
     if user is None:
         raise credentials_exception
 
+    token_iat = payload.get("iat")
+    if token_iat is not None:
+        from datetime import datetime, timezone
+        if isinstance(token_iat, (int, float)) and user.password_changed_at:
+            changed = user.password_changed_at
+            if changed.tzinfo is None:
+                changed = changed.replace(tzinfo=timezone.utc)
+            if datetime.fromtimestamp(float(token_iat), tz=timezone.utc) <= changed:
+                raise credentials_exception
+
     return user
