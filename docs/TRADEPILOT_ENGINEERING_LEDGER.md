@@ -122,3 +122,10 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - Paper trade close now checks the conditional update row count and refreshes the canonical trade when another transaction won the close race.
 - Regression contracts added for both invariants.
 - Status: IMPLEMENTED — CI PENDING.
+
+
+### 2026-09-29 — Broker order retry safety
+- Dhan order placement now explicitly disables automatic HTTP retries to avoid duplicate-order risk after ambiguous broker responses.
+- Generic retry behavior remains available for non-order broker calls.
+- Added regression coverage for the explicit retry policy.
+- Status: IMPLEMENTED — CI PENDING.
