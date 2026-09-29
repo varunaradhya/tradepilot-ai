@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.models.holding import Holding
 from app.models.transaction import Transaction
+from app.models.user import User
 from app.services.pnl_service import calculate_fifo_realized_pnl
 
 
@@ -14,6 +15,14 @@ def _ordered_transactions(db: Session, user_id: int) -> list[Transaction]:
         .order_by(Transaction.transaction_date.asc(), Transaction.id.asc())
         .all()
     )
+
+
+
+
+def _lock_user(db: Session, user_id: int) -> None:
+    # Rebuilding all holdings is a user-wide mutation. Serialize concurrent
+    # transaction mutations across workers using the durable user row lock.
+    db.query(User).filter(User.id == user_id).with_for_update().one()
 
 
 def rebuild_holdings(db: Session, user_id: int) -> None:
@@ -76,6 +85,7 @@ def _validate_transaction_values(symbol: str, transaction_type: str, quantity: f
 
 def create_transaction(db: Session, user_id: int, symbol: str, transaction_type: str, quantity: float, price: float, transaction_date: datetime | None = None):
     symbol, transaction_type = _validate_transaction_values(symbol, transaction_type, quantity, price)
+    _lock_user(db, user_id)
     transaction = Transaction(user_id=user_id, symbol=symbol, transaction_type=transaction_type, quantity=quantity, price=price, transaction_date=transaction_date or datetime.now(timezone.utc))
     db.add(transaction)
     try:
@@ -91,6 +101,7 @@ def create_transaction(db: Session, user_id: int, symbol: str, transaction_type:
 
 def update_transaction(db: Session, transaction_id: int, user_id: int, symbol: str, transaction_type: str, quantity: float, price: float, transaction_date: datetime | None = None):
     symbol, transaction_type = _validate_transaction_values(symbol, transaction_type, quantity, price)
+    _lock_user(db, user_id)
     transaction = get_transaction(db, transaction_id, user_id)
     if transaction is None:
         return None
@@ -112,6 +123,7 @@ def update_transaction(db: Session, transaction_id: int, user_id: int, symbol: s
 
 
 def delete_transaction(db: Session, transaction_id: int, user_id: int) -> bool | None:
+    _lock_user(db, user_id)
     transaction = get_transaction(db, transaction_id, user_id)
     if transaction is None:
         return None
