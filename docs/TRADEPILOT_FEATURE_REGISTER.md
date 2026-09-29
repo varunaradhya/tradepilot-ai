@@ -111,3 +111,9 @@
 ### 2026-09-29 — CI verification hardening
 - Fresh migration CI step now uses explicit isolated SQLite configuration.
 - GitHub execution remains unverified because no workflow run/check is exposed for the latest commit.
+
+
+### 2026-09-29 — Paper mutation concurrency hardening continuation
+- F&O paper-entry authorization reads can now be explicitly locked; the F&O entry path uses the lock before its duplicate open-position check.
+- Paper trade close detects lost conditional updates and returns refreshed canonical state instead of implying that its own mutation won.
+- Status: IMPLEMENTED — CI PENDING.
