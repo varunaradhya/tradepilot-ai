@@ -126,4 +126,15 @@ class InstrumentMaster:
         contains = [item for item in items if item.symbol.upper() != query and item not in starts and (query in item.symbol.upper() or query in item.name.upper())]
         return (exact + starts + contains)[: max(1, min(limit, 100))]
 
+def resolve_nse_equity(master: InstrumentMaster, symbol: str) -> IndianInstrument:
+    """Resolve exactly one NSE cash-equity instrument from the shared master."""
+    needle = symbol.strip().upper()
+    if not needle:
+        raise ValueError("symbol is required")
+    matches = [item for item in master.load() if item.exchange_segment == "NSE_EQ" and item.symbol.upper() == needle]
+    if not matches:
+        raise ValueError(f"NSE equity symbol not found: {needle}")
+    return matches[0]
+
+
 instrument_master = InstrumentMaster()
