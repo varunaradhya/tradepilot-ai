@@ -107,3 +107,7 @@
 ### 2026-09-29 — F&O close concurrency hardening
 - Manual option close now uses an ownership-scoped row lock.
 - Status: IMPLEMENTED — CI PENDING.
+
+### 2026-09-29 — CI verification hardening
+- Fresh migration CI step now uses explicit isolated SQLite configuration.
+- GitHub execution remains unverified because no workflow run/check is exposed for the latest commit.
