@@ -91,3 +91,24 @@ def test_paper_engine_rejects_short_entries_in_long_first_mode():
     assert engine.enter(100, 98, 104, direction="SHORT") is False
     assert engine.enter(100, 98, 104, direction="LONG") is True
     assert engine.snapshot()["trade_direction"] == "LONG_ONLY"
+
+
+def test_backtest_requires_valid_dataset_fingerprint():
+    rows = _rows(40)
+    try:
+        run_intraday_backtest(
+            rows,
+            IntradayBacktestConfig(dataset_fingerprint="not-a-sha256"),
+        )
+    except ValueError as exc:
+        assert "dataset_fingerprint" in str(exc)
+    else:
+        raise AssertionError("Invalid dataset fingerprint must be rejected")
+
+
+def test_backtest_preserves_dataset_fingerprint():
+    result = run_intraday_backtest(
+        _rows(40),
+        IntradayBacktestConfig(dataset_fingerprint="b" * 64),
+    )
+    assert result["dataset_fingerprint"] == "b" * 64
