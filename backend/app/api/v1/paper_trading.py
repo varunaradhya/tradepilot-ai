@@ -52,8 +52,16 @@ class DhanPaperRequest(BaseModel):
 
 
 def _owned(db: Session, user_id: int, trade_id: int) -> PaperTrade:
-    trade = db.query(PaperTrade).filter(PaperTrade.id == trade_id, PaperTrade.user_id == user_id).first()
-    if trade is None: raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Paper trade not found")
+    # Mutation endpoints lock the owned row so concurrent mark/close requests
+    # cannot both observe the same OPEN state and race their updates.
+    trade = (
+        db.query(PaperTrade)
+        .filter(PaperTrade.id == trade_id, PaperTrade.user_id == user_id)
+        .with_for_update()
+        .first()
+    )
+    if trade is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Paper trade not found")
     return trade
 
 
