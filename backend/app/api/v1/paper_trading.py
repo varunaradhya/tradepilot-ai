@@ -279,6 +279,7 @@ def paper_live_ltp(current_user: User = Depends(get_current_user), db: Session =
         orchestrator = _orchestrator(current_user.id, db)
         result = mark_dhan_paper_position(db, current_user.id, orchestrator)
         _persist_orchestrator(db, current_user.id)
+        db.commit()
         return result
     except ValueError as exc: raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
     except DhanAPIError as exc:
@@ -327,6 +328,7 @@ def paper_market_bar(payload: MarketBarRequest, current_user: User = Depends(get
                 db, current_user.id, payload.session, execution["trade"],
                 strategy_version="V1",
                 model_version=str(execution["trade"].get("model_version") or "RULES_V1"),
+                commit=False,
             )
         _persist_orchestrator(db, current_user.id)
         return result
