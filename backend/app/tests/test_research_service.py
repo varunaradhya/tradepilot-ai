@@ -23,8 +23,9 @@ class FakeStore:
     def __init__(self):
         self.saved = None
 
-    def save(self, dataset, bars):
+    def save_with_provenance(self, dataset, bars, provenance):
         self.saved = (dataset, bars)
+        self.provenance = provenance
         return {"dataset": dataset, "valid": True, "bars": len(bars)}
 
 
@@ -46,3 +47,5 @@ def test_download_daily_dataset_persists_validated_bars():
     assert result.symbol == "TCS"
     assert result.bars == 2
     assert store.saved[0] == "nse/TCS_daily"
+    assert store.provenance.dataset_id == "nse/TCS_daily"
+    assert store.provenance.content_fingerprint
