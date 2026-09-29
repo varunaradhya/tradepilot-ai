@@ -75,6 +75,8 @@ def run_fixed_parameter_walk_forward(
             max_trades_per_session=config.max_trades_per_session,
             strategy=IntradayConfig(**config.strategy.__dict__),
             strategy_version="V2",
+            dataset_fingerprint=config.dataset_fingerprint,
+            corporate_action_adjusted=config.corporate_action_adjusted,
         )
         v2 = run_intraday_backtest(validation, v2_config)
         comparison = compare_intraday_strategies(validation, config)
@@ -93,4 +95,8 @@ def run_fixed_parameter_walk_forward(
         "v1": {"windows": v1_results, "summary": _validation_summary(v1_results)},
         "v2": {"windows": v2_results, "summary": _validation_summary(v2_results)},
         "comparison": comparisons,
+        "dataset_fingerprint": config.dataset_fingerprint,
+        "corporate_action_adjusted": config.corporate_action_adjusted,
+        "strategy_fingerprint": v1_results[0].get("strategy_fingerprint") if v1_results else None,
+        "strategy_fingerprint_v2": v2_results[0].get("strategy_fingerprint") if v2_results else None,
     }
