@@ -103,3 +103,7 @@
 - Disabled F&O execution no longer decrypts broker credentials.
 - Regression coverage added.
 - Status: IMPLEMENTED — CI PENDING.
+
+### 2026-09-29 — F&O close concurrency hardening
+- Manual option close now uses an ownership-scoped row lock.
+- Status: IMPLEMENTED — CI PENDING.
