@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import math
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timezone
+from zoneinfo import ZoneInfo
 from typing import Iterable, Sequence
+
+from app.services.nse_equity_calendar import DEFAULT_NSE_EQUITY_CALENDAR, NSEEquityCalendar
 
 
 @dataclass(frozen=True)
@@ -56,6 +59,109 @@ def normalize_bars(rows: Iterable[dict]) -> list[MarketBar]:
         normalized.append(MarketBar(timestamp=timestamp, **values, volume=volume))
 
     return sorted(normalized, key=lambda item: item.timestamp)
+
+
+def validate_nse_equity_dataset(
+    rows: Sequence[MarketBar],
+    expected_interval_minutes: int | None = None,
+    calendar: NSEEquityCalendar = DEFAULT_NSE_EQUITY_CALENDAR,
+) -> dict:
+    """Validate intraday bars against the regular NSE equity session calendar."""
+    base = validate_dataset(rows, expected_interval_minutes=None)
+    if not rows:
+        return {
+            **base,
+            "calendar_valid": False,
+            "weekend_bars": 0,
+            "holiday_bars": 0,
+            "special_session_bars": 0,
+            "outside_session_bars": 0,
+            "pre_market_bars": 0,
+            "post_market_bars": 0,
+            "missing_sessions": 0,
+            "missing_session_dates": [],
+            "session_interval_gaps": 0,
+            "timezone_inconsistencies": 0,
+        }
+
+    ist = ZoneInfo("Asia/Kolkata")
+    regular_start = time(9, 15)
+    regular_end = time(15, 30)
+    local_times = [bar.timestamp.astimezone(ist) for bar in rows]
+    dates = [ts.date() for ts in local_times]
+    offsets = {ts.utcoffset() for ts in local_times}
+    weekend_bars = sum(ts.weekday() >= 5 for ts in local_times)
+    special_session_bars = sum(ts.date() in calendar.special_sessions for ts in local_times)
+    holiday_bars = sum(
+        ts.date() in calendar.holidays and ts.date() not in calendar.special_sessions
+        for ts in local_times
+    )
+    pre_market_bars = sum(ts.time() < regular_start for ts in local_times)
+    post_market_bars = sum(ts.time() > regular_end for ts in local_times)
+    outside_session_bars = pre_market_bars + post_market_bars
+
+    unique_dates = sorted(set(dates))
+    missing_session_dates: list[date] = []
+    calendar_valid = True
+    try:
+        expected_sessions = calendar.expected_sessions_between(unique_dates[0], unique_dates[-1])
+        observed_regular_dates = {
+            ts.date() for ts in local_times
+            if ts.time() >= regular_start and ts.time() <= regular_end
+            and calendar.is_trading_day(ts.date())
+        }
+        missing_session_dates = [day for day in expected_sessions if day not in observed_regular_dates]
+    except ValueError:
+        calendar_valid = False
+        expected_sessions = []
+
+    session_interval_gaps = 0
+    if expected_interval_minutes and expected_interval_minutes > 0:
+        expected_seconds = expected_interval_minutes * 60
+        for previous, current in zip(local_times, local_times[1:]):
+            if previous.date() != current.date():
+                continue
+            if previous.time() < regular_start or current.time() > regular_end:
+                continue
+            if current.time() < regular_start or previous.time() > regular_end:
+                continue
+            if (current - previous).total_seconds() > expected_seconds * 1.5:
+                session_interval_gaps += 1
+
+    valid = (
+        base["valid"]
+        and calendar_valid
+        and weekend_bars == 0
+        and holiday_bars == 0
+        and special_session_bars == 0
+        and outside_session_bars == 0
+        and not missing_session_dates
+        and session_interval_gaps == 0
+        and len(offsets) <= 1
+    )
+    return {
+        **base,
+        "valid": valid,
+        "calendar_valid": calendar_valid,
+        "calendar": {
+            "market": calendar.market,
+            "source": calendar.source,
+            "source_version": calendar.source_version,
+            "session_start": regular_start.isoformat(),
+            "session_end": regular_end.isoformat(),
+        },
+        "weekend_bars": weekend_bars,
+        "holiday_bars": holiday_bars,
+        "special_session_bars": special_session_bars,
+        "outside_session_bars": outside_session_bars,
+        "pre_market_bars": pre_market_bars,
+        "post_market_bars": post_market_bars,
+        "missing_sessions": len(missing_session_dates),
+        "missing_session_dates": [day.isoformat() for day in missing_session_dates],
+        "session_interval_gaps": session_interval_gaps,
+        "timezone_inconsistencies": max(len(offsets) - 1, 0),
+        "message": "OK" if valid else "Dataset requires session/calendar review",
+    }
 
 
 def validate_dataset(rows: Sequence[MarketBar], expected_interval_minutes: int | None = None) -> dict:
