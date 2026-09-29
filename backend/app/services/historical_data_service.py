@@ -89,6 +89,7 @@ def validate_nse_equity_dataset(
     regular_end = time(15, 30)
     local_times = [bar.timestamp.astimezone(ist) for bar in rows]
     dates = [ts.date() for ts in local_times]
+    source_offsets = {bar.timestamp.utcoffset() for bar in rows}
     offsets = {ts.utcoffset() for ts in local_times}
     weekend_bars = sum(ts.weekday() >= 5 for ts in local_times)
     special_session_bars = sum(ts.date() in calendar.special_sessions for ts in local_times)
@@ -159,7 +160,7 @@ def validate_nse_equity_dataset(
         "missing_sessions": len(missing_session_dates),
         "missing_session_dates": [day.isoformat() for day in missing_session_dates],
         "session_interval_gaps": session_interval_gaps,
-        "timezone_inconsistencies": max(len(offsets) - 1, 0),
+        "timezone_inconsistencies": max(len(source_offsets) - 1, 0),
         "message": "OK" if valid else "Dataset requires session/calendar review",
     }
 
