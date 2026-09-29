@@ -5,6 +5,8 @@ __pycache__/
 *.pyd
 .venv/
 venv/
+backend/.venv-certification/
+backend/.runtime-certification/
 
 # Environment
 .env
