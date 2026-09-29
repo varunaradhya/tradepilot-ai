@@ -173,6 +173,29 @@ def _metrics(y_true, y_prob) -> dict[str, float]:
     return metrics
 
 
+def _trading_metrics(events: list[PaperTradeLearningEvent]) -> dict[str, float | int | None]:
+    """Report trade-level evidence without using it for model qualification."""
+    pnls = [float(event.pnl) for event in events]
+    r_values = [float(event.r_multiple) for event in events]
+    wins = [value for value in pnls if value > 0]
+    losses = [value for value in pnls if value < 0]
+    equity = peak = 0.0
+    max_drawdown = 0.0
+    for pnl in pnls:
+        equity += pnl
+        peak = max(peak, equity)
+        max_drawdown = max(max_drawdown, peak - equity)
+    return {
+        "trades": len(events),
+        "total_pnl": round(sum(pnls), 4),
+        "expectancy": round(sum(pnls) / len(pnls), 4) if pnls else 0.0,
+        "win_rate_percent": round(len(wins) / len(pnls) * 100.0, 4) if pnls else 0.0,
+        "profit_factor": round(sum(wins) / abs(sum(losses)), 4) if losses else None,
+        "average_r_multiple": round(sum(r_values) / len(r_values), 4) if r_values else 0.0,
+        "max_drawdown_pnl": round(max_drawdown, 4),
+    }
+
+
 def _qualification_gate(metrics: dict[str, float]) -> bool:
     """Qualify from validation evidence only; final test metrics are report-only."""
     return (
