@@ -35,3 +35,17 @@ def test_market_state_supports_deferred_commit():
     source = (ROOT / "app/services/paper_market_state_service.py").read_text(encoding="utf-8")
     assert "commit: bool = True" in source
     assert "if commit:" in source
+
+
+def test_paper_session_state_supports_deferred_commit():
+    source = (ROOT / "app/services/paper_session_state_service.py").read_text(encoding="utf-8")
+    assert "commit: bool = True" in source
+    assert "if commit:" in source
+
+
+def test_signal_completion_and_market_bar_commit_at_request_boundary():
+    source = (ROOT / "app/api/v1/paper_trading.py").read_text(encoding="utf-8")
+    assert "complete_request(db, record, response, commit=False)" in source
+    assert "save_market_state(" in source
+    assert "commit=False" in source
+    assert "_persist_orchestrator(db, current_user.id)" in source
