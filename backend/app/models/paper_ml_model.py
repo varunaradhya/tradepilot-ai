@@ -21,6 +21,9 @@ class PaperMlModel(Base):
     model_json: Mapped[str] = mapped_column(Text, nullable=False)
     metrics_json: Mapped[str] = mapped_column(Text, nullable=False)
     training_samples: Mapped[int] = mapped_column(Integer, nullable=False)
+    dataset_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    strategy_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    feature_schema_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     validated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(
