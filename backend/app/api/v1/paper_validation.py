@@ -13,6 +13,7 @@ from app.services.paper_validation_service import (
 )
 from app.services.nse_equity_calendar import DEFAULT_NSE_EQUITY_CALENDAR, nse_equity_holidays
 from app.services.paper_validation_gate import validation_readiness
+from app.services.paper_reconciliation_service import reconcile_paper_learning
 
 router = APIRouter(prefix="/paper-validation", tags=["Paper Validation"])
 
@@ -110,3 +111,8 @@ def daily_dhan_validation(payload: MultiSymbolValidationRequest, current_user: U
         return run_daily_dhan_validation(db, current_user.id, payload.symbols, payload.session_date, payload.interval)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
+
+
+@router.get("/reconciliation")
+def paper_learning_reconciliation(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict[str, Any]:
+    return reconcile_paper_learning(db, current_user.id)
