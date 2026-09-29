@@ -136,3 +136,9 @@
 - Added the unique database boundary plus controlled conflict handling for concurrent/manual duplicate creation.
 - Existing duplicate rows are not silently merged by the migration; explicit reconciliation is required if they exist.
 - Status: IMPLEMENTED — CI PENDING.
+
+
+### 2026-09-29 — Portfolio transaction concurrency hardening
+- Transaction create/update/delete now serialize the user-wide holding rebuild using a durable user-row lock.
+- This closes a cross-worker race where concurrent transaction mutations could interleave full holding reconstruction.
+- Status: IMPLEMENTED — CI PENDING.
