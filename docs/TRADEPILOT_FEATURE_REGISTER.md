@@ -76,3 +76,10 @@
 ### 2026-09-29 — Authorization boundary hardening
 - Disabled legacy paper-session mutation endpoints that could bypass persisted strategy authorization, readiness and durable recovery controls.
 - Status: IMPLEMENTED — CI PENDING.
+
+
+### 2026-09-29 — Paper-only safety hardening
+- Disabled remaining legacy/destructive paper-session mutation endpoints in the main paper-trading router.
+- Hardened F&O execution so configuration cannot enable broker order submission.
+- Added regression contracts for both safety boundaries.
+- Status: IMPLEMENTED — CI PENDING.
