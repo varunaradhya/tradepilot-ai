@@ -129,3 +129,10 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - Generic retry behavior remains available for non-order broker calls.
 - Added regression coverage for the explicit retry policy.
 - Status: IMPLEMENTED — CI PENDING.
+
+
+### 2026-09-29 — Portfolio synchronization hardening
+- Serialized Dhan portfolio syncs by locking the ownership-scoped broker connection before fetching/applying the broker snapshot.
+- Stopped importing transactions with malformed broker timestamps rather than synthesizing a new timestamp that could defeat repeat-sync deduplication.
+- Added regression contracts for both invariants.
+- Status: IMPLEMENTED — CI PENDING.
