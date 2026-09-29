@@ -100,13 +100,15 @@ function Navigation({ page, setPage, onCommand, onProfile }: { page: Page; setPa
       <button type="button" onClick={() => setMenu(v => !v)} aria-label="Open navigation menu" aria-expanded={menu} className="tp-icon-button flex h-10 w-10 shrink-0 flex-col items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[.03]"><span className="h-0.5 w-5 bg-slate-300"/><span className="h-0.5 w-5 bg-slate-300"/><span className="h-0.5 w-5 bg-slate-300"/></button>
       <button type="button" className="tp-brand mr-2" onClick={() => setPage("dashboard")} aria-label="Go to TradePilot overview"><img src="/tradepilot-mark.svg" alt="" /><span><span className="tp-brand-name block">TradePilot AI</span><span className="tp-brand-sub block">Intelligent trading cockpit</span></span></button>
       <nav aria-label="Primary navigation" className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
-        {[
-          ["dashboard","Overview", page === "dashboard"],
-          ["research","Research", ["research","evidence","scanner"].includes(page)],
-          ["fno","Trade", ["fno","strategy","decision","paper"].includes(page)],
-          ["portfolio","Portfolio", ["portfolio","transactions"].includes(page)],
-          ["market","Markets", page === "market"],
-        ].map(([id,label,active]) => <button type="button" key={id} onClick={() => setPage(id as Page)} className={`tp-nav-item whitespace-nowrap rounded-xl px-3 py-2 text-[12px] font-bold ${active ? "tp-nav-item-active" : ""}`}>{label}</button>)}
+        {([
+          ["dashboard", "Overview", page === "dashboard"],
+          ["research", "Research", ["research", "evidence", "scanner"].includes(page)],
+          ["fno", "Trade", ["fno", "strategy", "decision", "paper"].includes(page)],
+          ["portfolio", "Portfolio", ["portfolio", "transactions"].includes(page)],
+          ["market", "Markets", page === "market"],
+        ] as Array<[Page, string, boolean]>).map(([id, label, active]) => (
+          <button type="button" key={id} onClick={() => setPage(id)} className={`tp-nav-item whitespace-nowrap rounded-xl px-3 py-2 text-[12px] font-bold ${active ? "tp-nav-item-active" : ""}`}>{label}</button>
+        ))}
       </nav>
       <button type="button" onClick={onCommand} aria-label="Search TradePilot pages" className="hidden items-center gap-2 rounded-xl border border-white/10 bg-white/[.03] px-3 py-2 text-[11px] font-bold text-slate-400 lg:flex">⌕ <span>Search</span><kbd>Ctrl K</kbd></button>
       <div className="relative">
