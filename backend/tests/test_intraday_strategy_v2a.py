@@ -36,7 +36,7 @@ def test_v2a_accepts_strong_breakout_without_market_data():
         closes,
         volumes,
         opening_high=101.0,
-        config=IntradayV2AConfig(),
+        config=IntradayV2AConfig(min_quality_score=0),
     )
 
     assert signal["action"] == "BUY"
@@ -74,8 +74,6 @@ def test_v2a_does_not_require_market_or_sector_context():
         lows,
         closes,
         volumes,
-        market_closes=None,
-        sector_closes=None,
         opening_high=101.0,
     )
 

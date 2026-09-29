@@ -47,7 +47,7 @@ def test_import_csv(tmp_path: Path):
         "2026-01-05T09:20:00+05:30,100.5,102,100,101.5,12\n",
         encoding="utf-8",
     )
-    provenance = import_csv(_request(), ResearchStore(tmp_path / "store"))
+    provenance = import_csv(HistoricalImportRequest(**{**_request().__dict__, "path": str(csv_path)}), ResearchStore(tmp_path / "store"))
     assert provenance.row_count == 2
 
 

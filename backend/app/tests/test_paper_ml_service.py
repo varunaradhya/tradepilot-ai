@@ -64,7 +64,7 @@ def test_learning_event_requires_feature_event_time():
         try:
             record_trade_outcome(db, 1, "2026-09-29", trade, commit=False)
         except ValueError as exc:
-            assert "event timestamp" in str(exc)
+            assert "entry_time/signal_time/timestamp" in str(exc)
         else:
             raise AssertionError("Learning event without feature-time must be rejected")
 

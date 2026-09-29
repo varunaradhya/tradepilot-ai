@@ -25,7 +25,7 @@ def test_paper_signal_route_claims_request_inside_mutation_transaction():
 
 
 def test_authorization_mutations_share_paper_state_lock():
-    source = _read("api/v1/paper_trading.py")
+    source = _read("app/api/v1/paper_trading.py")
     authorize = source.index("def authorize_paper_readiness")
     revoke = source.index("def revoke_paper_readiness")
     assert "_lock_paper_state(db, current_user.id)" in source[authorize:revoke]

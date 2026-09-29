@@ -15,6 +15,14 @@ class _Query:
     def first(self):
         return self.rows[0] if self.rows else None
 
+    def one(self):
+        if len(self.rows) != 1:
+            raise AssertionError(f"expected one row, found {len(self.rows)}")
+        return self.rows[0]
+
+    def with_for_update(self):
+        return self
+
 
 class _DB:
     def __init__(self):

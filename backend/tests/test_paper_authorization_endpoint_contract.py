@@ -116,7 +116,7 @@ def test_fno_paper_entry_locks_strategy_authorization_for_duplicate_position_rac
     start = source.index('def open_option_paper_trade(')
     end = source.index('\\n\\n@router.get("/paper/recovery")', start)
     handler = source[start:end]
-    assert "lock=True" in handler
+    assert "lock=True" in handler or "lock = True" in handler
 
 
 def test_active_strategy_authorization_supports_locked_reads():
