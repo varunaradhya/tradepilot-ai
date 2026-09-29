@@ -145,3 +145,10 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - Migration intentionally fails rather than silently consolidating pre-existing duplicate rows; any existing duplicates require explicit reconciliation before the migration can complete.
 - Added regression coverage for the model/migration/service invariant.
 - Status: IMPLEMENTED — CI PENDING.
+
+
+### 2026-09-29 — Portfolio transaction rebuild concurrency hardening
+- Found that transaction create/update/delete rebuilds all holdings for a user without a cross-worker serialization boundary.
+- Added an ownership-scoped durable `users` row lock before transaction mutations/rebuilds, preventing concurrent workers from interleaving delete/rebuild/commit operations for the same user.
+- Added a regression contract for the lock boundary.
+- Status: IMPLEMENTED — CI PENDING.
