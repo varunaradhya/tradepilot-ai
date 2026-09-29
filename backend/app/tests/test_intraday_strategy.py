@@ -1,6 +1,7 @@
 from app.services.intraday_strategy import IntradayConfig, generate_intraday_signal
 from app.services.intraday_backtest import IntradayBacktestConfig, run_intraday_backtest
 from app.services.paper_trading import PaperRiskConfig, PaperTradingEngine
+import app.services.intraday_backtest as backtest_module
 
 
 def _rows(n=40):
@@ -45,6 +46,34 @@ def test_intraday_backtest_returns_metrics_and_declares_long_mode():
     assert "profit_factor" in result
     assert result["trade_direction"] == "LONG_ONLY"
     assert all(t["direction"] == "LONG" for t in result["trades_detail"])
+
+
+def test_backtest_executes_completed_bar_signal_on_next_bar_open(monkeypatch):
+    rows=_rows(30)
+
+    def fake_signal(opens, highs, lows, closes, volumes, opening_high=None, opening_low=None, config=None):
+        if len(closes) == 20:
+            return {
+                "action": "BUY",
+                "entry": 100.0,
+                "stop": 99.0,
+                "target": 200.0,
+            }
+        return {"action": "NEUTRAL"}
+
+    monkeypatch.setattr(backtest_module, "generate_intraday_signal", fake_signal)
+    rows[20]["open"] = 110.0
+    rows[20]["high"] = 111.0
+    rows[20]["low"] = 109.0
+    rows[20]["close"] = 110.5
+
+    result = run_intraday_backtest(rows, IntradayBacktestConfig())
+    assert result["signal_execution"] == "NEXT_BAR_OPEN"
+    assert result["trades_detail"]
+    trade = result["trades_detail"][0]
+    assert trade["signal_entry"] == 100.0
+    assert trade["entry"] > 105.0
+    assert trade["entry"] != trade["signal_entry"]
 
 
 def test_invalid_trade_direction_is_rejected():
