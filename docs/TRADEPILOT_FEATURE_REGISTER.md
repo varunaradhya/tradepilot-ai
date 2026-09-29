@@ -83,3 +83,10 @@
 - Hardened F&O execution so configuration cannot enable broker order submission.
 - Added regression contracts for both safety boundaries.
 - Status: IMPLEMENTED — CI PENDING.
+
+
+### 2026-09-29 — Safety/concurrency hardening continuation
+- Enforced persisted strategy authorization and fingerprint parity for F&O paper entry.
+- Serialized paper market-state read/write boundaries with row locks and uniqueness-race recovery.
+- Added regression coverage for F&O authorization parity.
+- Status: IMPLEMENTED — CI PENDING.
