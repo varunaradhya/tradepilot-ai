@@ -42,3 +42,8 @@ The temporal learning-event implementation referenced datetime and timezone with
 ### AUDIT-017 — ML evaluation lacked trade-level outcome metrics — FIX IMPLEMENTED, CI PENDING
 **Priority:** P1  
 ML evaluation previously exposed classification metrics only. Validation/test evidence now also reports trade count, total P&L, expectancy, win rate, profit factor, average R-multiple and P&L drawdown. These are descriptive evaluation metrics only; model qualification remains controlled by the validation classification gate, and the final test set remains report-only.
+
+
+### AUDIT-018 — Backtest/walk-forward dataset lineage was incomplete — FIX IMPLEMENTED, CI PENDING
+**Priority:** P1  
+Portable historical datasets already received deterministic SHA-256 provenance, but the backtest and walk-forward result contracts did not carry that fingerprint. A result could therefore be detached from the exact dataset used for the evidence run. Backtest configuration now accepts an optional validated SHA-256 dataset fingerprint, returns it with the result, and the fixed-parameter walk-forward path propagates the same fingerprint into both strategy variants and the top-level result. Regression coverage verifies validation and propagation.
