@@ -16,7 +16,6 @@ def upgrade():
         sa.Column("result_json",sa.Text(),nullable=False),
         sa.Column("created_at",sa.DateTime(timezone=True),nullable=False),
         sa.UniqueConstraint("user_id","experiment_key",name="uq_research_experiment_user_key"))
-    op.create_index("ix_research_experiments_user_id","research_experiments",["user_id"])
     op.create_table("corporate_actions",
         sa.Column("id",sa.Integer(),primary_key=True),
         sa.Column("symbol",sa.String(30),nullable=False,index=True),
@@ -26,7 +25,5 @@ def upgrade():
         sa.Column("source",sa.String(80),nullable=False),
         sa.Column("created_at",sa.DateTime(timezone=True),nullable=False),
         sa.UniqueConstraint("symbol","action_date","action_type","factor","source",name="uq_corporate_action"))
-    op.create_index("ix_corporate_actions_symbol","corporate_actions",["symbol"])
-    op.create_index("ix_corporate_actions_action_date","corporate_actions",["action_date"])
 def downgrade():
     op.drop_table("corporate_actions"); op.drop_table("research_experiments")
