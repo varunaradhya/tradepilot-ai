@@ -99,3 +99,12 @@ def test_fno_disabled_execution_endpoint_does_not_load_broker_credentials():
     execute_source = source[start:]
     assert "execute_fno_decision(None" in execute_source
     assert "_dhan(db,current_user.id)" not in execute_source
+
+
+def test_fno_manual_close_locks_owned_option_position():
+    source = Path("app/api/v1/fno.py").read_text(encoding="utf-8")
+    start = source.index('@router.post("/paper/positions/{trade_id}/close")')
+    end = source.find('\n@router.post(', start + 10)
+    section = source[start:] if end < 0 else source[start:end]
+    assert ".with_for_update()" in section
+    assert "PaperTrade.user_id==current_user.id" in section
