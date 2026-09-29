@@ -180,3 +180,79 @@ def test_request_fingerprint_changes_when_expiry_changes():
     base = {**signal(), "underlying": {"symbol": "NIFTY", "expiry": "2026-09-24"}}
     changed = {**signal(), "underlying": {"symbol": "NIFTY", "expiry": "2026-10-01"}}
     assert request_fingerprint(base) != request_fingerprint(changed)
+
+
+def test_complete_request_preserves_first_response_on_repeated_completion():
+    db = make_db()
+    record, claimed = claim_request(db, 1, "repeat-complete-001", signal())
+    assert claimed is True
+
+    first = {"mode": "PAPER_ONLY", "accepted": True, "trade_id": 11}
+    second = {"mode": "PAPER_ONLY", "accepted": False, "reason": "retry"}
+
+    completed = complete_request(db, record, first)
+    replayed = complete_request(db, record, second)
+
+    assert completed.decision == "ACCEPTED"
+    assert replayed.decision == "ACCEPTED"
+    assert replay_response(replayed) == first
+
+
+def test_pending_request_reconciles_exact_existing_equity_trade():
+    from datetime import datetime, timezone
+
+    db = make_db()
+    signal_data = {
+        **signal(),
+        "quantity": 10,
+    }
+    record, claimed = claim_request(db, 1, "equity-recovery-001", signal_data)
+    assert claimed is True
+
+    trade = PaperTrade(
+        user_id=1,
+        symbol="NIFTY",
+        side="BUY",
+        status="OPEN",
+        quantity=10,
+        entry_price=120,
+        stop_price=90,
+        target_price=180,
+        strategy_version="V1",
+        asset_type="EQUITY",
+        created_at=datetime.now(timezone.utc),
+    )
+    db.add(trade)
+    db.commit()
+    db.refresh(trade)
+
+    recovered = reconcile_pending_request(db, record, signal_data)
+    assert recovered is not None
+    assert recovered["accepted"] is True
+    assert recovered["recovered"] is True
+    assert recovered["position"]["id"] == trade.id
+
+
+def test_pending_request_does_not_reconcile_ambiguous_equity_trades():
+    db = make_db()
+    signal_data = {**signal(), "quantity": 10}
+    record, _ = claim_request(db, 1, "equity-recovery-002", signal_data)
+
+    for _ in range(2):
+        db.add(PaperTrade(
+            user_id=1,
+            symbol="NIFTY",
+            side="BUY",
+            status="OPEN",
+            quantity=10,
+            entry_price=120,
+            stop_price=90,
+            target_price=180,
+            strategy_version="V1",
+            asset_type="EQUITY",
+        ))
+    db.commit()
+
+    assert reconcile_pending_request(db, record, signal_data) is None
+    db.refresh(record)
+    assert record.decision == "PENDING"
