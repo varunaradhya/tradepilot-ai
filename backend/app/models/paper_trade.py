@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Float, Integer, String
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.database import Base
@@ -24,6 +24,7 @@ class PaperTrade(Base):
     strategy_version: Mapped[str] = mapped_column(String(10), nullable=False, default="V1")
     asset_type: Mapped[str] = mapped_column(String(10), nullable=False, default="EQUITY")
     security_id: Mapped[str | None] = mapped_column(String(30), nullable=True, index=True)
+    learning_event_id: Mapped[int | None] = mapped_column(ForeignKey("paper_trade_learning_events.id"), nullable=True, index=True)
     exchange_segment: Mapped[str | None] = mapped_column(String(20), nullable=True)
     underlying: Mapped[str | None] = mapped_column(String(30), nullable=True)
     expiry: Mapped[str | None] = mapped_column(String(10), nullable=True)
