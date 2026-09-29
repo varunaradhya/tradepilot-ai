@@ -90,6 +90,7 @@ def record_trade_outcome(
     trade: dict[str, Any],
     strategy_version: str = "V1",
     model_version: str = "RULES_V1",
+    commit: bool = True,
 ) -> PaperTradeLearningEvent:
     features = trade.get("learning_features") or {}
     normalized = {name: _finite(features.get(name)) for name in FEATURE_NAMES}
@@ -120,13 +121,14 @@ def record_trade_outcome(
         exit_reason=str(trade.get("reason") or "UNKNOWN"),
     )
     db.add(event)
-    db.commit()
-    db.refresh(event)
+    if commit:
+        db.commit()
+        db.refresh(event)
     event_count = db.query(PaperTradeLearningEvent).filter(
         PaperTradeLearningEvent.user_id == user_id,
         PaperTradeLearningEvent.strategy_version == strategy_version,
     ).count()
-    if event_count >= MIN_TRAINING_SAMPLES and event_count % AUTO_RETRAIN_EVERY == 0:
+    if commit and event_count >= MIN_TRAINING_SAMPLES and event_count % AUTO_RETRAIN_EVERY == 0:
         train_model(db, user_id, strategy_version)
     return event
 
