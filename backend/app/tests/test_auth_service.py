@@ -122,3 +122,17 @@ def test_authenticate_user_returns_none_for_unknown_email():
         assert result is None
     finally:
         db.close()
+
+
+def test_refresh_token_payload_carries_issue_time():
+    from app.services.auth_service import create_refresh_token, decode_refresh_token_payload
+
+    db = create_test_session()
+    try:
+        user = create_test_user(db)
+        payload = decode_refresh_token_payload(create_refresh_token(user.id))
+        assert payload["sub"] == str(user.id)
+        assert "iat" in payload
+        assert payload["purpose"] == "refresh"
+    finally:
+        db.close()
