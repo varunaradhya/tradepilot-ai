@@ -33,6 +33,8 @@ jobs:
       - name: Compile backend
         run: python -m compileall app main.py
       - name: Verify fresh Alembic migration
+        env:
+          TRADEPILOT_DATABASE_URL: sqlite:///./ci-fresh.db
         run: python -m alembic upgrade head
       - name: Run backend tests
         run: python -m pytest -q
