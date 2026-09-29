@@ -326,7 +326,7 @@ def open_option_paper_trade(data: FNOPaperOpenRequest, current_user: User = Depe
         raise HTTPException(status_code=409,detail=detail)
     underlying_symbol = str(underlying.get("symbol") or "").strip().upper()
     interval = str(underlying.get("interval") or "5")
-    authorization = get_active_authorization(db, current_user.id, symbol=underlying_symbol, interval=interval, strategy_version=data.strategy_version)
+    authorization = get_active_authorization(db, current_user.id, symbol=underlying_symbol, interval=interval, strategy_version=data.strategy_version, lock=True)
     if authorization is None:
         raise HTTPException(status_code=403, detail="No active qualified strategy authorization for this F&O underlying and interval")
     decision_fingerprint = str(decision.get("strategy_fingerprint") or decision.get("strategyFingerprint") or "").strip()
