@@ -22,13 +22,24 @@ def _rows(n=120):
 
 
 def test_fixed_parameter_walk_forward_is_chronological_and_oos():
-    result = run_fixed_parameter_walk_forward(_rows(), train_size=60, validation_size=20, config=IntradayBacktestConfig(dataset_fingerprint="a" * 64))
-    assert result["parameter_selection"] is False\n    assert result["dataset_fingerprint"] == "a" * 64
+    result = run_fixed_parameter_walk_forward(
+        _rows(),
+        train_size=60,
+        validation_size=20,
+        config=IntradayBacktestConfig(
+            dataset_fingerprint="a" * 64,
+            corporate_action_adjusted=True,
+        ),
+    )
+    assert result["parameter_selection"] is False
+    assert result["dataset_fingerprint"] == "a" * 64
+    assert result["corporate_action_adjusted"] is True
     assert result["windows"] == 3
     windows = result["v1"]["windows"]
     assert windows[0]["train_end"] == windows[0]["validation_start"]
     assert windows[0]["validation_end"] == windows[1]["validation_start"]
     assert windows[1]["validation_end"] == windows[2]["validation_start"]
+    assert windows[0]["strategy_fingerprint"]
 
 
 def test_fixed_parameter_walk_forward_reports_both_versions():
