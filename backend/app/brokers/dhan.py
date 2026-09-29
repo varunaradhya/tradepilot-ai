@@ -30,22 +30,23 @@ class DhanClient:
                 pass
         return fallback + random.uniform(0, 0.5)
 
-    def _request(self, method: str, path: str, json: dict[str, Any] | None = None, *, include_client_id: bool = True) -> Any:
+    def _request(self, method: str, path: str, json: dict[str, Any] | None = None, *, include_client_id: bool = True, allow_retries: bool = True) -> Any:
         headers = {"Accept": "application/json", "Content-Type": "application/json", "access-token": self.access_token}
         if include_client_id:
             headers["client-id"] = self.client_id
-        for attempt in range(self.max_retries + 1):
+        retry_limit = self.max_retries if allow_retries else 0
+        for attempt in range(retry_limit + 1):
             try:
                 r = httpx.request(method, f"{self.BASE_URL}{path}", headers=headers, json=json, timeout=30.0)
             except httpx.RequestError as exc:
-                if attempt >= self.max_retries:
+                if attempt >= retry_limit:
                     raise DhanAPIError(f"Dhan connection failed after {attempt + 1} attempts: {exc}") from exc
                 delay = self._retry_delay(attempt)
                 print(f"Dhan connection retry {attempt + 1}/{self.max_retries} in {delay:.1f}s: {exc}", flush=True)
                 time.sleep(delay)
                 continue
             if r.status_code in (429, 500, 502, 503, 504):
-                if attempt >= self.max_retries:
+                if attempt >= retry_limit:
                     try: p = r.json()
                     except Exception: p = r.text
                     raise DhanAPIError(f"Dhan API returned {r.status_code} after {attempt + 1} attempts: {p}", r.status_code)
@@ -95,7 +96,10 @@ class DhanClient:
     def option_chain(self, underlying_security_id: int, underlying_segment: str, expiry: str):
         return self._request("POST", "/optionchain", {"UnderlyingScrip": underlying_security_id, "UnderlyingSeg": underlying_segment, "Expiry": expiry})
 
-    def place_order(self, order: dict[str, Any]): return self._request("POST", "/orders", order)
+    def place_order(self, order: dict[str, Any]):
+        # Never retry broker order placement: a timeout/5xx may occur after Dhan
+        # accepted the order, and an automatic retry could create a duplicate order.
+        return self._request("POST", "/orders", order, allow_retries=False)
     def get_order(self, order_id: str): return self._request("GET", f"/orders/{order_id}")
     def cancel_order(self, order_id: str): return self._request("DELETE", f"/orders/{order_id}")
 
