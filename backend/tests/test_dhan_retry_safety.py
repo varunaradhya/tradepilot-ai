@@ -14,3 +14,11 @@ def test_dhan_request_has_explicit_retry_policy():
     source = Path("app/brokers/dhan.py").read_text(encoding="utf-8")
     assert "allow_retries: bool = True" in source
     assert "retry_limit = self.max_retries if allow_retries else 0" in source
+
+
+def test_dhan_errors_do_not_persist_provider_response_payloads():
+    from pathlib import Path
+    source = Path("app/brokers/dhan.py").read_text(encoding="utf-8")
+    assert "Dhan API returned HTTP" in source
+    assert "print(" not in source
+    assert 'logger.warning("Dhan connection retry' in source
