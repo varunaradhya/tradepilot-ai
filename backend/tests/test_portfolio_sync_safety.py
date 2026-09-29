@@ -32,3 +32,11 @@ def test_holding_symbol_is_unique_per_user_at_database_boundary():
     assert "Holding.user_id == user_id" in service
     assert "Holding.symbol == normalized_symbol" in service
     assert "IntegrityError" in service
+
+
+def test_transaction_mutations_lock_user_before_rebuilding_holdings():
+    source = Path("app/services/transaction_service.py").read_text(encoding="utf-8")
+    assert "from app.models.user import User" in source
+    assert "def _lock_user" in source
+    assert "db.query(User).filter(User.id == user_id).with_for_update().one()" in source
+    assert source.index("_lock_user(db, user_id)") < source.index("db.commit()")
