@@ -68,3 +68,11 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - ML models persist aggregate training-dataset fingerprint, strategy fingerprint and feature-schema fingerprint.
 - Added regression tests for lineage aggregation, training rejection and migration chain.
 - CI remains unverified.
+
+
+### 2026-09-29 — Authorization boundary hardening
+- Found a legacy authenticated-but-unguarded `/paper-session/bar` mutation path with separate in-memory state.
+- Disabled legacy `/paper-session/bar` and `/paper-session/reset` mutations with HTTP 410.
+- Preserved the durable `/paper-trading/session/*` pipeline as the supported mutation path.
+- Added regression contract coverage.
+- Status: IMPLEMENTED — CI PENDING.
