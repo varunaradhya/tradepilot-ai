@@ -101,3 +101,7 @@ Broker connection writes now serialize against concurrent upserts using row lock
 ### AUDIT-032 — Disabled F&O execution endpoint still touched broker credentials — FIX IMPLEMENTED, CI PENDING
 **Priority:** P0  
 Although the execution service was already hard-locked to paper-only behavior, the API endpoint still instantiated a Dhan client and decrypted credentials before reaching that boundary. The endpoint is now broker-free and calls the disabled execution boundary with no broker credential access.
+
+### AUDIT-033 — F&O manual close lacked mutation row locking — FIX IMPLEMENTED, CI PENDING
+**Priority:** P1  
+The option manual-close endpoint now locks the owned `PaperTrade` row before applying the close mutation. This aligns F&O close behavior with the equity paper-trade mutation boundary.
