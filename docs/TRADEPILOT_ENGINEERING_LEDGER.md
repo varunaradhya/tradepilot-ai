@@ -84,3 +84,10 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - Hardened the F&O execution adapter to fail closed regardless of configuration and never submit a Dhan broker order.
 - Added regression contracts for the disabled routes and broker-execution fail-closed boundary.
 - Status: IMPLEMENTED — CI PENDING.
+
+
+### 2026-09-29 — Safety/concurrency hardening continuation
+- Enforced persisted strategy authorization and fingerprint parity for F&O paper entry.
+- Serialized paper market-state read/write boundaries with row locks and uniqueness-race recovery.
+- Added regression coverage for F&O authorization parity.
+- Status: IMPLEMENTED — CI PENDING.
