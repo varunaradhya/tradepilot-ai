@@ -37,25 +37,17 @@ def summary(current_user: User = Depends(get_current_user)) -> dict[str, Any]:
 
 @router.post("/bar")
 def market_bar(payload: MarketBarRequest, current_user: User = Depends(get_current_user)) -> dict[str, Any]:
-    if payload.low > payload.high:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="low cannot exceed high")
-    try:
-        return _coordinator(current_user.id).on_bar(
-            payload.session,
-            payload.symbol,
-            payload.open,
-            payload.high,
-            payload.low,
-            payload.close,
-            payload.volume,
-            payload.opening_high,
-            payload.opening_low,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+    """Legacy mutation path is disabled; use the durable authorized pipeline."""
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="Legacy paper-session mutation is disabled; use /api/v1/paper-trading/session/market-bar.",
+    )
 
 
 @router.post("/reset")
 def reset(current_user: User = Depends(get_current_user)) -> dict[str, Any]:
-    _coordinators[current_user.id] = PaperMarketCoordinator()
-    return {"mode": "SIMULATION_ONLY", "reset": True}
+    """Legacy reset path is disabled to prevent a second paper-state model."""
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="Legacy paper-session reset is disabled; use the durable paper-trading session controls.",
+    )
