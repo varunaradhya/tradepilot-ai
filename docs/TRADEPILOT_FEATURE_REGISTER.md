@@ -24,3 +24,12 @@
 - Attached provenance to Dhan daily research datasets.
 - Added regression tests for import, provenance, unsafe table identifiers and migration ordering.
 - Status: IMPLEMENTED — CI PENDING.
+
+
+### 2026-09-29 — Leakage hardening batch
+- Added explicit `event_at` to paper ML learning events and migration 0015.
+- Learning-event creation now requires a trustworthy entry/signal timestamp.
+- ML training orders observations by feature event time, not persistence ID.
+- Training fails closed if historical events lack feature timestamps.
+- Model qualification now uses validation metrics only; final test metrics are report-only.
+- Added regression coverage for temporal ordering, timestamp requirements and qualification behavior.
