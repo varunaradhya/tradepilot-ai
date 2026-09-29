@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -27,6 +28,19 @@ MIN_TRAINING_SAMPLES = 30
 PAPER_FORWARD_SAMPLES = 30
 AUTO_RETRAIN_EVERY = 10
 DEFAULT_THRESHOLD = 0.60
+
+
+def _feature_schema_fingerprint() -> str:
+    raw = json.dumps(list(FEATURE_NAMES), separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _training_dataset_fingerprint(events: list[PaperTradeLearningEvent]) -> str | None:
+    fingerprints = sorted({event.dataset_fingerprint for event in events if event.dataset_fingerprint})
+    if not fingerprints or len(fingerprints) != sum(1 for event in events if event.dataset_fingerprint):
+        return None
+    raw = json.dumps(fingerprints, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 def _finite(value: Any, default: float = 0.0) -> float:
@@ -127,6 +141,8 @@ def record_trade_outcome(
         event_at=event_at,
         strategy_version=strategy_version,
         model_version=model_version,
+        dataset_fingerprint=trade.get("dataset_fingerprint"),
+        strategy_fingerprint=trade.get("strategy_fingerprint"),
         fingerprint=fingerprint,
         features_json=json.dumps(normalized, sort_keys=True),
         label=1 if pnl > 0 else 0,
@@ -229,6 +245,13 @@ def train_model(db: Session, user_id: int, strategy_version: str = "V1") -> dict
             "reason": "NON_CHRONOLOGICAL_FEATURE_EVENTS",
             "samples": len(events),
         }
+    lineage_strategy = {event.strategy_fingerprint for event in events}
+    if len(lineage_strategy) != 1 or None in lineage_strategy:
+        return {"trained": False, "reason": "MIXED_OR_MISSING_STRATEGY_LINEAGE", "samples": len(events)}
+    dataset_fingerprint = _training_dataset_fingerprint(events)
+    if dataset_fingerprint is None:
+        return {"trained": False, "reason": "MISSING_OR_MIXED_DATASET_LINEAGE", "samples": len(events)}
+    strategy_fingerprint = next(iter(lineage_strategy))
     labels = [int(event.label) for event in events]
     if len(set(labels)) < 2:
         return {"trained": False, "reason": "SINGLE_CLASS_DATA", "samples": len(events)}
@@ -289,6 +312,9 @@ def train_model(db: Session, user_id: int, strategy_version: str = "V1") -> dict
         "validated": validated,
         "qualification_source": "validation_only",
         "test_set_role": "report_only",
+        "dataset_fingerprint": dataset_fingerprint,
+        "strategy_fingerprint": strategy_fingerprint,
+        "feature_schema_fingerprint": _feature_schema_fingerprint(),
     }
     db.query(PaperMlModel).filter(
         PaperMlModel.user_id == user_id,
@@ -303,6 +329,9 @@ def train_model(db: Session, user_id: int, strategy_version: str = "V1") -> dict
         model_json=json.dumps(payload, sort_keys=True),
         metrics_json=json.dumps(metrics, sort_keys=True),
         training_samples=n,
+        dataset_fingerprint=dataset_fingerprint,
+        strategy_fingerprint=strategy_fingerprint,
+        feature_schema_fingerprint=_feature_schema_fingerprint(),
         validated=validated,
         active=validated,
     )
