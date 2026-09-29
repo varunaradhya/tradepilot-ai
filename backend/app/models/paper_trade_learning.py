@@ -17,6 +17,8 @@ class PaperTradeLearningEvent(Base):
     symbol: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
     session: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
     event_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    dataset_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    strategy_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     strategy_version: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     model_version: Mapped[str] = mapped_column(String(20), nullable=False, default="RULES_V1")
     fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
