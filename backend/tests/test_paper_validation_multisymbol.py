@@ -42,7 +42,7 @@ def test_daily_validation_finalizes_one_day_across_symbols(monkeypatch):
     result = job.run_daily_dhan_validation(object(), 7, ["TCS", "tcs", "INFY", "RELIANCE"], date(2026, 9, 28), "5")
 
     assert calls == [("TCS", False), ("INFY", False), ("RELIANCE", False)]
-    assert finalized["symbols"] == ["TCS", "INFY"]
+    assert finalized["symbols"] == ["TCS", "INFY", "RELIANCE"]
     assert result["day_status"] == "COMPLETE"
     assert result["broker_orders_enabled"] is False
 
