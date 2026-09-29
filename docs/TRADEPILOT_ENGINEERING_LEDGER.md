@@ -3,7 +3,7 @@
 Repository: varunaradhya/tradepilot-ai
 Branch: main
 Last updated: 2026-09-29
-Current HEAD: eca0ef9be088b4f0345f38308be863c7dc266101
+Current HEAD: b6da87b5db397133a62913259c0146526a46525f
 
 ## Status
 - DONE — implementation complete and verified by available evidence
@@ -22,8 +22,8 @@ Current HEAD: eca0ef9be088b4f0345f38308be863c7dc266101
 | P1.2 | Backtest audit | PLANNED | Existing engine | Existing tests | — | — | Leakage/cost/slippage/position constraints need expanded audit |
 | P1.3 | Walk-forward validation audit | PLANNED | Existing framework | Existing tests | — | — | Dataset fingerprint and fold lineage need verification |
 | P1.4 | Strategy framework audit | PLANNED | V1/V2/V2A registry exists | Existing tests | — | — | Parameter provenance/fingerprinting pending |
-| P1.5 | ML data integrity | PLANNED | Existing ML service | Existing tests | — | — | Feature/label schema audit pending |
-| P1.6 | ML leakage protection | PLANNED | Existing chronological split | — | — | — | Dedicated regression suite pending |
+| P1.5 | ML data integrity | IMPLEMENTED — CI PENDING | Temporal feature-event timestamp persisted and required | Existing ML service | Existing tests | — | — | Feature/label schema audit pending |
+| P1.6 | ML leakage protection | PARTIAL — CI PENDING | Temporal event ordering hardened; test set removed from qualification gate | Existing chronological split | — | — | — | Dedicated regression suite pending |
 | P1.7 | ML lifecycle | PARTIAL | Training/deployment gates exist | Existing tests | — | PENDING | Rollback/version lifecycle audit pending |
 | P1.8 | ML evaluation | PARTIAL | Descriptive metrics exist | Existing tests | — | PENDING | Calibration/trading-aware metrics pending |
 | P1.9 | Portfolio risk engine | IMPLEMENTED | Existing portfolio risk service | Existing tests | — | PENDING | Current-head verification pending |
