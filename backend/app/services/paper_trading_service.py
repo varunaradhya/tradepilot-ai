@@ -66,7 +66,10 @@ def close_paper_trade(db: Session, trade: PaperTrade, exit_price: float, reason:
         pnl = (exit_price - trade.entry_price) * trade.quantity
     closed_at = datetime.now(timezone.utc)
     if hasattr(db, "execute") and hasattr(trade, "id"):
-        db.execute(update(PaperTrade).where(PaperTrade.id == trade.id, PaperTrade.status == "OPEN").values(exit_price=exit_price, pnl=pnl, reason=reason, status="CLOSED", closed_at=closed_at))
+        result = db.execute(update(PaperTrade).where(PaperTrade.id == trade.id, PaperTrade.status == "OPEN").values(exit_price=exit_price, pnl=pnl, reason=reason, status="CLOSED", closed_at=closed_at))
+        if getattr(result, "rowcount", 1) == 0 and hasattr(db, "refresh"):
+            db.refresh(trade)
+            return trade
     else:
         # Lightweight test doubles used by legacy unit tests do not expose execute().
         trade.exit_price = exit_price
