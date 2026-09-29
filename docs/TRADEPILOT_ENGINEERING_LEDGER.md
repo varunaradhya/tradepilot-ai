@@ -177,3 +177,9 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - ML prediction persistence and market-state persistence support deferred commits so state can be committed with the durable session snapshot.
 - Added regression contracts for request-scoped state and mutation serialization.
 - PostgreSQL runtime concurrency behavior remains to be certified in an executable environment.
+
+
+## Latest API/deployment hardening — 2026-09-29
+- F&O position reads are now observational; quote-based paper marking uses an explicit POST mutation endpoint.
+- F&O provider errors at the position-read boundary are sanitized.
+- Docker deployment explicitly sets `TRADEPILOT_ENV=production`, activating production configuration guards.
