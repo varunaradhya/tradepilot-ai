@@ -1,3 +1,4 @@
+from pathlib import Path
 ﻿import jwt
 
 from fastapi.testclient import TestClient
@@ -176,3 +177,9 @@ def test_existing_users_endpoint_still_works():
 
     assert response.status_code == 200
     assert isinstance(response.json(), list)
+
+
+def test_access_auth_rejects_token_issued_before_password_change():
+    source = Path("app/dependencies/auth.py").read_text(encoding="utf-8")
+    assert "password_changed_at" in source
+    assert "datetime.fromtimestamp(float(token_iat), tz=timezone.utc) < changed" in source
