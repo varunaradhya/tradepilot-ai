@@ -8,6 +8,9 @@ from app.models.broker_connection import BrokerConnection
 from app.models.holding import Holding
 from app.models.paper_historical_run import PaperHistoricalRun
 from app.models.paper_market_state import PaperMarketState
+from app.models.paper_validation_day import PaperValidationDay
+from app.models.paper_validation_symbol import PaperValidationSymbol
+from app.models.paper_validation_manifest import PaperValidationManifest
 from app.models.paper_trade_learning import PaperTradeLearningEvent
 from app.models.paper_ml_model import PaperMlModel
 from app.models.paper_ml_deployment import PaperMlDeployment
