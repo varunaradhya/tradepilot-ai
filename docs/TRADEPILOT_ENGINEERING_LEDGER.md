@@ -152,3 +152,12 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - Added an ownership-scoped durable `users` row lock before transaction mutations/rebuilds, preventing concurrent workers from interleaving delete/rebuild/commit operations for the same user.
 - Added a regression contract for the lock boundary.
 - Status: IMPLEMENTED — CI PENDING.
+
+
+### 2026-09-29 — Authentication/security hardening
+- Added `password_changed_at` to users and migration 0018.
+- Access and refresh tokens issued before a password change are rejected.
+- Production configuration now refuses the known development JWT secret and defaults schema auto-creation off; deployment uses explicit migrations.
+- Dhan provider error responses and retry logs no longer persist/print provider payloads or exception text.
+- Added regression contracts for migration lineage, token invalidation and Dhan error sanitization.
+- Status: IMPLEMENTED — CI PENDING.
