@@ -113,5 +113,5 @@ def fetch_intraday_history(
         rows.extend(_response_to_rows(payload))
 
     bars = normalize_bars(rows)
-    diagnostics = validate_dataset(bars)
+    diagnostics = validate_dataset(bars, expected_interval_minutes=int(request.interval))
     return bars, diagnostics
