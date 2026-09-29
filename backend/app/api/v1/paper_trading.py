@@ -247,7 +247,8 @@ def paper_session_signal(payload: PaperSignalRequest, current_user: User = Depen
                 )
             return {**recovered, "idempotent_replay": True, "request_id": request_id}
         return {**replay, "idempotent_replay": True, "request_id": request_id}
-    # The user row remains locked for the entire mutation transaction.\n    ml_assessment = predict(
+    # The user row remains locked for the entire mutation transaction.
+    ml_assessment = predict(
         db, current_user.id, payload.symbol, payload.strategy_version, signal, persist=True, commit=False,
     )
     signal["ml_assessment"] = ml_assessment
