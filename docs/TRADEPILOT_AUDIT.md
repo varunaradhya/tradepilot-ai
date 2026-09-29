@@ -66,3 +66,12 @@ ML models previously stored metrics and strategy version but not the dataset lin
 **Priority:** P0/P1  
 **Status:** FIX IMPLEMENTED — CI PENDING
 The legacy `/paper-session/bar` and `/paper-session/reset` endpoints were authenticated but writable through a separate in-memory coordinator. They did not enforce the persisted strategy-authorization/readiness pipeline or durable recovery state used by `/paper-trading/session/*`. Both mutation endpoints are now disabled with HTTP 410, leaving the durable authorized pipeline as the sole paper-session mutation path. A source-level regression contract prevents accidental reactivation.
+
+
+### AUDIT-025 — Main paper router retained legacy mutation/reset paths — FIX IMPLEMENTED, CI PENDING
+**Priority:** P0  
+The main `/paper-trading` router still exposed `/session/bar`, `/session/reset`, and `/session/market-reset`. These paths could mutate or destructively reset simulation state outside the server-controlled market-bar signal pipeline. All three are now disabled with HTTP 410. The supported paper entry path remains the authorization-gated market-bar/signal flow.
+
+### AUDIT-026 — F&O broker execution adapter could be configuration-enabled — FIX IMPLEMENTED, CI PENDING
+**Priority:** P0  
+The F&O execution service previously submitted a Dhan order when a live-execution configuration flag was enabled. Because TradePilot's current safety boundary is paper-only, configuration alone must never cross into broker execution. The adapter now fails closed and always returns LIVE_EXECUTION_DISABLED; broker order submission is removed from the service path. Regression coverage verifies that the adapter contains no broker order submission call.
