@@ -75,3 +75,12 @@ The main `/paper-trading` router still exposed `/session/bar`, `/session/reset`,
 ### AUDIT-026 — F&O broker execution adapter could be configuration-enabled — FIX IMPLEMENTED, CI PENDING
 **Priority:** P0  
 The F&O execution service previously submitted a Dhan order when a live-execution configuration flag was enabled. Because TradePilot's current safety boundary is paper-only, configuration alone must never cross into broker execution. The adapter now fails closed and always returns LIVE_EXECUTION_DISABLED; broker order submission is removed from the service path. Regression coverage verifies that the adapter contains no broker order submission call.
+
+
+### AUDIT-027 — F&O paper entry lacked strategy-authorization parity — FIX IMPLEMENTED, CI PENDING
+**Priority:** P0  
+F&O paper entry validated a client-supplied QUALIFIED decision and local risk gates but did not require the persisted strategy authorization used by the equity paper pipeline. F&O paper entry now requires active authorization for the underlying, interval and strategy version, and rejects a supplied strategy fingerprint that does not match the authorized fingerprint.
+
+### AUDIT-028 — Paper market-state writes were vulnerable to concurrent create/update races — FIX IMPLEMENTED, CI PENDING
+**Priority:** P1  
+Paper market state has a database uniqueness boundary, but the service used an unlocked read followed by insert/update. Concurrent requests could race at the state boundary. Reads/writes now use row locking where supported and the create path handles uniqueness races by reloading the canonical row before updating. This strengthens multi-request recovery without adding product functionality.
