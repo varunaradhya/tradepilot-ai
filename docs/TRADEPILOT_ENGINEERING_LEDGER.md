@@ -3,7 +3,7 @@
 Repository: varunaradhya/tradepilot-ai
 Branch: main
 Last updated: 2026-09-29
-Current HEAD: e7bd75123ce76e4695041298b974e8fe57c3dbe2
+Current HEAD: bc18400a830630d76b97003ebfec31a6fcd1f01c
 
 ## Status
 - DONE — implementation complete and verified by available evidence
@@ -25,7 +25,7 @@ Current HEAD: e7bd75123ce76e4695041298b974e8fe57c3dbe2
 | P1.5 | ML data integrity | IMPLEMENTED — CI PENDING | Temporal feature-event timestamp persisted and required | Existing ML service | Existing tests | — | — | Feature/label schema audit pending |
 | P1.6 | ML leakage protection | PARTIAL — CI PENDING | Temporal event ordering hardened; test set removed from qualification gate | Regression coverage added | ed45f12 | PENDING | Broader research leakage suite remains |
 | P1.7 | ML lifecycle | PARTIAL | Training/deployment gates exist | Existing tests | — | PENDING | Rollback/version lifecycle audit pending |
-| P1.8 | ML evaluation | PARTIAL | Descriptive metrics exist | Existing tests | — | PENDING | Calibration/trading-aware metrics pending |
+| P1.8 | ML evaluation | IMPLEMENTED — CI PENDING | Classification + trade-level P&L/R-multiple metrics added | Regression coverage added | b47c420 | PENDING | Calibration/real-data evidence remains |
 | P1.9 | Portfolio risk engine | IMPLEMENTED | Existing portfolio risk service | Existing tests | — | PENDING | Current-head verification pending |
 | P1.10 | Risk consistency | PLANNED | Risk controls exist | — | — | — | Cross-path equivalence audit pending |
 | P1.11 | Multi-worker safety | PLANNED | Durable state exists | — | — | — | Restart/concurrency verification pending |
