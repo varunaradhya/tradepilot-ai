@@ -56,3 +56,14 @@ def test_fno_execution_adapter_is_fail_closed():
     assert "LIVE_EXECUTION_DISABLED" in source
     assert "client.place_order" not in source
     assert "TRADEPILOT_LIVE_EXECUTION_ENABLED" not in source
+
+
+def test_fno_paper_entry_requires_persisted_strategy_authorization():
+    source = Path("app/api/v1/fno.py").read_text(encoding="utf-8")
+    start = source.index('def open_option_paper_trade(')
+    end = source.index('\n\n@router.get("/paper/recovery")', start)
+    handler = source[start:end]
+    assert "get_active_authorization" in handler
+    assert "No active qualified strategy authorization" in handler
+    assert "decision_fingerprint" in handler
+    assert "authorization.fingerprint" in handler
