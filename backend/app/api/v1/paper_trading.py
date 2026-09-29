@@ -246,7 +246,7 @@ def paper_session_signal(payload: PaperSignalRequest, current_user: User = Depen
         return {**replay, "idempotent_replay": True, "request_id": request_id}
     _lock_paper_state(db, current_user.id)
     ml_assessment = predict(
-        db, current_user.id, payload.symbol, payload.strategy_version, signal, persist=True,
+        db, current_user.id, payload.symbol, payload.strategy_version, signal, persist=True, commit=False,
     )
     signal["ml_assessment"] = ml_assessment
     if ml_assessment.get("decision") == "BLOCK":
@@ -309,7 +309,7 @@ def paper_market_bar(payload: MarketBarRequest, current_user: User = Depends(get
             coordinator.restore_state(payload.session, payload.symbol, persisted)
 
         def ml_decider(symbol: str, signal: dict[str, Any]) -> dict[str, Any]:
-            return predict(db, current_user.id, symbol, "V1", signal, persist=True)
+            return predict(db, current_user.id, symbol, "V1", signal, persist=True, commit=False)
 
         result = coordinator.on_bar(
             payload.session, payload.symbol, payload.open, payload.high, payload.low, payload.close,
@@ -318,7 +318,7 @@ def paper_market_bar(payload: MarketBarRequest, current_user: User = Depends(get
         save_market_state(
             db, current_user.id, payload.session, payload.symbol,
             coordinator.export_state(payload.session, payload.symbol),
-            payload.interval, "V1",
+            payload.interval, "V1", commit=False,
         )
         execution = result.get("execution") or {}
         if execution.get("trade"):
