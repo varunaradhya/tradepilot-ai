@@ -42,3 +42,17 @@ def test_legacy_paper_session_mutations_are_disabled():
     assert 'status.HTTP_410_GONE' in source
     assert 'Legacy paper-session mutation is disabled' in source
     assert 'Legacy paper-session reset is disabled' in source
+
+
+def test_main_paper_router_legacy_mutations_are_disabled():
+    source = _source()
+    assert 'detail="Legacy paper-session bar mutation is disabled' in source
+    assert 'detail="Legacy paper-session reset is disabled' in source
+    assert 'detail="Paper market-state reset is disabled' in source
+
+
+def test_fno_execution_adapter_is_fail_closed():
+    source = Path("app/services/fno_execution.py").read_text(encoding="utf-8")
+    assert "LIVE_EXECUTION_DISABLED" in source
+    assert "client.place_order" not in source
+    assert "TRADEPILOT_LIVE_EXECUTION_ENABLED" not in source
