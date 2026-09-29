@@ -110,3 +110,8 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - Locked owned option paper positions before manual close.
 - Added regression contract.
 - Status: IMPLEMENTED — CI PENDING.
+
+### 2026-09-29 — CI verification hardening
+- CI Alembic verification now explicitly targets an isolated SQLite database.
+- Latest GitHub commit status/workflow queries still return no checks or workflow runs.
+- Status: WORKFLOW CONFIGURED — EXECUTION NOT VERIFIED.
