@@ -13,3 +13,18 @@ TradePilot already had a canonical `MarketBar` normalization/quality contract an
 ### AUDIT-011 — Research dataset provenance was incomplete — FIX IMPLEMENTED, CI PENDING
 **Priority:** P1  
 Research JSONL datasets did not previously have a persisted reproducibility sidecar. Imports now record dataset identity, source, symbol, timeframe, range, row count, quality status, creation time, deterministic content fingerprint, source version, import method, corporate-action adjustment state and quality diagnostics. Existing Dhan daily research persistence now uses the same provenance mechanism.
+
+
+## 10. Latest leakage audit — 2026-09-29
+
+### AUDIT-012 — ML learning events were ordered by persistence ID — FIX IMPLEMENTED, CI PENDING
+**Priority:** P0/P1  
+The ML trainer previously ordered learning events by database ID. Delayed or backfilled trade persistence could therefore alter the temporal train/validation/test split. Learning events now persist `event_at`, derived from the trade's entry/signal timestamp, and training orders by feature event time. New learning events without a feature-time timestamp are rejected. Existing rows without timestamps fail closed during training until they are backfilled with trustworthy timestamps.
+
+### AUDIT-013 — ML test set influenced model qualification — FIX IMPLEMENTED, CI PENDING
+**Priority:** P1  
+The trainer previously set `validated` from test-set accuracy/Brier/ROC-AUC. This allowed the nominal final holdout to influence model promotion. Qualification now uses validation metrics only; test metrics remain report-only.
+
+### AUDIT-014 — Intraday walk-forward boundary — VERIFIED STATIC
+**Priority:** P1  
+The fixed-parameter intraday walk-forward path constructs chronological train/validation windows, rejects overlapping validation windows, and does not tune parameters from the train slice. The backtest receives validation data only for evaluation. Runtime execution remains CI-pending.
