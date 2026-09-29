@@ -123,3 +123,9 @@
 - Disabled automatic retries specifically for broker order placement while retaining retries for other Dhan API operations.
 - This preserves the paper/live safety boundary against future duplicate-order risk.
 - Status: IMPLEMENTED — CI PENDING.
+
+
+### 2026-09-29 — Portfolio consistency hardening
+- Dhan portfolio synchronization now uses a durable broker-connection row lock to serialize concurrent syncs.
+- Malformed broker-supplied trade timestamps are rejected instead of generating unstable local identities.
+- Status: IMPLEMENTED — CI PENDING.
