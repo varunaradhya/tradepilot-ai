@@ -27,7 +27,7 @@ def _revisions():
 def test_alembic_revisions_are_unique_and_form_one_linear_chain():
     revisions = _revisions()
     ids = [values["revision"] for values in revisions.values()]
-    assert len(ids) == 15
+    assert len(ids) == 16
     assert len(ids) == len(set(ids))
 
     by_id = {values["revision"]: values["down_revision"] for values in revisions.values()}
@@ -43,3 +43,4 @@ def test_recent_learning_link_migrations_are_in_chain():
     assert revisions["20260929_0013_paper_learning_link.py"]["down_revision"] == "20260928_0012"
     assert revisions["20260929_0014_unique_paper_learning_link.py"]["down_revision"] == "20260929_0013"
     assert revisions["20260929_0015_learning_event_time.py"]["down_revision"] == "20260929_0014"
+    assert revisions["20260929_0016_ml_lineage.py"]["down_revision"] == "20260929_0015"
