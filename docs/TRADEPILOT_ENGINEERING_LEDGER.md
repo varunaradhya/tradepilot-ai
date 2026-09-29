@@ -190,3 +190,12 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - Signal completion supports deferred commits and is committed at the request boundary.
 - Market-bar ML/learning/state writes can remain in the same transaction until request completion.
 - Added regression contracts for the atomic mutation boundary.
+
+
+## Latest paper transaction + UI hardening — 2026-09-29
+- Authorization and revocation mutations now share the durable paper-state user lock with signal/market mutations, reducing authorization-vs-execution races.
+- Paper signal request claiming supports deferred commit; the request claim, ML prediction, simulator state and terminal response can now share the request transaction.
+- Dhan replay validation evidence no longer commits before persisted paper trades; successful replay evidence is committed after the complete durable mutation set is prepared.
+- Added regression contracts for transaction boundaries.
+- Frontend hardening added persistent hash navigation, workflow-stage navigation, shared UI primitives, improved accessibility semantics, isolated stock-search IDs, explicit paper-exit confirmation and F&O risk visibility.
+- Status: IMPLEMENTED — CI / RUNTIME CERTIFICATION PENDING.
