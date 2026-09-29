@@ -76,3 +76,11 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - Preserved the durable `/paper-trading/session/*` pipeline as the supported mutation path.
 - Added regression contract coverage.
 - Status: IMPLEMENTED — CI PENDING.
+
+
+### 2026-09-29 — Paper-only safety hardening
+- Disabled remaining `/paper-trading/session/bar`, `/paper-trading/session/reset`, and `/paper-trading/session/market-reset` mutation paths with HTTP 410.
+- These legacy/destructive routes no longer provide alternate state mutation outside the hardened server-controlled market-bar/signal pipeline.
+- Hardened the F&O execution adapter to fail closed regardless of configuration and never submit a Dhan broker order.
+- Added regression contracts for the disabled routes and broker-execution fail-closed boundary.
+- Status: IMPLEMENTED — CI PENDING.
