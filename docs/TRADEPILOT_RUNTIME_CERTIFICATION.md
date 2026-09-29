@@ -4,6 +4,8 @@
 
 Certification was executed on Windows at commit `82b67efd7eb81756da60c68ddcc9a97a89b3b895` using Python 3.12.10 in an isolated `backend/.venv-certification` environment. Docker was unavailable and was not used. Raw market data and the original SQLite database were not modified.
 
+This document preserves historical certification and forensic evidence. Its inclusion on a later reconciled branch is not a new real-data certification of that branch.
+
 ## Executed checks
 
 | Gate | Result | Evidence |
@@ -17,7 +19,7 @@ Certification was executed on Windows at commit `82b67efd7eb81756da60c68ddcc9a97
 
 ## Migration repair
 
-The base Alembic revision did not create `paper_trades`, although revision `20260821_0005` altered that table. The base migration now creates the pre-option columns and indexes. Revision `20260928_0009` also no longer requests duplicate SQLite indexes through both column metadata and explicit index creation.
+The original issue was that `paper_trades` had to exist before revision `20260821_0005` added option columns. Current `main` repairs that fresh-database path in revision `20260821_0005` with a conditional base-table creation. Its current revision `20260928_0009` has no duplicate explicit SQLite index creation.
 
 ## Real historical data
 
@@ -63,7 +65,7 @@ Across all accepted full sessions, TCS had 1,196 strict sessions and 19 irregula
 
 ## Historical import and provenance
 
-`HistoricalImportRequest`, `DatasetProvenance`, deterministic `fingerprint_market_bars`, and `import_historical_data` are now available in `app.services.historical_data_import_service`. The implementation reads CSV, JSONL, SQLite (read-only URI), Parquet when `pyarrow` is installed, and PostgreSQL. It persists only to a caller-selected `ResearchStore` plus a JSON provenance sidecar. It does not alter source data.
+The current import/provenance implementation uses `HistoricalImportRequest`, `DatasetProvenance`, deterministic `fingerprint_market_bars`, and the `import_rows`/format-specific import functions in `app.services.historical_data_import_service`. It persists imported data and provenance only to a caller-selected `ResearchStore`; source data is not altered.
 
 ## Backtest, walk-forward, and paper evidence
 
@@ -75,4 +77,4 @@ Live F&O execution is still locked in code: `TRADEPILOT_LIVE_EXECUTION_ENABLED=F
 
 ## Certification state
 
-**PARTIALLY CERTIFIED.** Runtime code, migration chain, importer/provenance primitives, frontend build, and safety locks have executable evidence. Strict real-data interval validity and multi-session lineage/walk-forward/paper evidence remain outstanding.
+The historical run was **PARTIALLY CERTIFIED**. Strict real-data interval validity and multi-session lineage/walk-forward/paper evidence remained outstanding. A later branch must run its own relevant runtime evidence before making a new certification claim.
