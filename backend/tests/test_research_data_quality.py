@@ -15,3 +15,20 @@ def test_quality_rejects_duplicate_and_invalid_bars():
     assert result["valid"] is False
     assert result["duplicates"]==1
     assert result["invalid_ohlc"]==2
+
+
+def test_quality_rejects_invalid_timestamp():
+    rows=[{"timestamp":"not-a-time","open":100,"high":102,"low":99,"close":101,"volume":1000}]
+    result=analyze_intraday_quality(rows)
+    assert result["valid"] is False
+    assert result["invalid_timestamps"] == 1
+
+
+def test_quality_detects_expected_interval_gap():
+    rows=[
+        {"timestamp":"2026-01-01T09:15:00","open":100,"high":102,"low":99,"close":101,"volume":1000},
+        {"timestamp":"2026-01-01T09:25:00","open":101,"high":103,"low":100,"close":102,"volume":1000},
+    ]
+    result=analyze_intraday_quality(rows, expected_interval_minutes=5)
+    assert result["large_gaps"] == 1
+    assert result["valid"] is True
