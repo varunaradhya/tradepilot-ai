@@ -136,3 +136,12 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - Stopped importing transactions with malformed broker timestamps rather than synthesizing a new timestamp that could defeat repeat-sync deduplication.
 - Added regression contracts for both invariants.
 - Status: IMPLEMENTED — CI PENDING.
+
+
+### 2026-09-29 — Portfolio holding uniqueness hardening
+- Found that portfolio holdings had no database uniqueness boundary for `(user_id, symbol)`, despite broker synchronization assuming one holding per symbol.
+- Added `uq_holdings_user_symbol` as a unique database index.
+- Manual holding creation now performs an ownership-scoped duplicate check and handles concurrent uniqueness races as a controlled conflict.
+- Migration intentionally fails rather than silently consolidating pre-existing duplicate rows; any existing duplicates require explicit reconciliation before the migration can complete.
+- Added regression coverage for the model/migration/service invariant.
+- Status: IMPLEMENTED — CI PENDING.
