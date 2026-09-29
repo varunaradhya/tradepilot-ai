@@ -67,7 +67,8 @@ def get_active_authorization(
     strategy_version: str,
     lock: bool = False,
 ) -> StrategyPaperAuthorization | None:
-    query = db.query(StrategyPaperAuthorization)
+    query = (
+        db.query(StrategyPaperAuthorization)
         .filter(
             StrategyPaperAuthorization.user_id == user_id,
             StrategyPaperAuthorization.symbol == symbol.strip().upper(),
