@@ -223,12 +223,11 @@ def paper_session_signal(payload: PaperSignalRequest, current_user: User = Depen
 
 @router.post("/session/bar")
 def paper_session_bar(payload: PaperBarRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict[str, Any]:
-    if payload.low > payload.high: raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="low cannot exceed high")
-    result = _orchestrator(current_user.id, db).on_bar(payload.session,payload.high,payload.low,payload.close)
-    if result.get("trade"):
-        record_trade_outcome(db, current_user.id, payload.session, result["trade"], strategy_version="V1", model_version=str(result["trade"].get("model_version") or "RULES_V1"))
-    _persist_orchestrator(db, current_user.id)
-    return {"mode":"SIMULATION_ONLY",**result}
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="Legacy paper-session bar mutation is disabled; use /api/v1/paper-trading/session/market-bar.",
+    )
+
 
 @router.post("/session/live-ltp")
 def paper_live_ltp(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict[str, Any]:
@@ -248,16 +247,11 @@ def paper_live_ltp(current_user: User = Depends(get_current_user), db: Session =
 
 @router.post("/session/reset")
 def paper_session_reset(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict[str, Any]:
-    previous = _orchestrator(current_user.id, db)
-    fingerprint = previous.summary().get("strategy_fingerprint")
-    orchestrator = PaperTradingOrchestrator(PaperOrchestratorConfig(trade_direction="LONG_ONLY"))
-    if fingerprint:
-        orchestrator.authorize_strategy(fingerprint=fingerprint)
-    _sessions[current_user.id] = orchestrator
-    _market[current_user.id] = PaperMarketCoordinator(orchestrator=orchestrator)
-    _restored.add(current_user.id)
-    _persist_orchestrator(db, current_user.id)
-    return {"mode":"SIMULATION_ONLY","reset":True}
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="Legacy paper-session reset is disabled; use durable paper-trading session controls.",
+    )
+
 
 @router.post("/session/market-bar")
 def paper_market_bar(payload: MarketBarRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict[str, Any]:
@@ -312,7 +306,7 @@ def paper_dhan_session(payload: DhanPaperRequest, current_user: User = Depends(g
 
 @router.post("/session/market-reset")
 def paper_market_reset(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict[str, Any]:
-    _market[current_user.id] = PaperMarketCoordinator(orchestrator=_orchestrator(current_user.id, db))
-    cleared = clear_market_state(db, current_user.id)
-    _persist_orchestrator(db, current_user.id)
-    return {"mode":"SIMULATION_ONLY","reset":True,"cleared_market_states":cleared}
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="Paper market-state reset is disabled; destructive simulation-state mutation is not exposed through the API.",
+    )
