@@ -90,3 +90,10 @@
 - Serialized paper market-state read/write boundaries with row locks and uniqueness-race recovery.
 - Added regression coverage for F&O authorization parity.
 - Status: IMPLEMENTED — CI PENDING.
+
+
+### 2026-09-29 — Mutation concurrency hardening
+- Direct paper-trade mark/close mutations now lock the owned row before mutation.
+- Strategy authorization updates now handle concurrent upsert races safely.
+- Added regression coverage.
+- Status: IMPLEMENTED — CI PENDING.
