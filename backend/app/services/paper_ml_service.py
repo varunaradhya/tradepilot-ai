@@ -107,10 +107,24 @@ def record_trade_outcome(
     ).first()
     if existing:
         return existing
+    raw_event_at = trade.get("entry_time") or trade.get("signal_time") or trade.get("timestamp")
+    event_at = None
+    if isinstance(raw_event_at, datetime):
+        event_at = raw_event_at if raw_event_at.tzinfo else raw_event_at.replace(tzinfo=timezone.utc)
+    elif raw_event_at:
+        try:
+            event_at = datetime.fromisoformat(str(raw_event_at).replace("Z", "+00:00"))
+            if event_at.tzinfo is None:
+                event_at = event_at.replace(tzinfo=timezone.utc)
+        except ValueError as exc:
+            raise ValueError("trade event timestamp must be ISO-8601") from exc
+    if event_at is None:
+        raise ValueError("ML learning events require an entry_time/signal_time/timestamp for temporal evaluation")
     event = PaperTradeLearningEvent(
         user_id=user_id,
         symbol=str(trade.get("symbol") or "").strip().upper() or "UNKNOWN",
         session=str(session),
+        event_at=event_at,
         strategy_version=strategy_version,
         model_version=model_version,
         fingerprint=fingerprint,
@@ -137,7 +151,10 @@ def _events(db: Session, user_id: int, strategy_version: str) -> list[PaperTrade
     return db.query(PaperTradeLearningEvent).filter(
         PaperTradeLearningEvent.user_id == user_id,
         PaperTradeLearningEvent.strategy_version == strategy_version,
-    ).order_by(PaperTradeLearningEvent.id.asc()).all()
+    ).order_by(
+        PaperTradeLearningEvent.event_at.asc(),
+        PaperTradeLearningEvent.id.asc(),
+    ).all()
 
 
 def _metrics(y_true, y_prob) -> dict[str, float]:
@@ -166,6 +183,18 @@ def train_model(db: Session, user_id: int, strategy_version: str = "V1") -> dict
             "trained": False,
             "reason": "INSUFFICIENT_TRAINING_DATA",
             "minimum_samples": MIN_TRAINING_SAMPLES,
+            "samples": len(events),
+        }
+    if any(event.event_at is None for event in events):
+        return {
+            "trained": False,
+            "reason": "MISSING_FEATURE_EVENT_TIME",
+            "samples": len(events),
+        }
+    if any(events[index].event_at > events[index + 1].event_at for index in range(len(events) - 1)):
+        return {
+            "trained": False,
+            "reason": "NON_CHRONOLOGICAL_FEATURE_EVENTS",
             "samples": len(events),
         }
     labels = [int(event.label) for event in events]
