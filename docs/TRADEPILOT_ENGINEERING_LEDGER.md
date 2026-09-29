@@ -3,7 +3,7 @@
 Repository: varunaradhya/tradepilot-ai
 Branch: main
 Last updated: 2026-09-29
-Current HEAD: 78068372e17eb112761c28b42f47612b091cf35f
+Current HEAD: lineage-hardening batch in main; exact SHA is reported in the session completion record
 
 ## Status
 - DONE — implementation complete and verified by available evidence
@@ -19,13 +19,13 @@ Current HEAD: 78068372e17eb112761c28b42f47612b091cf35f
 | P0.3 | Fresh CI verification | PENDING | .github/workflows/ci.yml exists | N/A | 7fa7b7e | NOT OBSERVED | GitHub integration returned no workflow/status for current push |
 | P0.4 | Migration integrity | IMPLEMENTED — CI PENDING | Linear 001→014 chain audited; 0013 SQLite batch alteration; 0014 unique-link constraint | Static chain regression added; runtime upgrade/downgrade not executed | c89e548 | PENDING | Fresh/upgrade/downgrade runtime verification still required |
 | P1.1 | Historical ingestion hardening | PARTIAL | Dhan path normalized + session-aware; portable import now reuses canonical contract | Import/provenance regression tests added; CI pending | 2fb579e | PENDING | Corporate-action treatment and runtime evidence remain |
-| P1.2 | Backtest audit | IMPLEMENTED — CI PENDING | Same-bar execution leakage fixed; signals execute next-bar open; dataset fingerprint propagated | Regression coverage added | 46cf600 | PENDING | Future-high/low, normalization, overlap and runtime evidence remain |
-| P1.3 | Walk-forward validation audit | PARTIAL — CI PENDING | Chronological non-overlapping windows plus dataset fingerprint lineage | Regression coverage added | abb9483 | Runtime/OOS evidence remains |
-| P1.4 | Strategy framework audit | PLANNED | V1/V2/V2A registry exists | Existing tests | — | — | Parameter provenance/fingerprinting pending |
-| P1.5 | ML data integrity | IMPLEMENTED — CI PENDING | Temporal feature-event timestamp persisted and required | Existing ML service | Existing tests | — | — | Feature/label schema audit pending |
+| P1.2 | Backtest audit | IMPLEMENTED — CI PENDING | Same-bar execution leakage fixed; next-bar execution; dataset fingerprint + corporate-action state + strategy fingerprint propagated | Regression coverage added | lineage batch | PENDING | Future-high/low, normalization, overlap and runtime evidence remain |
+| P1.3 | Walk-forward validation audit | IMPLEMENTED — CI PENDING | Chronological non-overlapping windows plus dataset fingerprint, corporate-action and strategy lineage | Regression coverage added | lineage batch | PENDING | Runtime/OOS evidence remains |
+| P1.4 | Strategy framework audit | IMPLEMENTED — CI PENDING | V1/V2/V2A registry plus deterministic strategy fingerprint carried into evidence | Regression coverage added | lineage batch | PENDING | Broader experiment registry provenance remains |
+| P1.5 | ML data integrity | IMPLEMENTED — CI PENDING | Temporal event timestamp plus dataset/strategy lineage persisted and required | Regression coverage added | lineage batch | PENDING | Real-data evidence remains |
 | P1.6 | ML leakage protection | PARTIAL — CI PENDING | Temporal event ordering hardened; test set removed from qualification gate | Regression coverage added | ed45f12 | PENDING | Broader research leakage suite remains |
 | P1.7 | ML lifecycle | PARTIAL | Training/deployment gates exist | Existing tests | — | PENDING | Rollback/version lifecycle audit pending |
-| P1.8 | ML evaluation | IMPLEMENTED — CI PENDING | Classification + trade-level P&L/R-multiple metrics added | Regression coverage added | b47c420 | PENDING | Calibration/real-data evidence remains |
+| P1.8 | ML evaluation | IMPLEMENTED — CI PENDING | Classification + trade-level metrics + dataset/strategy/schema lineage | Regression coverage added | lineage batch | PENDING | Calibration/real-data evidence remains |
 | P1.9 | Portfolio risk engine | IMPLEMENTED | Existing portfolio risk service | Existing tests | — | PENDING | Current-head verification pending |
 | P1.10 | Risk consistency | PLANNED | Risk controls exist | — | — | — | Cross-path equivalence audit pending |
 | P1.11 | Multi-worker safety | PLANNED | Durable state exists | — | — | — | Restart/concurrency verification pending |
@@ -57,3 +57,14 @@ Current HEAD: 78068372e17eb112761c28b42f47612b091cf35f
 6. Keep live broker execution hard locked.
 7. Never fabricate market data, backtest results, profitability, broker certification, or CI results.
 8. Prefer shared contracts over parallel validation implementations.
+
+
+## Latest lineage hardening — 2026-09-29
+- Added explicit corporate-action state to lineage-backed backtests and walk-forward results.
+- Added strategy fingerprint and dataset fingerprint to backtest trade evidence.
+- Persisted dataset/strategy fingerprints on paper ML learning events.
+- Added migration 0016 for ML lineage fields.
+- ML training now fails closed on missing/mixed strategy lineage or missing/mixed dataset lineage.
+- ML models persist aggregate training-dataset fingerprint, strategy fingerprint and feature-schema fingerprint.
+- Added regression tests for lineage aggregation, training rejection and migration chain.
+- CI remains unverified.
