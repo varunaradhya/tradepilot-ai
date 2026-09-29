@@ -86,11 +86,28 @@ def claim_request(
 
 
 def complete_request(db: Session, record: PaperSignalRequest, response: dict[str, Any]) -> PaperSignalRequest:
-    record.decision = "ACCEPTED" if response.get("accepted") else "REJECTED"
-    record.response_json = json.dumps(response, sort_keys=True, separators=(",", ":"), default=str)
+    """Complete a request exactly once and preserve the first durable response.
+
+    The request row is reloaded under a mutation lock so a retry/recovery worker
+    cannot overwrite a response that another worker already committed.
+    """
+    locked = (
+        db.query(PaperSignalRequest)
+        .filter(PaperSignalRequest.id == record.id)
+        .with_for_update()
+        .one()
+    )
+    if locked.decision != "PENDING":
+        db.refresh(locked)
+        return locked
+
+    locked.decision = "ACCEPTED" if response.get("accepted") else "REJECTED"
+    locked.response_json = json.dumps(
+        response, sort_keys=True, separators=(",", ":"), default=str
+    )
     db.commit()
-    db.refresh(record)
-    return record
+    db.refresh(locked)
+    return locked
 
 
 def replay_response(record: PaperSignalRequest) -> dict[str, Any] | None:
