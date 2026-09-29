@@ -4,7 +4,7 @@
 
 ### AUDIT-009 — Alembic chain requires runtime verification — STATIC AUDIT COMPLETE
 **Priority:** P0/P1  
-The repository contains a single linear revision chain from `20260815_0001` through `20260929_0014`, with the recent learning-link migrations correctly ordered. A static regression test now checks revision uniqueness and linear `down_revision` linkage. Runtime fresh upgrade, upgrade of an existing database, and downgrade/recovery remain unverified because the available environment cannot execute the repository.
+The repository contains a single linear revision chain through `20260929_0016`, with the recent learning-link migrations correctly ordered. A static regression test now checks revision uniqueness and linear `down_revision` linkage. Runtime fresh upgrade, upgrade of an existing database, and downgrade/recovery remain unverified because the available environment cannot execute the repository.
 
 ### AUDIT-010 — Portable historical import was missing — FIX IMPLEMENTED, CI PENDING
 **Priority:** P1  
