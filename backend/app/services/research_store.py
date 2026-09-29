@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
+from app.services.dataset_provenance import DatasetProvenance
 from app.services.historical_data_service import MarketBar, normalize_bars, validate_dataset
 
 
@@ -26,6 +27,10 @@ class ResearchStore:
             raise ValueError("Invalid dataset path")
         return path
 
+    def _provenance_path(self, dataset: str) -> Path:
+        path = self._path(dataset)
+        return path.with_suffix(".meta.json")
+
     def save(self, dataset: str, bars: list[MarketBar]) -> dict:
         normalized = normalize_bars([bar.as_row() for bar in bars])
         diagnostics = validate_dataset(normalized)
@@ -41,11 +46,43 @@ class ResearchStore:
         os.replace(temp_path, path)
         return {"dataset": dataset, **diagnostics, "path": str(path)}
 
+    def save_with_provenance(
+        self,
+        dataset: str,
+        bars: list[MarketBar],
+        provenance: DatasetProvenance,
+    ) -> dict:
+        if provenance.dataset_id != dataset:
+            raise ValueError("Provenance dataset_id must match dataset")
+        result = self.save(dataset, bars)
+        metadata_path = self._provenance_path(dataset)
+        metadata_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = provenance.as_dict()
+        with NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            delete=False,
+            dir=metadata_path.parent,
+            suffix=".tmp",
+        ) as handle:
+            temp_path = Path(handle.name)
+            json.dump(payload, handle, sort_keys=True, separators=(",", ":"))
+        os.replace(temp_path, metadata_path)
+        return {**result, "provenance_path": str(metadata_path)}
+
+    def get_provenance(self, dataset: str) -> dict | None:
+        path = self._provenance_path(dataset)
+        if not path.exists():
+            return None
+        with path.open("r", encoding="utf-8") as handle:
+            return json.load(handle)
+
     def merge(self, dataset: str, bars: list[MarketBar]) -> dict:
-        existing=self.load(dataset)
-        merged={bar.timestamp:bar for bar in existing}
-        for bar in bars: merged[bar.timestamp]=bar
-        ordered=sorted(merged.values(), key=lambda item:item.timestamp)
+        existing = self.load(dataset)
+        merged = {bar.timestamp: bar for bar in existing}
+        for bar in bars:
+            merged[bar.timestamp] = bar
+        ordered = sorted(merged.values(), key=lambda item: item.timestamp)
         return self.save(dataset, ordered)
 
     def load(self, dataset: str) -> list[MarketBar]:
