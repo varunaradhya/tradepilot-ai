@@ -141,3 +141,12 @@ The completion boundary previously mutated the ORM instance directly and committ
 ### AUDIT-041 — Crash-left paper signal recovery covered options but not equity
 **Priority:** P1
 Pending-request reconciliation previously proved recovery only for option trades, leaving an equity crash window unresolved. Reconciliation now supports equity requests when exactly one matching open trade can be proven from user, symbol, quantity, strategy version, entry, stop, target and creation-time constraints. Ambiguous matches fail closed; recovery never creates or retries a trade. The signal endpoint invokes this recovery path before returning a pending-processing conflict.
+
+
+### AUDIT-042 — Paper session state depended on process-local mutable caches
+**Priority:** P1
+The paper router retained `_sessions` and `_market` dictionaries plus a per-process restoration flag. Different API workers could therefore operate on divergent simulator state even though a durable database snapshot existed. The router now reconstructs the orchestrator and market coordinator from durable state per request; mutable simulator state is no longer retained in process-global dictionaries.
+
+### AUDIT-043 — Paper-state mutation needed a durable worker-serialization boundary
+**Priority:** P1
+Request-scoped reconstruction alone prevents stale in-memory state but does not serialize concurrent mutations. Paper signal and market-bar mutations now acquire a user-row lock, and their ML prediction/market-state writes can be deferred into the same database transaction as the durable session snapshot. Regression contracts verify the lock and deferred-commit boundaries. Runtime PostgreSQL concurrency execution remains CI/environment verification work.
