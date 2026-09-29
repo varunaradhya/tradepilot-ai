@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import math
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Iterable, Sequence
 
 
@@ -35,6 +35,8 @@ def normalize_bars(rows: Iterable[dict]) -> list[MarketBar]:
             timestamp = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
         if not isinstance(timestamp, datetime):
             raise ValueError("Each market bar requires a valid timestamp")
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.replace(tzinfo=timezone.utc)
 
         values = {key: float(row[key]) for key in ("open", "high", "low", "close")}
         if not all(math.isfinite(value) for value in values.values()):
@@ -56,7 +58,7 @@ def normalize_bars(rows: Iterable[dict]) -> list[MarketBar]:
     return sorted(normalized, key=lambda item: item.timestamp)
 
 
-def validate_dataset(rows: Sequence[MarketBar]) -> dict:
+def validate_dataset(rows: Sequence[MarketBar], expected_interval_minutes: int | None = None) -> dict:
     """Return deterministic quality diagnostics before a dataset enters backtesting."""
     if not rows:
         return {"valid": False, "bars": 0, "duplicates": 0, "gaps": 0, "message": "No market data"}
@@ -64,15 +66,20 @@ def validate_dataset(rows: Sequence[MarketBar]) -> dict:
     timestamps = [row.timestamp for row in rows]
     duplicates = len(timestamps) - len(set(timestamps))
     gaps = sum(1 for previous, current in zip(timestamps, timestamps[1:]) if current <= previous)
+    interval_gaps = 0
+    if expected_interval_minutes and expected_interval_minutes > 0:
+        expected_seconds = expected_interval_minutes * 60
+        interval_gaps = sum(1 for previous, current in zip(timestamps, timestamps[1:]) if (current - previous).total_seconds() > expected_seconds * 1.5)
     missing_volume = sum(1 for row in rows if row.volume is None)
 
     return {
-        "valid": duplicates == 0 and gaps == 0,
+        "valid": duplicates == 0 and gaps == 0 and interval_gaps == 0,
         "bars": len(rows),
         "start": timestamps[0].isoformat(),
         "end": timestamps[-1].isoformat(),
         "duplicates": duplicates,
         "non_increasing_timestamps": gaps,
+        "interval_gaps": interval_gaps,
         "missing_volume": missing_volume,
-        "message": "OK" if duplicates == 0 and gaps == 0 else "Dataset requires cleaning",
+        "message": "OK" if duplicates == 0 and gaps == 0 and interval_gaps == 0 else "Dataset requires cleaning",
     }
