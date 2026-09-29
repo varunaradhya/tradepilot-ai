@@ -98,3 +98,10 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - Serialized strategy authorization upserts and added uniqueness-race recovery.
 - Added regression contracts for both boundaries.
 - Status: IMPLEMENTED — CI PENDING.
+
+### 2026-09-29 — Broker security hardening
+- Serialized broker connection upserts and recovered uniqueness races.
+- Locked sync metadata updates and sanitized persisted sync messages.
+- Removed broker credential access from the already-disabled F&O execution endpoint.
+- Added regression contracts.
+- Status: IMPLEMENTED — CI PENDING.
