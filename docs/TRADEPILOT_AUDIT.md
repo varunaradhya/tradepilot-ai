@@ -132,3 +132,12 @@ Concurrent Dhan sync requests could fetch overlapping broker snapshots and then 
 ### AUDIT-039 — Malformed broker trade timestamps could create repeat-sync duplicates — FIX IMPLEMENTED, CI PENDING
 **Priority:** P1  
 When Dhan supplied a malformed trade timestamp, the previous code generated a fresh local timestamp. Repeating the same sync could therefore produce a different transaction identity each time. Malformed supplied timestamps are now rejected for import instead of being converted into a synthetic identity; a local timestamp is used only when the broker supplied no timestamp at all.
+
+
+### AUDIT-040 — Paper signal completion could be overwritten by concurrent recovery/retry
+**Priority:** P1
+The completion boundary previously mutated the ORM instance directly and committed without reloading the request under a mutation lock. A concurrent retry/recovery worker could race the terminal response boundary. Completion now reloads the request row with a row lock and preserves the first terminal response. Repeated completion is treated as an idempotent replay rather than an overwrite.
+
+### AUDIT-041 — Crash-left paper signal recovery covered options but not equity
+**Priority:** P1
+Pending-request reconciliation previously proved recovery only for option trades, leaving an equity crash window unresolved. Reconciliation now supports equity requests when exactly one matching open trade can be proven from user, symbol, quantity, strategy version, entry, stop, target and creation-time constraints. Ambiguous matches fail closed; recovery never creates or retries a trade. The signal endpoint invokes this recovery path before returning a pending-processing conflict.
