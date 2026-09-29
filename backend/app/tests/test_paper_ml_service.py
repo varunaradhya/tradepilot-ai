@@ -152,3 +152,52 @@ def test_trading_metrics_report_trade_level_evidence():
     assert metrics["expectancy"] == 25.0
     assert metrics["win_rate_percent"] == 50.0
     assert metrics["average_r_multiple"] == 0.375
+
+
+def test_ml_training_dataset_lineage_requires_complete_and_consistent_events():
+    from app.services.paper_ml_service import _training_dataset_fingerprint
+
+    complete = [
+        PaperTradeLearningEvent(dataset_fingerprint="a" * 64),
+        PaperTradeLearningEvent(dataset_fingerprint="a" * 64),
+    ]
+    mixed = [
+        PaperTradeLearningEvent(dataset_fingerprint="a" * 64),
+        PaperTradeLearningEvent(dataset_fingerprint="b" * 64),
+    ]
+    missing = [
+        PaperTradeLearningEvent(dataset_fingerprint="a" * 64),
+        PaperTradeLearningEvent(dataset_fingerprint=None),
+    ]
+    assert _training_dataset_fingerprint(complete)
+    assert _training_dataset_fingerprint(mixed)
+    assert _training_dataset_fingerprint(missing) is None
+
+
+def test_ml_training_rejects_missing_strategy_or_dataset_lineage():
+    from app.services.paper_ml_service import train_model
+
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        for i in range(30):
+            db.add(PaperTradeLearningEvent(
+                user_id=1,
+                symbol="TCS",
+                session="2026-09-29",
+                event_at=datetime(2026, 9, 29, 9, i % 60, tzinfo=timezone.utc),
+                strategy_version="V1",
+                model_version="RULES_V1",
+                dataset_fingerprint="a" * 64,
+                strategy_fingerprint=None,
+                fingerprint=f"{i:064x}",
+                features_json=json.dumps({"volume_ratio": 1.0}),
+                label=i % 2,
+                pnl=1.0 if i % 2 else -1.0,
+                r_multiple=1.0 if i % 2 else -1.0,
+                exit_reason="TARGET" if i % 2 else "STOP",
+            ))
+        db.commit()
+        result = train_model(db, 1, "V1")
+        assert result["trained"] is False
+        assert result["reason"] == "MIXED_OR_MISSING_STRATEGY_LINEAGE"
