@@ -124,3 +124,14 @@ def test_active_strategy_authorization_supports_locked_reads():
     assert "lock: bool = False" in source
     assert "if lock:" in source
     assert "query.with_for_update()" in source
+
+
+
+def test_paper_trade_close_detects_lost_concurrent_update():
+    source = Path("app/services/paper_trading_service.py").read_text(encoding="utf-8")
+    start = source.index("def close_paper_trade(")
+    end = source.index("\ndef paper_trade_costs(", start)
+    section = source[start:end]
+    assert "PaperTrade.status == \"OPEN\"" in section
+    assert "rowcount" in section
+    assert "db.refresh(trade)" in section
