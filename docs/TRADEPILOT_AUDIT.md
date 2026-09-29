@@ -84,3 +84,12 @@ F&O paper entry validated a client-supplied QUALIFIED decision and local risk ga
 ### AUDIT-028 — Paper market-state writes were vulnerable to concurrent create/update races — FIX IMPLEMENTED, CI PENDING
 **Priority:** P1  
 Paper market state has a database uniqueness boundary, but the service used an unlocked read followed by insert/update. Concurrent requests could race at the state boundary. Reads/writes now use row locking where supported and the create path handles uniqueness races by reloading the canonical row before updating. This strengthens multi-request recovery without adding product functionality.
+
+
+### AUDIT-029 — Direct paper-trade mutations were not serialized — FIX IMPLEMENTED, CI PENDING
+**Priority:** P1  
+Owned paper-trade mark/close endpoints correctly filtered by user ID, but the row was loaded without a mutation lock before the service updated it. Mutation endpoints now lock the owned row with `with_for_update()` before marking or closing, strengthening concurrent-request behavior.
+
+### AUDIT-030 — Strategy authorization upsert was race-prone — FIX IMPLEMENTED, CI PENDING
+**Priority:** P1  
+Strategy authorization used an unlocked read followed by insert/update despite a unique database boundary. Concurrent authorization requests could race. The service now locks existing rows and handles uniqueness races by reloading the canonical authorization row before applying the update.
