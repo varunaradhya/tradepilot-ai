@@ -118,3 +118,8 @@ Concurrent F&O paper requests with different request IDs could both observe no o
 ### AUDIT-036 — Concurrent paper close could return stale mutation state — FIX IMPLEMENTED, CI PENDING
 **Priority:** P1  
 Paper close already used a conditional `OPEN` update, but callers could not distinguish a lost concurrent update from a successful mutation. The service now checks the affected-row count and refreshes the canonical trade state when another transaction closed it first. Regression coverage verifies the conditional-update and refresh contract.
+
+
+### AUDIT-037 — Broker order placement inherited automatic retry behavior — FIX IMPLEMENTED, CI PENDING
+**Priority:** P0 safety boundary  
+The generic Dhan HTTP client retried transient failures for all methods. If broker order placement were ever enabled, retrying a POST after a timeout/5xx could duplicate an order that the broker had already accepted. Order placement now explicitly disables automatic retries while read/market-data paths retain their existing retry policy. Regression coverage enforces the boundary.
