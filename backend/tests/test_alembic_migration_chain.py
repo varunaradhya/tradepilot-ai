@@ -44,3 +44,38 @@ def test_recent_learning_link_migrations_are_in_chain():
     assert revisions["20260929_0014_unique_paper_learning_link.py"]["down_revision"] == "20260929_0013"
     assert revisions["20260929_0015_learning_event_time.py"]["down_revision"] == "20260929_0014"
     assert revisions["20260929_0016_ml_lineage.py"]["down_revision"] == "20260929_0015"
+
+
+def test_alembic_runtime_fresh_upgrade_and_recovery(tmp_path, monkeypatch):
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    backend = Path(__file__).resolve().parents[1]
+    db_path = tmp_path / "fresh.db"
+    env = os.environ.copy()
+    env["TRADEPILOT_DATABASE_URL"] = f"sqlite:///{db_path}"
+
+    def run(*args):
+        return subprocess.run(
+            [sys.executable, "-m", "alembic", *args],
+            cwd=backend,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+    # Fresh database: full migration chain must build successfully.
+    run("upgrade", "head")
+
+    # Existing database: a partially upgraded installation must reach head.
+    run("downgrade", "20260929_0015")
+    run("upgrade", "head")
+
+    # Recovery path: complete downgrade and rebuild must also succeed.
+    run("downgrade", "base")
+    run("upgrade", "head")
+
+    assert db_path.exists()
