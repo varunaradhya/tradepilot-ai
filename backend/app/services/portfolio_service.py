@@ -1,6 +1,7 @@
 ﻿from decimal import Decimal
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.holding import Holding
@@ -44,15 +45,29 @@ def create_holding(
     average_buy_price: Decimal,
 ) -> Holding:
 
+    normalized_symbol = symbol.strip().upper()
+    existing = db.execute(
+        select(Holding).where(
+            Holding.user_id == user_id,
+            Holding.symbol == normalized_symbol,
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        raise ValueError("A holding for this symbol already exists")
+
     holding = Holding(
         user_id=user_id,
-        symbol=symbol.strip().upper(),
+        symbol=normalized_symbol,
         quantity=quantity,
         average_buy_price=average_buy_price,
     )
 
     db.add(holding)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise ValueError("A holding for this symbol already exists") from exc
     db.refresh(holding)
 
     return holding
