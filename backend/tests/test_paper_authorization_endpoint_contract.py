@@ -34,3 +34,11 @@ def test_readiness_authorization_is_server_owned():
     assert '@router.post("/readiness/authorize")' in source
     assert "authorize_strategy(db" in source
     assert "strategy_fingerprint" in source
+
+
+
+def test_legacy_paper_session_mutations_are_disabled():
+    source = Path("app/api/v1/paper_session.py").read_text(encoding="utf-8")
+    assert 'status.HTTP_410_GONE' in source
+    assert 'Legacy paper-session mutation is disabled' in source
+    assert 'Legacy paper-session reset is disabled' in source
