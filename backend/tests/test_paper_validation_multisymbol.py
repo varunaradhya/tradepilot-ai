@@ -33,6 +33,11 @@ def test_daily_validation_finalizes_one_day_across_symbols(monkeypatch):
         return type("Day", (), {"status": "COMPLETE"})()
     monkeypatch.setattr(job, "run_dhan_paper_session", fake_run)
     monkeypatch.setattr(job, "finalize_multi_symbol_validation_day", fake_finalize)
+    monkeypatch.setattr(
+        job,
+        "persist_validation_manifest",
+        lambda db, user_id, run_key: type("Manifest", (), {"root_hash": "a" * 64})(),
+    )
 
     result = job.run_daily_dhan_validation(object(), 7, ["TCS", "tcs", "INFY", "RELIANCE"], date(2026, 9, 28), "5")
 
