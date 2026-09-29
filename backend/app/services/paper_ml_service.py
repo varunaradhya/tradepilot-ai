@@ -370,6 +370,7 @@ def predict(
     features: dict[str, Any],
     *,
     persist: bool = True,
+    commit: bool = True,
 ) -> dict[str, Any]:
     model = _active_model(db, user_id, strategy_version)
     if model is None:
@@ -401,7 +402,8 @@ def predict(
             strategy_version=strategy_version, probability=probability,
             decision=effective_decision, features_json=json.dumps(learning_features(features), sort_keys=True),
         ))
-        db.commit()
+        if commit:
+            db.commit()
     return {
         "available": True,
         "model_id": model.id,
