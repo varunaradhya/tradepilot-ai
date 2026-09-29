@@ -9,7 +9,7 @@ from app.models.paper_historical_run import PaperHistoricalRun
 from app.models.paper_trade import PaperTrade
 from app.services.broker_service import get_access_token, get_user_broker
 from app.services.dhan_historical_service import HistoricalRequest, fetch_intraday_history
-from app.services.instrument_master_service import InstrumentMaster, instrument_master
+from app.services.instrument_master_service import InstrumentMaster, instrument_master, resolve_nse_equity
 from app.services.paper_market_service import PaperMarketCoordinator
 from app.services.paper_ml_service import record_trade_outcome
 from app.services.paper_validation_service import (
@@ -33,11 +33,7 @@ def run_dhan_paper_session(
     except ValueError as exc:
         raise ValueError("session must be YYYY-MM-DD") from exc
 
-    needle = symbol.strip().upper()
-    matches = [item for item in master.load() if item.symbol.upper() == needle and item.exchange_segment == "NSE_EQ"]
-    if not matches:
-        raise ValueError(f"NSE equity symbol not found: {needle}")
-    instrument = matches[0]
+    instrument = resolve_nse_equity(master, symbol)
     client = DhanClient(connection.client_id, get_access_token(connection))
     run_key = validation_run_key(trading_day)
 
@@ -98,7 +94,7 @@ def run_dhan_paper_session(
     persisted = 0
     total_pnl = 0.0
     for trade in runner.orchestrator.trades():
-        record_trade_outcome(db, user_id, session, trade, strategy_version=strategy_version, model_version=str(trade.get("model_version") or "RULES_V1"))
+        record_trade_outcome(db, user_id, session, trade, strategy_version=strategy_version, model_version=str(trade.get("model_version") or "RULES_V1"), commit=False)
         db.add(PaperTrade(
             user_id=user_id, symbol=instrument.symbol, side="BUY", status="CLOSED",
             quantity=int(trade["quantity"]), entry_price=float(trade["entry"]), stop_price=float(trade["stop"]),
