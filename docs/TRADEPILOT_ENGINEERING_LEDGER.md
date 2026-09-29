@@ -3,7 +3,7 @@
 Repository: varunaradhya/tradepilot-ai
 Branch: main
 Last updated: 2026-09-29
-Current HEAD: 64ec14443fb22f41151e52fe94fa49b7b827afc5
+Current HEAD: e7bd75123ce76e4695041298b974e8fe57c3dbe2
 
 ## Status
 - DONE — implementation complete and verified by available evidence
@@ -19,11 +19,11 @@ Current HEAD: 64ec14443fb22f41151e52fe94fa49b7b827afc5
 | P0.3 | Fresh CI verification | PENDING | .github/workflows/ci.yml exists | N/A | 7fa7b7e | NOT OBSERVED | GitHub integration returned no workflow/status for current push |
 | P0.4 | Migration integrity | IMPLEMENTED — CI PENDING | Linear 001→014 chain audited; 0013 SQLite batch alteration; 0014 unique-link constraint | Static chain regression added; runtime upgrade/downgrade not executed | c89e548 | PENDING | Fresh/upgrade/downgrade runtime verification still required |
 | P1.1 | Historical ingestion hardening | PARTIAL | Dhan path normalized + session-aware; portable import now reuses canonical contract | Import/provenance regression tests added; CI pending | 2fb579e | PENDING | Corporate-action treatment and runtime evidence remain |
-| P1.2 | Backtest audit | PLANNED | Existing engine | Existing tests | — | — | Leakage/cost/slippage/position constraints need expanded audit |
+| P1.2 | Backtest audit | IMPLEMENTED — CI PENDING | Same-bar execution leakage fixed; signals execute next-bar open | Regression test added | e7bd751 | PENDING | Future-high/low, normalization, dataset-overlap and runtime evidence remain |
 | P1.3 | Walk-forward validation audit | PLANNED | Existing framework | Existing tests | — | — | Dataset fingerprint and fold lineage need verification |
 | P1.4 | Strategy framework audit | PLANNED | V1/V2/V2A registry exists | Existing tests | — | — | Parameter provenance/fingerprinting pending |
 | P1.5 | ML data integrity | IMPLEMENTED — CI PENDING | Temporal feature-event timestamp persisted and required | Existing ML service | Existing tests | — | — | Feature/label schema audit pending |
-| P1.6 | ML leakage protection | PARTIAL — CI PENDING | Temporal event ordering hardened; test set removed from qualification gate | Existing chronological split | — | — | — | Dedicated regression suite pending |
+| P1.6 | ML leakage protection | PARTIAL — CI PENDING | Temporal event ordering hardened; test set removed from qualification gate | Regression coverage added | ed45f12 | PENDING | Broader research leakage suite remains |
 | P1.7 | ML lifecycle | PARTIAL | Training/deployment gates exist | Existing tests | — | PENDING | Rollback/version lifecycle audit pending |
 | P1.8 | ML evaluation | PARTIAL | Descriptive metrics exist | Existing tests | — | PENDING | Calibration/trading-aware metrics pending |
 | P1.9 | Portfolio risk engine | IMPLEMENTED | Existing portfolio risk service | Existing tests | — | PENDING | Current-head verification pending |
