@@ -47,3 +47,16 @@ ML evaluation previously exposed classification metrics only. Validation/test ev
 ### AUDIT-018 — Backtest/walk-forward dataset lineage was incomplete — FIX IMPLEMENTED, CI PENDING
 **Priority:** P1  
 Portable historical datasets already received deterministic SHA-256 provenance, but the backtest and walk-forward result contracts did not carry that fingerprint. A result could therefore be detached from the exact dataset used for the evidence run. Backtest configuration now accepts an optional validated SHA-256 dataset fingerprint, returns it with the result, and the fixed-parameter walk-forward path propagates the same fingerprint into both strategy variants and the top-level result. Regression coverage verifies validation and propagation.
+
+
+### AUDIT-019 — Backtest corporate-action state could be ambiguous — FIX IMPLEMENTED, CI PENDING
+**Priority:** P1  
+Dataset provenance already records whether imported prices are corporate-action adjusted, but the evidence-run contract did not require that state to be declared. Lineage-backed backtests now fail closed when a dataset fingerprint is supplied without an explicit corporate_action_adjusted boolean, and the state is propagated into backtest/walk-forward results. This does not prove the underlying provider's adjustment correctness; real corporate-action data remains required for that evidence.
+
+### AUDIT-020 — Strategy parameter provenance was only implicit — FIX IMPLEMENTED, CI PENDING
+**Priority:** P1  
+Backtests already generated a strategy fingerprint, but trade-level learning evidence did not retain the exact fingerprint. Backtest trades now carry the strategy fingerprint, and learning events persist it. ML training fails closed if strategy lineage is missing or mixed across the training set.
+
+### AUDIT-021 — ML training dataset lineage was incomplete — FIX IMPLEMENTED, CI PENDING
+**Priority:** P1  
+ML models previously stored metrics and strategy version but not the dataset lineage represented by their training events or the feature-schema identity. Learning events now persist dataset fingerprints; training rejects missing dataset lineage and derives a deterministic aggregate fingerprint across the training datasets. Persisted models also record dataset fingerprint, strategy fingerprint and feature-schema fingerprint. This is lineage evidence, not proof of real-market performance.
