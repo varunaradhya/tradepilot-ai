@@ -93,3 +93,11 @@ Owned paper-trade mark/close endpoints correctly filtered by user ID, but the ro
 ### AUDIT-030 — Strategy authorization upsert was race-prone — FIX IMPLEMENTED, CI PENDING
 **Priority:** P1  
 Strategy authorization used an unlocked read followed by insert/update despite a unique database boundary. Concurrent authorization requests could race. The service now locks existing rows and handles uniqueness races by reloading the canonical authorization row before applying the update.
+
+### AUDIT-031 — Broker connection upsert and sync metadata were race/logging sensitive — FIX IMPLEMENTED, CI PENDING
+**Priority:** P1  
+Broker connection writes now serialize against concurrent upserts using row locks plus uniqueness-race recovery. Sync metadata is reloaded under lock and persists controlled status messages instead of raw broker exception text, reducing durable leakage of request/provider details.
+
+### AUDIT-032 — Disabled F&O execution endpoint still touched broker credentials — FIX IMPLEMENTED, CI PENDING
+**Priority:** P0  
+Although the execution service was already hard-locked to paper-only behavior, the API endpoint still instantiated a Dhan client and decrypted credentials before reaching that boundary. The endpoint is now broker-free and calls the disabled execution boundary with no broker credential access.
