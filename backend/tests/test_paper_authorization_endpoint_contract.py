@@ -91,3 +91,11 @@ def test_broker_connection_mutations_are_concurrency_safe_and_sync_messages_are_
     assert "IntegrityError" in source
     assert "str(exc)" not in source
     assert "encrypted_access_token" in source
+
+
+def test_fno_disabled_execution_endpoint_does_not_load_broker_credentials():
+    source = Path("app/api/v1/fno.py").read_text(encoding="utf-8")
+    start = source.index('@router.post("/execute")')
+    execute_source = source[start:]
+    assert "execute_fno_decision(None" in execute_source
+    assert "_dhan(db,current_user.id)" not in execute_source
