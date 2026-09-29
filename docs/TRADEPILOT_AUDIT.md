@@ -123,3 +123,12 @@ Paper close already used a conditional `OPEN` update, but callers could not dist
 ### AUDIT-037 — Broker order placement inherited automatic retry behavior — FIX IMPLEMENTED, CI PENDING
 **Priority:** P0 safety boundary  
 The generic Dhan HTTP client retried transient failures for all methods. If broker order placement were ever enabled, retrying a POST after a timeout/5xx could duplicate an order that the broker had already accepted. Order placement now explicitly disables automatic retries while read/market-data paths retain their existing retry policy. Regression coverage enforces the boundary.
+
+
+### AUDIT-038 — Portfolio sync could interleave concurrent snapshots — FIX IMPLEMENTED, CI PENDING
+**Priority:** P1  
+Concurrent Dhan sync requests could fetch overlapping broker snapshots and then mutate the same user's holdings/transactions without a durable serialization boundary. Portfolio sync now locks the user/broker connection row before the broker snapshot is applied, serializing syncs for that connection through the transaction boundary.
+
+### AUDIT-039 — Malformed broker trade timestamps could create repeat-sync duplicates — FIX IMPLEMENTED, CI PENDING
+**Priority:** P1  
+When Dhan supplied a malformed trade timestamp, the previous code generated a fresh local timestamp. Repeating the same sync could therefore produce a different transaction identity each time. Malformed supplied timestamps are now rejected for import instead of being converted into a synthetic identity; a local timestamp is used only when the broker supplied no timestamp at all.
