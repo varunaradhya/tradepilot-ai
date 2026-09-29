@@ -331,6 +331,7 @@ def paper_market_bar(payload: MarketBarRequest, current_user: User = Depends(get
                 commit=False,
             )
         _persist_orchestrator(db, current_user.id)
+        db.commit()
         return result
     except ValueError as exc: raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
 
