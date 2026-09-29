@@ -97,6 +97,16 @@ def _market_coordinator(
     return PaperMarketCoordinator(orchestrator=_orchestrator(user_id, db))
 
 
+def _lock_paper_state(db: Session, user_id: int) -> User:
+    """Serialize a paper-state mutation across API workers."""
+    return (
+        db.query(User)
+        .filter(User.id == user_id)
+        .with_for_update()
+        .one()
+    )
+
+
 def _research_rows(symbol: str, interval: str) -> list[dict]:
     dataset = f"nse/{symbol.strip().upper()}_intraday_{interval}m"
     bars = research_store.load(dataset)
@@ -234,6 +244,7 @@ def paper_session_signal(payload: PaperSignalRequest, current_user: User = Depen
                 )
             return {**recovered, "idempotent_replay": True, "request_id": request_id}
         return {**replay, "idempotent_replay": True, "request_id": request_id}
+    _lock_paper_state(db, current_user.id)
     ml_assessment = predict(
         db, current_user.id, payload.symbol, payload.strategy_version, signal, persist=True,
     )
@@ -263,6 +274,7 @@ def paper_session_bar(payload: PaperBarRequest, current_user: User = Depends(get
 @router.post("/session/live-ltp")
 def paper_live_ltp(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict[str, Any]:
     try:
+        _lock_paper_state(db, current_user.id)
         orchestrator = _orchestrator(current_user.id, db)
         result = mark_dhan_paper_position(db, current_user.id, orchestrator)
         _persist_orchestrator(db, current_user.id)
@@ -290,6 +302,7 @@ def paper_market_bar(payload: MarketBarRequest, current_user: User = Depends(get
     if not _load_authorization(db, current_user.id, payload.symbol, payload.interval, "V1"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No active qualified strategy authorization for this symbol and interval")
     try:
+        _lock_paper_state(db, current_user.id)
         coordinator = _market_coordinator(current_user.id, db)
         persisted = load_market_state(db, current_user.id, payload.session, payload.symbol, payload.interval, "V1")
         if persisted:
@@ -323,6 +336,7 @@ def paper_dhan_session(payload: DhanPaperRequest, current_user: User = Depends(g
     if not _load_authorization(db, current_user.id, payload.symbol, payload.interval, "V1"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No active qualified strategy authorization for this symbol and interval")
     try:
+        _lock_paper_state(db, current_user.id)
         result = run_dhan_paper_session(db,current_user.id,payload.symbol,payload.session,payload.interval,coordinator=_market_coordinator(current_user.id, db))
         _persist_orchestrator(db, current_user.id)
         return result
