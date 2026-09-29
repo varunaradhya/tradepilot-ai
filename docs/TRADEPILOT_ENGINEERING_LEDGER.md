@@ -17,7 +17,7 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 | P0.1 | NSE session/calendar-aware historical validation | IMPLEMENTED | historical_data_service.py, nse_equity_calendar.py, dhan_historical_service.py | test_historical_data_service.py | 59ca4c9 | PENDING | Runtime/CI verification unavailable |
 | P0.2 | Trade → ML Learning → Validation reconciliation | IMPLEMENTED | paper_reconciliation_service.py | test_paper_reconciliation.py | 74fc25f | PENDING | Runtime/CI verification unavailable |
 | P0.3 | Fresh CI verification | PENDING | .github/workflows/ci.yml exists | N/A | 7fa7b7e | NOT OBSERVED | GitHub integration returned no workflow/status for current push |
-| P0.4 | Migration integrity | IMPLEMENTED — CI PENDING | Linear chain through 0016 audited; 0013 SQLite batch alteration; 0014 unique-link constraint; 0015 event time; 0016 ML lineage | Static chain regression added; runtime upgrade/downgrade not executed | c89e548 | PENDING | Fresh/upgrade/downgrade runtime verification still required |
+| P0.4 | Migration integrity | IMPLEMENTED — CI PENDING | Linear chain through 0018 audited; 0013 SQLite batch alteration; 0014 unique-link constraint; 0015 event time; 0016 ML lineage | Static chain regression added; runtime upgrade/downgrade not executed | c89e548 | PENDING | Fresh/upgrade/downgrade runtime verification still required |
 | P1.1 | Historical ingestion hardening | PARTIAL | Dhan path normalized + session-aware; portable import now reuses canonical contract | Import/provenance regression tests added; CI pending | 2fb579e | PENDING | Corporate-action treatment and runtime evidence remain |
 | P1.2 | Backtest audit | IMPLEMENTED — CI PENDING | Same-bar execution leakage fixed; next-bar execution; dataset fingerprint + corporate-action state + strategy fingerprint propagated | Regression coverage added | lineage batch | PENDING | Future-high/low, normalization, overlap and runtime evidence remain |
 | P1.3 | Walk-forward validation audit | IMPLEMENTED — CI PENDING | Chronological non-overlapping windows plus dataset fingerprint, corporate-action and strategy lineage | Regression coverage added | lineage batch | PENDING | Runtime/OOS evidence remains |
@@ -32,8 +32,8 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 | P1.12 | Idempotency | PARTIAL | Several DB uniqueness boundaries exist | Existing tests | — | PENDING | Full repeated-operation audit pending |
 | P1.13 | Restart/recovery | PLANNED | — | — | — | — | Requires runtime environment |
 | P1.14 | Live execution hard-lock | LOCKED | production_safety + broker capability constraints | Safety regression suite exists | — | PENDING | Must remain disabled |
-| P1.15 | Auth/authorization | PLANNED | Existing auth foundation | — | — | — | IDOR/ownership audit pending |
-| P1.16 | Secrets/security | PLANNED | Existing environment configuration | — | — | — | Repo/history/log/Docker audit pending |
+| P1.15 | Auth/authorization | PARTIAL | Ownership-scoped APIs plus token validation; current code audit hardened password-change invalidation | Existing auth/ownership tests | — | Full endpoint matrix/runtime verification pending |
+| P1.16 | Secrets/security | PARTIAL | Encrypted broker secrets, production JWT guard, sanitized Dhan errors/logs, live execution lock | Regression contracts | — | Deployment secret rotation/runtime verification pending |
 | P1.17 | Operational monitoring | PARTIAL | health/audit services exist | — | — | — | Runtime telemetry verification pending |
 | P1.18 | Audit trail | PARTIAL | operational audit foundation exists | — | — | — | Coverage audit pending |
 | P1.19 | Research dashboard | PARTIAL | Research UI exists | Frontend build pending | — | PENDING | Evidence/reconciliation surfaces need verification |
