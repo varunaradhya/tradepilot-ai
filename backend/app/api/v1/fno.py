@@ -393,31 +393,76 @@ def option_paper_recovery_status(
         ],
     }
 
-@router.get("/paper/positions")
-def option_paper_positions(current_user: User = Depends(get_current_user), db=Depends(get_db)):
-    trades=[t for t in list_paper_trades(db,current_user.id,"OPEN") if t.asset_type=="OPTION"]
-    if not trades: return {"mode":"PAPER_ONLY","market_connected":False,"positions":[]}
-    client=_dhan(db,current_user.id); security_ids=[str(t.security_id) for t in trades if t.security_id]
-    try: quotes=client.market_quote("NSE_FNO",security_ids)
-    except DhanAPIError as exc: raise HTTPException(status_code=502, detail=str(exc)) from exc
-    positions=[]
-    quote_failures=[]
+def _option_positions_with_quotes(db, user_id: int, *, mutate: bool) -> dict[str, Any]:
+    trades = [
+        t for t in list_paper_trades(db, user_id, "OPEN")
+        if t.asset_type == "OPTION"
+    ]
+    if not trades:
+        return {"mode": "PAPER_ONLY", "market_connected": False, "positions": []}
+
+    client = _dhan(db, user_id)
+    security_ids = [str(t.security_id) for t in trades if t.security_id]
+    try:
+        quotes = client.market_quote("NSE_FNO", security_ids)
+    except DhanAPIError as exc:
+        raise HTTPException(status_code=502, detail="Dhan market quote failed.") from exc
+
+    positions = []
+    quote_failures = []
     for trade in trades:
-        quote=_quote_from_response(quotes,str(trade.security_id))
-        if not quote or quote.get("bid",0) <= 0:
+        quote = _quote_from_response(quotes, str(trade.security_id))
+        if not quote or quote.get("bid", 0) <= 0:
             quote_failures.append(str(trade.security_id))
-        executable_price=quote["bid"] if quote and quote.get("bid",0)>0 else 0
-        if executable_price > 0:
-            trade=update_paper_trade(db,trade,executable_price)
-        costs=paper_trade_costs(trade,executable_price if executable_price > 0 else None)
-        positions.append({"id":trade.id,"symbol":trade.symbol,"underlying":trade.underlying,"expiry":trade.expiry,"strike":trade.strike,"option_type":trade.option_type,"security_id":trade.security_id,"quantity":trade.quantity,"entry_price":trade.entry_price,"last_price":quote.get("ltp") if quote else None,"executable_bid":quote.get("bid") if quote else None,"ask":quote.get("ask") if quote else None,"stop_price":trade.stop_price,"target_price":trade.target_price,"pnl":trade.pnl,"estimated_round_trip_costs":costs,"status":trade.status,"reason":trade.reason})
+        executable_price = quote["bid"] if quote and quote.get("bid", 0) > 0 else 0
+        if mutate and executable_price > 0:
+            trade = update_paper_trade(db, trade, executable_price)
+        costs = paper_trade_costs(
+            trade, executable_price if executable_price > 0 else None
+        )
+        positions.append({
+            "id": trade.id,
+            "symbol": trade.symbol,
+            "underlying": trade.underlying,
+            "expiry": trade.expiry,
+            "strike": trade.strike,
+            "option_type": trade.option_type,
+            "security_id": trade.security_id,
+            "quantity": trade.quantity,
+            "entry_price": trade.entry_price,
+            "last_price": quote.get("ltp") if quote else None,
+            "executable_bid": quote.get("bid") if quote else None,
+            "ask": quote.get("ask") if quote else None,
+            "stop_price": trade.stop_price,
+            "target_price": trade.target_price,
+            "pnl": trade.pnl,
+            "estimated_round_trip_costs": costs,
+            "status": trade.status,
+            "reason": trade.reason,
+        })
     return {
-        "mode":"PAPER_ONLY",
-        "market_connected":not bool(quote_failures),
-        "data_status":"DEGRADED" if quote_failures else "READY",
-        "quote_failures":quote_failures,
-        "positions":positions,
+        "mode": "PAPER_ONLY",
+        "market_connected": not bool(quote_failures),
+        "data_status": "DEGRADED" if quote_failures else "READY",
+        "quote_failures": quote_failures,
+        "positions": positions,
     }
+
+
+@router.get("/paper/positions")
+def option_paper_positions(
+    current_user: User = Depends(get_current_user), db=Depends(get_db)
+):
+    # GET is observational only: it never mutates paper positions.
+    return _option_positions_with_quotes(db, current_user.id, mutate=False)
+
+
+@router.post("/paper/positions/mark")
+def mark_option_paper_positions(
+    current_user: User = Depends(get_current_user), db=Depends(get_db)
+):
+    # Explicit mutation endpoint for applying broker bid marks to the paper ledger.
+    return _option_positions_with_quotes(db, current_user.id, mutate=True)
 
 @router.post("/paper/positions/{trade_id}/close")
 def close_option_paper_trade(trade_id:int,exit_price:float=Query(gt=0),current_user:User=Depends(get_current_user),db=Depends(get_db)):
