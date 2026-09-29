@@ -115,3 +115,10 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - CI Alembic verification now explicitly targets an isolated SQLite database.
 - Latest GitHub commit status/workflow queries still return no checks or workflow runs.
 - Status: WORKFLOW CONFIGURED — EXECUTION NOT VERIFIED.
+
+
+### 2026-09-29 — F&O duplicate-entry and close-state hardening
+- F&O paper entry now requests a row lock on the active strategy authorization before checking for an existing open option position, closing a duplicate-position read/insert race within the authorization boundary.
+- Paper trade close now checks the conditional update row count and refreshes the canonical trade when another transaction won the close race.
+- Regression contracts added for both invariants.
+- Status: IMPLEMENTED — CI PENDING.
