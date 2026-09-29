@@ -14,6 +14,34 @@ depends_on = None
 
 
 def upgrade():
+    # The original migration chain relied on application startup creating
+    # paper_trades, but a fresh Alembic database must be self-contained.
+    # Preserve compatibility with databases where the table already exists.
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if not inspector.has_table("paper_trades"):
+        op.create_table(
+            "paper_trades",
+            sa.Column("id", sa.Integer(), primary_key=True),
+            sa.Column("user_id", sa.Integer(), nullable=False),
+            sa.Column("symbol", sa.String(length=30), nullable=False),
+            sa.Column("side", sa.String(length=10), nullable=False, server_default="BUY"),
+            sa.Column("status", sa.String(length=20), nullable=False, server_default="OPEN"),
+            sa.Column("quantity", sa.Integer(), nullable=False),
+            sa.Column("entry_price", sa.Float(), nullable=False),
+            sa.Column("stop_price", sa.Float(), nullable=False),
+            sa.Column("target_price", sa.Float(), nullable=False),
+            sa.Column("exit_price", sa.Float(), nullable=True),
+            sa.Column("pnl", sa.Float(), nullable=False, server_default="0"),
+            sa.Column("reason", sa.String(length=40), nullable=True),
+            sa.Column("strategy_version", sa.String(length=10), nullable=False, server_default="V1"),
+            sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+            sa.Column("closed_at", sa.DateTime(timezone=True), nullable=True),
+        )
+        op.create_index("ix_paper_trades_id", "paper_trades", ["id"], unique=False)
+        op.create_index("ix_paper_trades_user_id", "paper_trades", ["user_id"], unique=False)
+        op.create_index("ix_paper_trades_symbol", "paper_trades", ["symbol"], unique=False)
+
     op.add_column("paper_trades", sa.Column("asset_type", sa.String(length=10), nullable=False, server_default="EQUITY"))
     op.add_column("paper_trades", sa.Column("security_id", sa.String(length=30), nullable=True))
     op.add_column("paper_trades", sa.Column("exchange_segment", sa.String(length=20), nullable=True))
