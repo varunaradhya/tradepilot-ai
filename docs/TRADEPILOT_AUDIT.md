@@ -33,3 +33,12 @@ The fixed-parameter intraday walk-forward path constructs chronological train/va
 ### AUDIT-015 — Intraday backtest used same-bar signal information for execution — FIX IMPLEMENTED, CI PENDING
 **Priority:** P0/P1  
 The intraday backtest generated a signal from the completed current bar and immediately filled that signal using the same bar's close. Because the signal can depend on that bar's close/high/low, this is not an executable historical fill and can introduce look-ahead/same-bar execution bias. The engine now queues completed-bar BUY signals and executes them only on the next bar's open, rejects final-bar signals with no executable next bar, and records both signal time/reference price and actual simulated entry time/fill. A regression test forces a 100 signal reference followed by a 110 next-bar open and verifies the fill is based on the next bar. Runtime/CI verification remains pending.
+
+
+### AUDIT-016 — ML event timestamp path had a missing runtime import — FIX IMPLEMENTED, CI PENDING
+**Priority:** P1  
+The temporal learning-event implementation referenced datetime and timezone without importing them in the service module. This would fail when recording an event with a timestamp at runtime. The imports are now explicit and regression coverage already exercises timestamp persistence.
+
+### AUDIT-017 — ML evaluation lacked trade-level outcome metrics — FIX IMPLEMENTED, CI PENDING
+**Priority:** P1  
+ML evaluation previously exposed classification metrics only. Validation/test evidence now also reports trade count, total P&L, expectancy, win rate, profit factor, average R-multiple and P&L drawdown. These are descriptive evaluation metrics only; model qualification remains controlled by the validation classification gate, and the final test set remains report-only.
