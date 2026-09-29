@@ -105,3 +105,7 @@ Although the execution service was already hard-locked to paper-only behavior, t
 ### AUDIT-033 — F&O manual close lacked mutation row locking — FIX IMPLEMENTED, CI PENDING
 **Priority:** P1  
 The option manual-close endpoint now locks the owned `PaperTrade` row before applying the close mutation. This aligns F&O close behavior with the equity paper-trade mutation boundary.
+
+### AUDIT-034 — CI migration verification relied on implicit database configuration — HARDENED, CI EXECUTION PENDING
+**Priority:** P1  
+The CI workflow already invoked `alembic upgrade head`, but it did not explicitly set the CI database URL. The migration step now uses an isolated SQLite file (`ci-fresh.db`) so the intended fresh-database verification is deterministic and independent of developer/local configuration. GitHub has still reported no workflow run for the latest commits, so execution remains unverified.
