@@ -66,11 +66,15 @@ def decode_access_token(token: str) -> dict:
     return payload
 
 
-def decode_refresh_token(token: str) -> int:
+def decode_refresh_token_payload(token: str) -> dict:
     payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
     if payload.get("purpose") != REFRESH_TOKEN_PURPOSE:
         raise ValueError("Invalid refresh token")
-    return int(payload["sub"])
+    return payload
+
+
+def decode_refresh_token(token: str) -> int:
+    return int(decode_refresh_token_payload(token)["sub"])
 
 
 def create_password_reset_token(user_id: int) -> str:
