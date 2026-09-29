@@ -1,3 +1,5 @@
+from datetime import date
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
@@ -48,8 +50,8 @@ def test_reconciliation_accepts_linked_trade():
     )
     db.add(trade)
     db.add(PaperValidationSymbol(
-        user_id=1, validation_run=validation_run_key(__import__("datetime").date(2026, 1, 1)),
-        session_date=__import__("datetime").date(2026, 1, 1), symbol="TCS",
+        user_id=1, validation_run=validation_run_key(date(2026, 1, 1)),
+        session_date=date(2026, 1, 1), symbol="TCS",
         status="COMPLETE", bars=75, trades=1, net_pnl=2.0, data_quality_json='{"valid": true}',
     ))
     db.commit()
