@@ -105,3 +105,8 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - Removed broker credential access from the already-disabled F&O execution endpoint.
 - Added regression contracts.
 - Status: IMPLEMENTED — CI PENDING.
+
+### 2026-09-29 — F&O close concurrency hardening
+- Locked owned option paper positions before manual close.
+- Added regression contract.
+- Status: IMPLEMENTED — CI PENDING.
