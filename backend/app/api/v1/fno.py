@@ -22,6 +22,7 @@ from app.services.kill_switch_service import kill_switch_status
 from app.services.market_data_health import evaluate_market_data_freshness
 from app.services.market_session_scheduler import scheduler_status
 from app.services.paper_risk_guard import PaperRiskConfig, PaperRiskState, evaluate_paper_entry, normalize_trade_timestamp
+from app.services.strategy_paper_authorization import get_active_authorization
 
 router = APIRouter(prefix="/fno", tags=["F&O"])
 
@@ -323,6 +324,14 @@ def open_option_paper_trade(data: FNOPaperOpenRequest, current_user: User = Depe
         recovery_required=is_stale_pending_request(existing_request)
         detail="A stale PENDING paper request requires reconciliation before retry." if recovery_required else "A paper order request with this id is already being processed."
         raise HTTPException(status_code=409,detail=detail)
+    underlying_symbol = str(underlying.get("symbol") or "").strip().upper()
+    interval = str(underlying.get("interval") or "5")
+    authorization = get_active_authorization(db, current_user.id, symbol=underlying_symbol, interval=interval, strategy_version=data.strategy_version)
+    if authorization is None:
+        raise HTTPException(status_code=403, detail="No active qualified strategy authorization for this F&O underlying and interval")
+    decision_fingerprint = str(decision.get("strategy_fingerprint") or decision.get("strategyFingerprint") or "").strip()
+    if decision_fingerprint and decision_fingerprint != authorization.fingerprint:
+        raise HTTPException(status_code=409, detail="F&O decision strategy fingerprint does not match active authorization")
     kill_block=_fno_kill_switch_gate(db)
     if kill_block:
         raise HTTPException(status_code=409,detail="F&O paper risk gate blocked entry: " + kill_block)
