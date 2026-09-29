@@ -17,6 +17,7 @@ services:
     build: ./backend
     environment:
       TRADEPILOT_DATABASE_URL: postgresql+psycopg://tradepilot:${POSTGRES_PASSWORD:-change-me-before-deployment}@database:5432/tradepilot
+      TRADEPILOT_ENV: production
       TRADEPILOT_AUTO_CREATE_SCHEMA: "false"
       TRADEPILOT_JWT_SECRET: ${TRADEPILOT_JWT_SECRET:?set-in-your-environment}
       TRADEPILOT_BROKER_ENCRYPTION_KEY: ${TRADEPILOT_BROKER_ENCRYPTION_KEY:?set-in-your-environment}
