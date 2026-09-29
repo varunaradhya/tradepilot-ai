@@ -142,3 +142,10 @@
 - Transaction create/update/delete now serialize the user-wide holding rebuild using a durable user-row lock.
 - This closes a cross-worker race where concurrent transaction mutations could interleave full holding reconstruction.
 - Status: IMPLEMENTED — CI PENDING.
+
+
+### 2026-09-29 — Authentication and deployment security hardening
+- Password changes now invalidate previously issued access/refresh tokens through durable password-change timestamps.
+- Production refuses the known development JWT secret; automatic schema creation defaults off in favor of Alembic.
+- Dhan provider errors/retry logs are sanitized to avoid leaking provider payloads or exception details.
+- Status: IMPLEMENTED — CI PENDING.
