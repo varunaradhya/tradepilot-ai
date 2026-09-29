@@ -71,3 +71,8 @@
 - Persisted ML models now record aggregate training-dataset fingerprint, strategy fingerprint and feature-schema fingerprint.
 - Added migration 0016 and regression coverage.
 - Status: IMPLEMENTED — CI PENDING.
+
+
+### 2026-09-29 — Authorization boundary hardening
+- Disabled legacy paper-session mutation endpoints that could bypass persisted strategy authorization, readiness and durable recovery controls.
+- Status: IMPLEMENTED — CI PENDING.
