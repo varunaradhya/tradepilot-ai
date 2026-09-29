@@ -2,6 +2,8 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
+from app.models.broker_connection import BrokerConnection
+
 from app.brokers.dhan import DhanAPIError, DhanClient
 from app.models.holding import Holding
 from app.models.transaction import Transaction
@@ -158,12 +160,14 @@ def _sync_trades(
                     str(raw_date).replace(" ", "T")
                 )
             except (TypeError, ValueError):
-                transaction_date = None
+                # Do not synthesize a new timestamp for a malformed broker
+                # timestamp: that would give the same broker trade a different
+                # local identity on every sync and create duplicates.
+                continue
 
-        # A malformed broker timestamp must not be treated as an exact match
-        # for every prior row. Fall back to the model's timestamp only when the
-        # broker supplied no timestamp at all.
-        if transaction_date is None and not raw_date:
+        # Use the local creation time only when the broker supplied no timestamp
+        # at all. A missing timestamp is inherently weaker evidence.
+        if transaction_date is None:
             transaction_date = datetime.now(timezone.utc)
 
         existing = _find_transaction(
@@ -197,6 +201,19 @@ def sync_dhan_portfolio(
     db: Session,
     connection,
 ):
+    # Serialize syncs for the same user/broker connection. Holding this row
+    # lock across the snapshot and local commit prevents concurrent syncs from
+    # interleaving broker snapshots and local mutations.
+    connection = (
+        db.query(BrokerConnection)
+        .filter(
+            BrokerConnection.id == connection.id,
+            BrokerConnection.user_id == connection.user_id,
+            BrokerConnection.broker_name == connection.broker_name,
+        )
+        .with_for_update()
+        .one()
+    )
     token = get_access_token(connection)
     client = DhanClient(
         client_id=connection.client_id,
