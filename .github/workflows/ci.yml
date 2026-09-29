@@ -37,6 +37,10 @@ jobs:
           TRADEPILOT_DATABASE_URL: sqlite:///./ci-fresh.db
         run: python -m alembic upgrade head
       - name: Run backend tests
+        env:
+          TRADEPILOT_ENV: test
+          TRADEPILOT_AUTO_CREATE_SCHEMA: "true"
+          TRADEPILOT_JWT_SECRET: ci-test-jwt-secret
         run: python -m pytest -q
 
   frontend:
