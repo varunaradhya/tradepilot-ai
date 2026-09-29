@@ -65,7 +65,7 @@ def get_current_user(
             changed = user.password_changed_at
             if changed.tzinfo is None:
                 changed = changed.replace(tzinfo=timezone.utc)
-            if datetime.fromtimestamp(float(token_iat), tz=timezone.utc) <= changed:
+            if datetime.fromtimestamp(float(token_iat), tz=timezone.utc) < changed:
                 raise credentials_exception
 
     return user
