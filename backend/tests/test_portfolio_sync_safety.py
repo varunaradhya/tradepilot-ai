@@ -18,3 +18,17 @@ def test_malformed_broker_trade_timestamp_is_not_replaced_with_new_identity():
     assert "Do not synthesize a new timestamp" in section
     assert "continue" in section
     assert "if transaction_date is None:" in section
+
+
+def test_holding_symbol_is_unique_per_user_at_database_boundary():
+    model = Path("app/models/holding.py").read_text(encoding="utf-8")
+    migration = next(
+        Path("alembic/versions").glob("20260929_0017_holding_uniqueness.py")
+    ).read_text(encoding="utf-8")
+    service = Path("app/services/portfolio_service.py").read_text(encoding="utf-8")
+    assert 'UniqueConstraint("user_id", "symbol", name="uq_holdings_user_symbol")' in model
+    assert '"uq_holdings_user_symbol"' in migration
+    assert "unique=True" in migration
+    assert "Holding.user_id == user_id" in service
+    assert "Holding.symbol == normalized_symbol" in service
+    assert "IntegrityError" in service
