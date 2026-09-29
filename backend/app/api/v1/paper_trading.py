@@ -260,7 +260,8 @@ def paper_session_signal(payload: PaperSignalRequest, current_user: User = Depen
     else:
         response = {"mode": "SIMULATION_ONLY", **_orchestrator(current_user.id, db).on_signal(payload.session, signal)}
     _persist_orchestrator(db, current_user.id)
-    complete_request(db, record, response)
+    complete_request(db, record, response, commit=False)
+    db.commit()
     return {**response, "idempotent_replay": False, "request_id": request_id}
 
 @router.post("/session/bar")
