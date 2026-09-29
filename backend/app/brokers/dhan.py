@@ -1,8 +1,12 @@
 from typing import Any
+import logging
 import random
 import time
 
 import httpx
+
+
+logger = logging.getLogger(__name__)
 
 
 class DhanAPIError(Exception):
@@ -40,19 +44,19 @@ class DhanClient:
                 r = httpx.request(method, f"{self.BASE_URL}{path}", headers=headers, json=json, timeout=30.0)
             except httpx.RequestError as exc:
                 if attempt >= retry_limit:
-                    raise DhanAPIError(f"Dhan connection failed after {attempt + 1} attempts: {exc}") from exc
+                    raise DhanAPIError(f"Dhan connection failed after {attempt + 1} attempts.") from exc
                 delay = self._retry_delay(attempt)
-                print(f"Dhan connection retry {attempt + 1}/{self.max_retries} in {delay:.1f}s: {exc}", flush=True)
+                logger.warning("Dhan connection retry %s/%s in %.1fs", attempt + 1, self.max_retries, delay)
                 time.sleep(delay)
                 continue
             if r.status_code in (429, 500, 502, 503, 504):
                 if attempt >= retry_limit:
                     try: p = r.json()
                     except Exception: p = r.text
-                    raise DhanAPIError(f"Dhan API returned {r.status_code} after {attempt + 1} attempts: {p}", r.status_code)
+                    raise DhanAPIError(f"Dhan API returned {r.status_code} after {attempt + 1} attempts.", r.status_code)
                 retry_after = r.headers.get("Retry-After")
                 delay = self._retry_delay(attempt, retry_after)
-                print(f"Dhan HTTP {r.status_code} retry {attempt + 1}/{self.max_retries} in {delay:.1f}s", flush=True)
+                logger.warning("Dhan HTTP %s retry %s/%s in %.1fs", r.status_code, attempt + 1, self.max_retries, delay)
                 time.sleep(delay)
                 continue
             if r.status_code >= 400:
@@ -60,7 +64,7 @@ class DhanClient:
                 except Exception: p = r.text
                 if r.status_code == 401:
                     raise DhanAPIError("Dhan authentication failed (401). The saved access token is invalid or expired. Reconnect Dhan with a fresh access token.", 401)
-                raise DhanAPIError(f"Dhan API returned {r.status_code}: {p}", r.status_code)
+                raise DhanAPIError(f"Dhan API returned HTTP {r.status_code}.", r.status_code)
             try: return r.json()
             except Exception as exc: raise DhanAPIError("Dhan returned invalid JSON.") from exc
         raise DhanAPIError("Dhan request failed unexpectedly.")
