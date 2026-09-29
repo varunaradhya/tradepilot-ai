@@ -109,3 +109,12 @@ The option manual-close endpoint now locks the owned `PaperTrade` row before app
 ### AUDIT-034 — CI migration verification relied on implicit database configuration — HARDENED, CI EXECUTION PENDING
 **Priority:** P1  
 The CI workflow already invoked `alembic upgrade head`, but it did not explicitly set the CI database URL. The migration step now uses an isolated SQLite file (`ci-fresh.db`) so the intended fresh-database verification is deterministic and independent of developer/local configuration. GitHub has still reported no workflow run for the latest commits, so execution remains unverified.
+
+
+### AUDIT-035 — F&O duplicate-position read/insert race — FIX IMPLEMENTED, CI PENDING
+**Priority:** P1  
+Concurrent F&O paper requests with different request IDs could both observe no open position for the same strategy/underlying and proceed toward insertion. Active strategy authorization reads now support an explicit row lock, and the F&O paper-entry path uses that lock before the duplicate-position check. This serializes the authorization-scoped entry boundary without enabling live execution.
+
+### AUDIT-036 — Concurrent paper close could return stale mutation state — FIX IMPLEMENTED, CI PENDING
+**Priority:** P1  
+Paper close already used a conditional `OPEN` update, but callers could not distinguish a lost concurrent update from a successful mutation. The service now checks the affected-row count and refreshes the canonical trade state when another transaction closed it first. Regression coverage verifies the conditional-update and refresh contract.
