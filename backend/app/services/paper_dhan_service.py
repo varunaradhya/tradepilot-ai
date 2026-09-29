@@ -94,9 +94,11 @@ def run_dhan_paper_session(
     persisted = 0
     total_pnl = 0.0
     for trade in runner.orchestrator.trades():
-        record_trade_outcome(db, user_id, session, trade, strategy_version=strategy_version, model_version=str(trade.get("model_version") or "RULES_V1"), commit=False)
+        learning_event = record_trade_outcome(db, user_id, session, trade, strategy_version=strategy_version, model_version=str(trade.get("model_version") or "RULES_V1"), commit=False)
+        db.flush()
         db.add(PaperTrade(
             user_id=user_id, symbol=instrument.symbol, side="BUY", status="CLOSED",
+            learning_event_id=learning_event.id,
             quantity=int(trade["quantity"]), entry_price=float(trade["entry"]), stop_price=float(trade["stop"]),
             target_price=float(trade["target"]), exit_price=float(trade["exit"]), pnl=float(trade["pnl"]),
             reason=f"DHAN:{session}:{interval}", strategy_version=strategy_version,
