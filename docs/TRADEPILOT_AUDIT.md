@@ -150,3 +150,12 @@ The paper router retained `_sessions` and `_market` dictionaries plus a per-proc
 ### AUDIT-043 — Paper-state mutation needed a durable worker-serialization boundary
 **Priority:** P1
 Request-scoped reconstruction alone prevents stale in-memory state but does not serialize concurrent mutations. Paper signal and market-bar mutations now acquire a user-row lock, and their ML prediction/market-state writes can be deferred into the same database transaction as the durable session snapshot. Regression contracts verify the lock and deferred-commit boundaries. Runtime PostgreSQL concurrency execution remains CI/environment verification work.
+
+
+### AUDIT-044 — F&O position GET endpoint mutated the paper ledger
+**Priority:** P1
+`GET /fno/paper/positions` fetched live quotes and called the paper-trade update path, making a read operation capable of changing simulation state. The read endpoint is now observational; applying a broker bid mark is exposed through an explicit POST `/fno/paper/positions/mark` mutation endpoint. Provider error details are also sanitized at this boundary.
+
+### AUDIT-045 — Deployment environment was implicit
+**Priority:** P1
+The production Docker deployment required a JWT secret but did not explicitly set the application environment to production. The compose backend now sets `TRADEPILOT_ENV=production`, ensuring production-only configuration guards are actually active.
