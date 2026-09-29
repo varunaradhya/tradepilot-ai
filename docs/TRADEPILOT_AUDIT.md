@@ -60,3 +60,9 @@ Backtests already generated a strategy fingerprint, but trade-level learning evi
 ### AUDIT-021 — ML training dataset lineage was incomplete — FIX IMPLEMENTED, CI PENDING
 **Priority:** P1  
 ML models previously stored metrics and strategy version but not the dataset lineage represented by their training events or the feature-schema identity. Learning events now persist dataset fingerprints; training rejects missing dataset lineage and derives a deterministic aggregate fingerprint across the training datasets. Persisted models also record dataset fingerprint, strategy fingerprint and feature-schema fingerprint. This is lineage evidence, not proof of real-market performance.
+
+
+### AUDIT-024 — Legacy paper-session mutation path bypassed the hardened pipeline
+**Priority:** P0/P1  
+**Status:** FIX IMPLEMENTED — CI PENDING
+The legacy `/paper-session/bar` and `/paper-session/reset` endpoints were authenticated but writable through a separate in-memory coordinator. They did not enforce the persisted strategy-authorization/readiness pipeline or durable recovery state used by `/paper-trading/session/*`. Both mutation endpoints are now disabled with HTTP 410, leaving the durable authorized pipeline as the sole paper-session mutation path. A source-level regression contract prevents accidental reactivation.
