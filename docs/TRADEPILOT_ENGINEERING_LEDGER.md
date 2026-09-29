@@ -161,3 +161,10 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - Dhan provider error responses and retry logs no longer persist/print provider payloads or exception text.
 - Added regression contracts for migration lineage, token invalidation and Dhan error sanitization.
 - Status: IMPLEMENTED — CI PENDING.
+
+
+## Latest signal-pipeline hardening — 2026-09-29
+- Paper signal request completion now uses a row-level mutation lock and first-response-wins semantics.
+- Crash-left pending signal recovery now covers both equity and option paper trades.
+- Recovery is evidence-based and fail-closed: zero or multiple matching trades do not trigger creation/retry.
+- Regression coverage added for repeated completion, exact equity recovery, and ambiguous equity recovery.
