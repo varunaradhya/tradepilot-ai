@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+
 from app.dependencies.auth import get_current_user
 from app.db.database import get_db
 from app.models.user import User
@@ -31,9 +32,6 @@ from app.services.paper_session_state_service import load_paper_session_state, s
 from app.services.paper_market_state_service import load_market_state, save_market_state, clear_market_state
 
 router = APIRouter(prefix="/paper-trading", tags=["Paper Trading"])
-_sessions: dict[int, PaperTradingOrchestrator] = {}
-_market: dict[int, PaperMarketCoordinator] = {}
-_restored: set[int] = set()
 
 class PaperTradeCreate(BaseModel):
     symbol: str = Field(min_length=1, max_length=30); quantity: int = Field(gt=0, le=1_000_000); entry_price: float = Field(gt=0); stop_price: float = Field(gt=0); target_price: float = Field(gt=0); strategy_version: str = Field(default="V1", pattern="^(V1|V2)$")
@@ -66,21 +64,37 @@ def _owned(db: Session, user_id: int, trade_id: int) -> PaperTrade:
 
 
 def _orchestrator(user_id: int, db: Session | None = None) -> PaperTradingOrchestrator:
-    orchestrator = _sessions.setdefault(user_id, PaperTradingOrchestrator(PaperOrchestratorConfig(trade_direction="LONG_ONLY")))
-    if db is not None and user_id not in _restored:
+    """Build a request-scoped orchestrator from durable state.
+
+    Paper session state must not live as mutable process-global state because
+    multiple API workers can otherwise diverge. Each request reconstructs the
+    deterministic simulator from the database snapshot and callers persist
+    the resulting state before the request completes.
+    """
+    orchestrator = PaperTradingOrchestrator(
+        PaperOrchestratorConfig(trade_direction="LONG_ONLY")
+    )
+    if db is not None:
         state = load_paper_session_state(db, user_id)
         if state:
             orchestrator.restore_state(state)
-        _restored.add(user_id)
     return orchestrator
 
 
-def _persist_orchestrator(db: Session, user_id: int) -> None:
-    save_paper_session_state(db, user_id, _orchestrator(user_id, db).export_state())
+def _persist_orchestrator(
+    db: Session,
+    user_id: int,
+    orchestrator: PaperTradingOrchestrator | None = None,
+) -> None:
+    current = orchestrator or _orchestrator(user_id, db)
+    save_paper_session_state(db, user_id, current.export_state())
 
 
-def _market_coordinator(user_id: int, db: Session | None = None) -> PaperMarketCoordinator:
-    return _market.setdefault(user_id, PaperMarketCoordinator(orchestrator=_orchestrator(user_id, db)))
+def _market_coordinator(
+    user_id: int,
+    db: Session | None = None,
+) -> PaperMarketCoordinator:
+    return PaperMarketCoordinator(orchestrator=_orchestrator(user_id, db))
 
 
 def _research_rows(symbol: str, interval: str) -> list[dict]:
