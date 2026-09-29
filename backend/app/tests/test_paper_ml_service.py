@@ -111,3 +111,18 @@ def test_learning_events_are_ordered_by_feature_time_not_insert_id():
         ordered = _events(db, 1, "V1")
         assert ordered[0].event_at.hour == 9
         assert ordered[1].event_at.hour == 10
+
+
+def test_ml_qualification_gate_uses_validation_metrics():
+    from app.services.paper_ml_service import _qualification_gate
+
+    assert _qualification_gate({
+        "accuracy": 0.60,
+        "brier": 0.20,
+        "roc_auc": 0.55,
+    }) is True
+    assert _qualification_gate({
+        "accuracy": 0.49,
+        "brier": 0.10,
+        "roc_auc": 0.90,
+    }) is False
