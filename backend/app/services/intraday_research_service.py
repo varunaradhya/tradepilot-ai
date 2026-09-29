@@ -5,7 +5,7 @@ from datetime import date
 
 from app.brokers.dhan import DhanClient
 from app.services.dhan_historical_service import HistoricalRequest, fetch_intraday_history
-from app.services.instrument_master_service import InstrumentMaster, instrument_master
+from app.services.instrument_master_service import InstrumentMaster, instrument_master, resolve_nse_equity
 from app.services.intraday_backtest import IntradayBacktestConfig, run_intraday_backtest
 from app.services.research_store import ResearchStore, research_store
 
@@ -34,11 +34,7 @@ def download_intraday_dataset(
         raise ValueError("start must be before end")
     if interval not in {"1", "5", "15", "25", "60"}:
         raise ValueError("interval must be 1, 5, 15, 25, or 60 minutes")
-    needle = symbol.strip().upper()
-    matches = [item for item in master.load() if item.symbol.upper() == needle]
-    if not matches:
-        raise ValueError(f"NSE equity symbol not found: {needle}")
-    instrument = matches[0]
+    instrument = resolve_nse_equity(master, symbol)
     bars, diagnostics = fetch_intraday_history(
         client,
         HistoricalRequest(
