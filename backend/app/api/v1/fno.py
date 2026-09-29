@@ -430,6 +430,11 @@ def close_option_paper_trade(trade_id:int,exit_price:float=Query(gt=0),current_u
     return {"mode":"PAPER_ONLY","position":{"id":trade.id,"status":trade.status,"exit_price":trade.exit_price,"pnl":trade.pnl,"estimated_round_trip_costs":costs,"reason":trade.reason}}
 
 @router.post("/execute")
-def execute(data:FNOExecuteRequest,current_user:User=Depends(get_current_user),db=Depends(get_db)):
-    try: return execute_fno_decision(_dhan(db,current_user.id),data.decision,data.correlation_id)
-    except (DhanAPIError,ValueError) as exc: raise HTTPException(status_code=400,detail=str(exc)) from exc
+def execute(data:FNOExecuteRequest,current_user:User=Depends(get_current_user)):
+    # The execution boundary is deliberately broker-free while live execution is
+    # hard-locked. Do not decrypt or instantiate broker credentials here.
+    del current_user
+    try:
+        return execute_fno_decision(None, data.decision, data.correlation_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
