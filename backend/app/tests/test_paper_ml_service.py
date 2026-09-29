@@ -126,3 +126,29 @@ def test_ml_qualification_gate_uses_validation_metrics():
         "brier": 0.10,
         "roc_auc": 0.90,
     }) is False
+
+
+def test_trading_metrics_report_trade_level_evidence():
+    from app.services.paper_ml_service import _trading_metrics
+
+    events = [
+        PaperTradeLearningEvent(
+            user_id=1, symbol="TCS", session="2026-09-29",
+            strategy_version="V1", model_version="RULES_V1",
+            fingerprint="c" * 64, features_json="{}",
+            label=1, pnl=100.0, r_multiple=1.5, exit_reason="TARGET",
+        ),
+        PaperTradeLearningEvent(
+            user_id=1, symbol="TCS", session="2026-09-29",
+            strategy_version="V1", model_version="RULES_V1",
+            fingerprint="d" * 64, features_json="{}",
+            label=0, pnl=-50.0, r_multiple=-0.75, exit_reason="STOP",
+        ),
+    ]
+
+    metrics = _trading_metrics(events)
+    assert metrics["trades"] == 2
+    assert metrics["total_pnl"] == 50.0
+    assert metrics["expectancy"] == 25.0
+    assert metrics["win_rate_percent"] == 50.0
+    assert metrics["average_r_multiple"] == 0.375
