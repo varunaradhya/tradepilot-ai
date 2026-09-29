@@ -85,7 +85,13 @@ def claim_request(
     return record, True
 
 
-def complete_request(db: Session, record: PaperSignalRequest, response: dict[str, Any]) -> PaperSignalRequest:
+def complete_request(
+    db: Session,
+    record: PaperSignalRequest,
+    response: dict[str, Any],
+    *,
+    commit: bool = True,
+) -> PaperSignalRequest:
     """Complete a request exactly once and preserve the first durable response.
 
     The request row is reloaded under a mutation lock so a retry/recovery worker
@@ -105,7 +111,8 @@ def complete_request(db: Session, record: PaperSignalRequest, response: dict[str
     locked.response_json = json.dumps(
         response, sort_keys=True, separators=(",", ":"), default=str
     )
-    db.commit()
+    if commit:
+        db.commit()
     db.refresh(locked)
     return locked
 
