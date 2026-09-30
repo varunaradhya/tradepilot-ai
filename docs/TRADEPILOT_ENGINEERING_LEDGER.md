@@ -238,3 +238,13 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - Production Compose now requires explicit PostgreSQL password and CORS configuration, adds backend readiness health checks, and waits for backend readiness before starting the frontend.
 - Added `docs/TRADEPILOT_PRODUCTION_READINESS.md` covering backup/restore and environment-dependent runtime drills.
 - Status: IMPLEMENTED — runtime deployment verification remains pending.
+
+
+### 2026-09-30 — Current-head CI certification
+- GitHub Actions run **1640** for commit `29a8cb3bb829aab45c0d7ec53238ce457d8213f1` completed successfully.
+- Backend: 835 passed, 1 skipped, 102 warnings; compile and fresh Alembic migration passed.
+- Frontend production build passed.
+- Docker Compose deployment-config validation passed.
+- Release gate passed.
+- Earlier failed CI iterations exposed and fixed: explicit CORS CI environment, legacy brokerage compatibility, optional legacy open field, and the ML duplicate-timestamp test contract.
+- Status: **DONE — current-head CI verified**.
