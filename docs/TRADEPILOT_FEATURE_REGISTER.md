@@ -149,3 +149,13 @@
 - Production refuses the known development JWT secret; automatic schema creation defaults off in favor of Alembic.
 - Dhan provider errors/retry logs are sanitized to avoid leaking provider payloads or exception details.
 - Status: IMPLEMENTED — CI PENDING.
+
+
+### 2026-09-30 — Research-engine boundary audit
+- Walk-forward window builder now emits a valid single window when the dataset exactly fits train + validation sizes.
+- Overlapping validation windows are rejected by default.
+- Added regression coverage for exact-fit and overlap behavior.
+- Added an auditable India-equity intraday fee calculator with explicit brokerage, exchange/IPFT, SEBI turnover, STT, stamp duty and GST inputs.
+- The fee schedule is explicit/versioned rather than silently treating brokerage-only simulation as complete statutory-cost modeling.
+- Backtest session-boundary hardening is recorded in the engineering ledger and dedicated audit document.
+- Status: IMPLEMENTED — CI PENDING.
