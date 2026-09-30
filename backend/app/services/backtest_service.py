@@ -1,7 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
+from math import isfinite
 from typing import Sequence
+
+from app.services.india_equity_fee_service import (
+    IndiaEquityIntradayFeeSchedule,
+    NSE_EQUITY_INTRADAY_2026,
+    calculate_intraday_equity_fees,
+)
 
 from app.services.algo_strategy import StrategyConfig, generate_regime_momentum_signal, position_size
 from app.services.technical_service import atr
@@ -10,7 +18,7 @@ from app.services.technical_service import atr
 @dataclass(frozen=True)
 class BacktestConfig:
     initial_capital: float = 100000.0
-    brokerage_rate: float = 0.0003
+    fee_schedule: IndiaEquityIntradayFeeSchedule = NSE_EQUITY_INTRADAY_2026
     slippage_rate: float = 0.0005
     max_daily_loss_percent: float = 0.02
     max_trades_per_day: int = 3
@@ -43,12 +51,63 @@ def _session_key(row: dict) -> str:
     return text
 
 
-def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestConfig()) -> dict:
-    """Conservative long-only backtest with next-bar execution and realistic costs."""
-    if config.initial_capital <= 0:
-        raise ValueError("initial_capital must be positive")
+def _validate_backtest_rows(rows: Sequence[dict]) -> None:
+    """Fail closed on ordering, symbol mixing, and malformed OHLC input."""
     if not rows:
         raise ValueError("rows must not be empty")
+
+    parsed_timestamps: list[datetime] = []
+    symbols: set[str] = set()
+    for index, row in enumerate(rows):
+        if not isinstance(row, dict):
+            raise ValueError(f"row {index} must be an object")
+
+        timestamp = row.get("timestamp")
+        if timestamp is None or not str(timestamp).strip():
+            raise ValueError(f"row {index} missing timestamp")
+        try:
+            parsed = datetime.fromisoformat(str(timestamp).replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValueError(f"row {index} has invalid timestamp") from exc
+        parsed_timestamps.append(parsed)
+
+        symbol = row.get("symbol")
+        if symbol is not None and str(symbol).strip():
+            symbols.add(str(symbol).strip())
+        elif any("symbol" in item for item in rows):
+            raise ValueError("all rows must provide symbol when any row does")
+
+        for field in ("open", "high", "low", "close"):
+            if field not in row:
+                raise ValueError(f"row {index} missing {field}")
+            try:
+                value = float(row[field])
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"row {index} has invalid {field}") from exc
+            if not isfinite(value) or value <= 0:
+                raise ValueError(f"row {index} has non-positive or non-finite {field}")
+
+        if float(row["low"]) > float(row["high"]):
+            raise ValueError(f"row {index} has low above high")
+
+    if len(symbols) > 1:
+        raise ValueError("backtest rows must contain exactly one symbol")
+
+    for previous, current in zip(parsed_timestamps, parsed_timestamps[1:]):
+        if current <= previous:
+            raise ValueError("backtest timestamps must be strictly increasing and unique")
+
+    timezone_aware = [value.tzinfo is not None and value.utcoffset() is not None for value in parsed_timestamps]
+    if any(timezone_aware) and not all(timezone_aware):
+        raise ValueError("backtest timestamps must not mix timezone-aware and naive values")
+
+
+def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestConfig()) -> dict:
+    """Conservative long-only backtest with next-bar execution and explicit Indian-equity fees."""
+    if config.initial_capital <= 0:
+        raise ValueError("initial_capital must be positive")
+    _validate_backtest_rows(rows)
+    config.fee_schedule.validate()
     if config.max_daily_loss_percent <= 0 or config.max_trades_per_day < 1:
         raise ValueError("invalid portfolio risk limits")
 
@@ -71,13 +130,29 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
     def close_position(exit_price: float, reason: str) -> None:
         nonlocal cash, quantity, entry_price, stop, target, entry_cost, initial_risk, high_watermark, holding_bars, daily_pnl
         gross = quantity * exit_price
-        exit_cost = gross * config.brokerage_rate
-        # Entry brokerage was already deducted from cash at entry; include it
-        # exactly once in realized P&L and charge exit brokerage once here.
+        exit_fees = calculate_intraday_equity_fees(
+            buy_value=0.0,
+            sell_value=gross,
+            schedule=config.fee_schedule,
+        )
+        exit_cost = exit_fees["total"]
         pnl = quantity * (exit_price - entry_price) - entry_cost - exit_cost
         cash += gross - exit_cost
         daily_pnl += pnl
-        trades.append({"entry": entry_price, "exit": exit_price, "quantity": quantity, "pnl": pnl, "reason": reason, "holding_bars": holding_bars})
+        trades.append(
+            {
+                "entry": entry_price,
+                "exit": exit_price,
+                "quantity": quantity,
+                "pnl": pnl,
+                "reason": reason,
+                "holding_bars": holding_bars,
+                "entry_fees": entry_cost,
+                "exit_fees": exit_cost,
+                "total_fees": entry_cost + exit_cost,
+                "fee_schedule_version": config.fee_schedule.version,
+            }
+        )
         quantity = 0
         entry_price = stop = target = entry_cost = initial_risk = high_watermark = 0.0
         holding_bars = 0
@@ -218,6 +293,8 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
         "expectancy_per_trade": round(expectancy, 2),
         "max_drawdown_percent": round(max_drawdown, 2),
         "gross_profit": round(gross_profit, 2), "gross_loss": round(gross_loss, 2),
+        "total_fees": round(sum(float(t["total_fees"]) for t in trades), 2),
+        "fee_schedule_version": config.fee_schedule.version,
         "session_policy": "FLAT_AT_SESSION_END" if config.force_flat_at_session_end else "ALLOW_OVERNIGHT",
         "trades_detail": trades, "equity_curve": [round(value, 2) for value in equity_curve],
     }
