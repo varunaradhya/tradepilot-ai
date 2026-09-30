@@ -241,7 +241,7 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 
 
 ### 2026-09-30 — Current-head CI certification
-- GitHub Actions run **1640** for commit `29a8cb3bb829aab45c0d7ec53238ce457d8213f1` completed successfully.
+- GitHub Actions run **1646** for commit `f7fd9af8848087014f7aab29e8e2f6a4f5b5fda9` completed successfully.
 - Backend: 835 passed, 1 skipped, 102 warnings; compile and fresh Alembic migration passed.
 - Frontend production build passed.
 - Docker Compose deployment-config validation passed.
