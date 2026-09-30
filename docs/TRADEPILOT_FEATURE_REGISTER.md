@@ -166,3 +166,12 @@
 - Paper reconciliation orphan detection now includes learning events attached to open Dhan paper trades.
 - No new performance qualification is granted by these code changes.
 - Status: IMPLEMENTED — CI PENDING.
+
+
+## 2026-09-30 hardening additions
+
+- **Backtest input contract:** strict timestamp ordering/uniqueness, timezone-awareness consistency, OHLC validation, and single-symbol enforcement.
+- **Backtest cost accounting:** explicit versioned India-equity intraday fee schedule integrated into entry/exit cash and P&L, with per-trade fee evidence.
+- **Execution safety regressions:** gap-through-stop, conservative same-bar stop/target ordering, and daily-loss halting.
+- **Deployment safety:** explicit production secrets/CORS, backend readiness healthcheck, Compose dependency ordering, and Python runtime alignment with CI.
+- **Recovery documentation:** production backup/restore and runtime-drill runbook.
