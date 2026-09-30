@@ -50,7 +50,13 @@ def _dhan_client(db: Session, current_user: User) -> DhanClient:
 
 def _dataset_rows(symbol: str, interval: str, *, certified: bool = False):
     dataset = f"nse/{symbol.strip().upper()}_intraday_{interval}m"
-    bars = require_certified_dataset(dataset) [0] if certified else research_store.load(dataset)
+    if certified:
+        try:
+            bars, _ = require_certified_dataset(dataset)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+    else:
+        bars = research_store.load(dataset)
     rows = []
     for bar in bars:
         row = bar.as_row(); row["session"] = row["timestamp"].date().isoformat(); rows.append(row)
@@ -214,13 +220,13 @@ def intraday_regime_analysis(benchmark: str=Query(default="NIFTY", min_length=1,
 @router.get("/intraday/regime-report")
 def intraday_regime_report(symbol: str=Query(min_length=1,max_length=30), benchmark: str=Query(default="NIFTY", min_length=1,max_length=30), sector: str | None=Query(default=None,max_length=30), interval: str=Query(default="5",pattern="^(1|5|15|25|60)$"), current_user: User=Depends(get_current_user)):
     del current_user
-    _, rows = _dataset_rows(symbol, interval)
+    _, rows = _dataset_rows(symbol, interval, certified=True)
     if not rows: raise HTTPException(status_code=404,detail=f"Intraday dataset not found: {symbol.strip().upper()}")
-    _, benchmark_rows = _dataset_rows(benchmark, interval)
+    _, benchmark_rows = _dataset_rows(benchmark, interval, certified=True)
     if not benchmark_rows: raise HTTPException(status_code=404,detail=f"Benchmark dataset not found: {benchmark.strip().upper()}")
     sector_rows = None
     if sector:
-        _, sector_rows = _dataset_rows(sector, interval)
+        _, sector_rows = _dataset_rows(sector, interval, certified=True)
         if not sector_rows: raise HTTPException(status_code=404,detail=f"Sector dataset not found: {sector.strip().upper()}")
     return {"symbol":symbol.strip().upper(),"benchmark":benchmark.strip().upper(),"sector":sector.strip().upper() if sector else None,"interval":interval,**build_intraday_regime_report(rows, benchmark_rows, sector_rows)}
 
