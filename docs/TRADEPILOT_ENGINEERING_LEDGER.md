@@ -209,3 +209,17 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - Added `docs/TRADEPILOT_BACKTEST_AUDIT.md` with remaining backtest gaps.
 - Remaining: statutory India-equity fee model, entry-boundary dataset assertions, and broader malformed/duplicate/gap-risk regression coverage.
 - Status: IMPLEMENTED — CI PENDING.
+
+
+### 2026-09-30 — ML temporal tie handling
+- ML events continue to order by event time plus persistence ID.
+- Removed the incorrect global unique-timestamp requirement so simultaneous same-bar events can be evaluated deterministically.
+- Backward event-time movement remains fail-closed.
+- Added chronology regression coverage.
+- Status: IMPLEMENTED — CI PENDING.
+
+### 2026-09-30 — Paper reconciliation scope hardening
+- Orphan learning-event detection now considers all Dhan paper trades, including still-open trades.
+- Closed-trade reconciliation invariants remain strict for missing/broken links, symbol/session contamination, P&L mismatch and validation evidence.
+- Added regression coverage for open-trade event scope.
+- Status: IMPLEMENTED — CI PENDING.
