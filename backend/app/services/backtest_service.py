@@ -193,8 +193,14 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
             sizing_entry = actual_entry if actual_entry > actual_stop else planned_entry
             size = position_size(cash, sizing_entry, actual_stop, config.strategy)
             if size > 0:
-                new_entry_cost = size * actual_entry * config.brokerage_rate
-                total_entry_cash = size * actual_entry + new_entry_cost
+                new_entry_value = size * actual_entry
+                entry_fees = calculate_intraday_equity_fees(
+                    buy_value=new_entry_value,
+                    sell_value=0.0,
+                    schedule=config.fee_schedule,
+                )
+                new_entry_cost = entry_fees["total"]
+                total_entry_cash = new_entry_value + new_entry_cost
                 if total_entry_cash <= cash:
                     cash -= total_entry_cash
                     quantity = size
