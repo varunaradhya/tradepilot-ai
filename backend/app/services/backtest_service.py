@@ -127,6 +127,7 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
             sebi_turnover_rate=0.0,
             stt_sell_rate=0.0,
             stamp_buy_rate=0.0,
+            gst_rate=0.0,
         )
         if config.brokerage_rate is not None
         else config.fee_schedule
