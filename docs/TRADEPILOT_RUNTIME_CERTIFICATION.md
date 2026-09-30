@@ -171,3 +171,16 @@ The production/deployment hardening now includes explicit PostgreSQL password/CO
 **PARTIALLY CERTIFIED / NOT READY TO MERGE**
 
 Engineering CI is green for the current head. The remaining research blocker is still source-backed corporate-action adjustment metadata (or a separately documented dataset with explicit adjustment state). Production runtime/backup/restore drills remain environment-dependent. Live execution remains locked.
+
+
+## 2026-09-30 — Final current-head verification
+
+PR #46 current HEAD is `70a1ee5fbbbd9bd1a31c461c84a430dd30471985`. GitHub Actions run **1649** (`36755021474`) completed successfully for that exact SHA.
+
+- Backend: **PASS** — compile, fresh Alembic migration, and full backend test suite; **835 passed, 1 skipped, 102 warnings**.
+- Frontend: **PASS** — production build.
+- Deployment-config: **PASS** — Docker Compose validation.
+- Release-gate: **PASS**.
+- The earlier run-1646 verification is superseded as current-head evidence by run 1649.
+
+This is repository-level CI evidence only. It does not certify production runtime drills, corporate-action adjustment state, historical market-data quality, profitability, walk-forward performance, or ML performance. Live execution remains locked.
