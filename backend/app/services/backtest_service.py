@@ -113,7 +113,14 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
         raise ValueError("initial_capital must be positive")
     _validate_backtest_rows(rows)
     fee_schedule = (
-        replace(config.fee_schedule, brokerage_rate=config.brokerage_rate)
+        replace(
+            config.fee_schedule,
+            brokerage_rate=config.brokerage_rate,
+            exchange_and_ipft_rate=0.0,
+            sebi_turnover_rate=0.0,
+            stt_sell_rate=0.0,
+            stamp_buy_rate=0.0,
+        )
         if config.brokerage_rate is not None
         else config.fee_schedule
     )
