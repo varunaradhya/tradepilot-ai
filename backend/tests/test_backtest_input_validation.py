@@ -39,7 +39,8 @@ def test_backtest_rejects_backward_timestamps() -> None:
 
 def test_backtest_rejects_mixed_symbols() -> None:
     rows = _rows()
-    rows[0]["symbol"] = "TCS"
+    for row in rows:
+        row["symbol"] = "TCS"
     rows[1]["symbol"] = "INFY"
     with pytest.raises(ValueError, match="exactly one symbol"):
         backtest_service.run_daily_backtest(rows)
