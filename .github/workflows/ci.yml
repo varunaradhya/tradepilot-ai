@@ -71,6 +71,7 @@ jobs:
           POSTGRES_PASSWORD: ci-placeholder-password
           TRADEPILOT_JWT_SECRET: ci-placeholder-jwt-secret
           TRADEPILOT_BROKER_ENCRYPTION_KEY: ci-placeholder-broker-key
+          TRADEPILOT_CORS_ORIGINS: http://localhost:8080
         run: docker compose config --quiet
 
   release-gate:
