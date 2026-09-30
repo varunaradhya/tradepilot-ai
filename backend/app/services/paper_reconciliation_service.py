@@ -27,6 +27,18 @@ def _trade_session(trade: PaperTrade) -> str | None:
     return timestamp.astimezone(IST).date().isoformat() if timestamp else None
 
 
+def _orphan_learning_event_ids(
+    events: list[PaperTradeLearningEvent],
+    all_dhan_trades: list[PaperTrade],
+) -> list[int]:
+    linked_ids = {
+        trade.learning_event_id
+        for trade in all_dhan_trades
+        if trade.learning_event_id is not None
+    }
+    return [event.id for event in events if event.id not in linked_ids]
+
+
 def reconcile_paper_learning(db: Session, user_id: int) -> dict:
     """Reconcile Dhan paper trades across trade, learning, and validation ledgers."""
     all_dhan_trades = db.query(PaperTrade).filter(
@@ -50,13 +62,7 @@ def reconcile_paper_learning(db: Session, user_id: int) -> dict:
     ]
 
     linked_trade_ids = {trade.id for trade in trades if trade.learning_event_id in events_by_id}
-    all_dhan_learning_event_ids = {
-        trade.learning_event_id for trade in all_dhan_trades
-        if trade.learning_event_id is not None
-    }
-    orphan_learning_event_ids = [
-        event.id for event in events if event.id not in all_dhan_learning_event_ids
-    ]
+    orphan_learning_event_ids = _orphan_learning_event_ids(events, all_dhan_trades)
 
     contamination_trade_ids: list[int] = []
     pnl_mismatch_trade_ids: list[int] = []
