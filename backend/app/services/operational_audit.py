@@ -21,9 +21,12 @@ def record_event(db: Session, event_type: str, *, severity: str = "INFO", user_i
     return event
 
 
-def list_recent_events(db: Session, *, limit: int = 50) -> list[dict]:
+def list_recent_events(db: Session, *, limit: int = 50, user_id: int | None = None) -> list[dict]:
     limit = max(1, min(limit, 200))
-    events = db.query(OperationalAuditEvent).order_by(OperationalAuditEvent.created_at.desc()).limit(limit).all()
+    query = db.query(OperationalAuditEvent)
+    if user_id is not None:
+        query = query.filter(OperationalAuditEvent.user_id == user_id)
+    events = query.order_by(OperationalAuditEvent.created_at.desc()).limit(limit).all()
     result = []
     for event in events:
         try:
