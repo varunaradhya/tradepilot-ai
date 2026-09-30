@@ -199,3 +199,13 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - Added regression contracts for transaction boundaries.
 - Frontend hardening added persistent hash navigation, workflow-stage navigation, shared UI primitives, improved accessibility semantics, isolated stock-search IDs, explicit paper-exit confirmation and F&O risk visibility.
 - Status: IMPLEMENTED — CI / RUNTIME CERTIFICATION PENDING.
+
+
+### 2026-09-30 — Backtest session-boundary audit
+- Audited the existing next-bar-open backtest execution engine.
+- Fixed a pending-signal/session-crossing defect: a signal generated in one NSE session is now discarded at the next session boundary.
+- Intraday positions now flatten at the prior session close by default; overnight carry requires explicit `force_flat_at_session_end=False`.
+- Added regression coverage for signal carry-over and session-end flattening.
+- Added `docs/TRADEPILOT_BACKTEST_AUDIT.md` with remaining backtest gaps.
+- Remaining: statutory India-equity fee model, entry-boundary dataset assertions, and broader malformed/duplicate/gap-risk regression coverage.
+- Status: IMPLEMENTED — CI PENDING.
