@@ -69,11 +69,25 @@ Across all accepted full sessions, TCS had 1,196 strict sessions and 19 irregula
 
 The scan classified 2,840 of 24,274 sessions as `STRICT_VALID` and 21,434 as `INVALID`. Each of the 20 symbols had 142 strict-valid sessions; the remaining invalid-session counts range from 1,066 (ITC) to 1,073. The strict subset is an eligibility filter, not a repair of the broader **DATA QUALITY FAILURE**.
 
+### Corporate-action lineage investigation
+
+**BLOCKED — source adjustment state remains unavailable.** The current provenance model stores `corporate_action_adjusted` as an optional field, and the repository contains corporate-action infrastructure (`corporate_actions` table plus adjustment-factor helpers), but the certified Dhan-derived dataset has no source-backed adjustment-state field and no dataset-linked corporate-action record was identified that can establish whether these intraday OHLC values are adjusted or unadjusted.
+
+The Dhan historical-data API documentation describes the intraday response as OHLC, volume, and epoch timestamp data, but does not document an adjustment-state field or a parameter establishing that the returned intraday candles are corporate-action-adjusted. Therefore the provider documentation is not sufficient evidence to assign `ADJUSTED` or `UNADJUSTED` to the stored dataset. urlDhanHQ Historical Data API documentationhttps://dhanhq.co/docs/v2/historical-data/
+
+No corporate-action state was inferred from prices, symbol history, or the existence of the corporate-actions table. The correct state for the certified source remains **UNKNOWN**.
+
 ### Strict-subset research and validation status
 
 **NOT TESTED / DATA LIMITATION — lineage-aware real-data backtest, walk-forward, and PaperTrade → PaperMlLearningEvent → ValidationEvidence reconciliation.** A fixed three-session TCS strict-valid sample (`2026-01-01`, `2026-01-02`, `2026-01-05`) was selected deterministically. Each session has 75 exact-grid bars and a per-session fingerprint, but all carry corporate-action state `UNKNOWN`. The existing backtest lineage contract correctly rejects a fingerprinted run without explicit `corporate_action_adjusted` state. Assigning `True` or `False` would fabricate unavailable source metadata, so no P&L result, walk-forward result, paper/ML linkage, or performance claim was produced.
 
 The implementation continues to enforce completed-bar signals with `NEXT_BAR_OPEN` execution and prohibits a final-bar executable trade. Existing focused regression coverage validates those guards, but it does not turn the blocked real-data lineage exercise into performance evidence.
+
+## Verification of current certification branch
+
+**PASS — GitHub CI verified for current strict-session certification commit.** GitHub Actions run **1585** for commit `84a12e18efd84d88725245a023d322da7b05a628` completed successfully. Backend, frontend, deployment-config, and release-gate jobs all reported success. The backend job completed compile, fresh Alembic migration, and backend test execution successfully; the frontend job completed dependency installation and production build successfully.
+
+This current-head CI result supersedes the earlier local full-suite stall as the authoritative repository-level regression evidence for commit `84a12e18efd84d88725245a023d322da7b05a628`. The exact local pytest count is not asserted here because the local runner did not complete reliably.
 
 ## Historical import and provenance
 
@@ -83,7 +97,7 @@ Importer safety follow-up on `certification-sync`: **JSONL PASS** — one JSON o
 
 ## Backtest, walk-forward, and paper evidence
 
-The previously executed one-session real-data backtest made zero trades and is not performance evidence. Walk-forward remains **NOT TESTED / DATA LIMITATION** for that single session. End-to-end real historical paper-to-ML-to-validation reconciliation remains **NOT TESTED** because the real source fails strict interval certification; no broker credentials or orders were used.
+The previously executed one-session real-data backtest made zero trades and is not performance evidence. Walk-forward remains **NOT TESTED / DATA LIMITATION** for that single session. End-to-end real historical paper-to-ML-to-validation reconciliation remains **NOT TESTED** because the real source lacks explicit corporate-action adjustment state; no broker credentials or orders were used.
 
 ## Security
 
@@ -91,4 +105,15 @@ Live F&O execution is still locked in code: `TRADEPILOT_LIVE_EXECUTION_ENABLED=F
 
 ## Certification state
 
-The historical run was **PARTIALLY CERTIFIED**. Strict real-data interval validity and multi-session lineage/walk-forward/paper evidence remained outstanding. A later branch must run its own relevant runtime evidence before making a new certification claim.
+The current branch is **PARTIALLY CERTIFIED**:
+
+- Historical importer safety: **PASS**
+- Strict raw NSE session classification: **PASS**
+- Broad Dhan-derived 5-minute dataset: **DATA QUALITY FAILURE**
+- Strict-valid session research qualification: **BLOCKED — corporate-action state UNKNOWN**
+- Real-data backtest performance evidence: **NOT ESTABLISHED**
+- Walk-forward: **NOT TESTED / DATA LIMITATION**
+- Paper/ML/validation reconciliation: **NOT TESTED / DATA LIMITATION**
+- Live execution: **LOCKED**
+
+The next legitimate research-enablement step is to obtain source-backed corporate-action adjustment metadata for the dataset (or import a separately documented dataset whose adjustment state is explicit). The lineage contract should not be weakened to make the current source pass.
