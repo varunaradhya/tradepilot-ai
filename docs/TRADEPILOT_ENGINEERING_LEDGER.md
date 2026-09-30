@@ -285,3 +285,11 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - Scorecard and evidence aggregation now load requested datasets through the certified dataset helper.
 - This closes the identified API/service paths that could otherwise consume stored bars without provenance, structural-data, and corporate-action certification.
 - Status: IMPLEMENTED — current-head CI result still not observable.
+
+
+### 2026-10-01 — Portfolio risk consistency hardening
+- Audited the separate portfolio-risk layer without modifying the completed research-certification work.
+- Found that invalid existing portfolio positions with negative market value or negative stop-loss risk were silently clamped to zero instead of failing closed.
+- Added strict validation for existing positions and portfolio risk configuration bounds.
+- Added regression coverage for invalid exposure, invalid risk, and invalid configuration.
+- Status: IMPLEMENTED — current-head CI pending.
