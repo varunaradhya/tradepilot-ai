@@ -266,3 +266,14 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - Research API performance, walk-forward, experiment, research-lab, and regime analytics now use the certification boundary; data-quality inspection remains available separately so uncertified datasets can still be diagnosed.
 - Added regression coverage for missing provenance, fingerprint mismatch, unknown corporate-action state, and successful explicit-state certification.
 - Status: IMPLEMENTED — CI pending on current head; real-data qualification remains blocked until source-backed corporate-action state is available.
+
+
+
+### 2026-10-01 — Real intraday dataset quarantine and certification hardening
+- Audited the supplied local SQLite intraday dataset covering roughly 2021-08 through 2026-08.
+- Confirmed structural defects in the supplied audit: negative volume rows, weekend bars during NSE equity market hours, and synchronized large price discontinuities requiring source/corporate-action review.
+- Preserved the raw dataset as forensic input; no rows were silently corrected or deleted.
+- Research certification now independently rejects weekend bars, bars outside the regular NSE equity session, negative volume, and mixed source timezone offsets before analytics can consume the dataset.
+- Added regression coverage for weekend, negative-volume, and outside-session certification failures.
+- Large price moves remain a diagnostic/manual-review signal rather than an automatic rejection, because genuine corporate actions can create large discontinuities.
+- Status: IMPLEMENTED — current-head CI pending; supplied real dataset remains NOT CERTIFIED until rebuilt/revalidated with source-backed session/calendar and corporate-action evidence.
