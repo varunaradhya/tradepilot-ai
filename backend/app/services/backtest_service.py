@@ -15,6 +15,7 @@ class BacktestConfig:
     max_daily_loss_percent: float = 0.02
     max_trades_per_day: int = 3
     trailing_stop_enabled: bool = True
+    force_flat_at_session_end: bool = True
     strategy: StrategyConfig = StrategyConfig()
 
 
@@ -65,6 +66,7 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
     daily_trades = 0
     current_session = None
     halted = False
+    last_processed_close: float | None = None
 
     def close_position(exit_price: float, reason: str) -> None:
         nonlocal cash, quantity, entry_price, stop, target, entry_cost, initial_risk, high_watermark, holding_bars, daily_pnl
@@ -83,6 +85,14 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
     for i, row in enumerate(rows):
         session = _session_key(row)
         if session != current_session:
+            # A pending signal is valid only for the session in which the
+            # completed signal bar occurred. Never execute it on a later
+            # session's opening bar.
+            pending_signal = None
+            if current_session is not None and quantity and config.force_flat_at_session_end:
+                if last_processed_close is None:
+                    raise RuntimeError("missing prior close at session boundary")
+                close_position(_sell_fill(last_processed_close, config.slippage_rate), "SESSION_END")
             current_session = session
             daily_start_equity = cash + quantity * float(row.get("open", row.get("close", 0.0)))
             daily_pnl = 0.0
@@ -165,6 +175,7 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
 
         equity = cash + quantity * close if quantity else cash
         equity_curve.append(equity)
+        last_processed_close = close
         if equity - daily_start_equity <= -(daily_start_equity * config.max_daily_loss_percent):
             halted = True
             pending_signal = None
@@ -207,5 +218,6 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
         "expectancy_per_trade": round(expectancy, 2),
         "max_drawdown_percent": round(max_drawdown, 2),
         "gross_profit": round(gross_profit, 2), "gross_loss": round(gross_loss, 2),
+        "session_policy": "FLAT_AT_SESSION_END" if config.force_flat_at_session_end else "ALLOW_OVERNIGHT",
         "trades_detail": trades, "equity_curve": [round(value, 2) for value in equity_curve],
     }
