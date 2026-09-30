@@ -142,3 +142,32 @@ These changes are engineering hardening only. They do not establish strategy pro
 - ML performance evidence: NOT ESTABLISHED.
 - PaperTrade → ML → Validation reconciliation: code contract exists; real-data execution evidence NOT ESTABLISHED.
 - Live execution: LOCKED.
+
+## 2026-09-30 — Current-head CI and hardening verification
+
+The certification-sync branch was re-verified through GitHub Actions run **1640** for commit `29a8cb3bb829aab45c0d7ec53238ce457d8213f1`.
+
+- Backend: **PASS** — dependency installation, compile, fresh Alembic migration, and full backend test suite completed successfully.
+- Frontend: **PASS** — dependency installation and production build completed successfully.
+- Deployment-config: **PASS** — Docker Compose configuration validated with explicit CI secrets/CORS.
+- Release-gate: **PASS**.
+- Full backend result: **835 passed, 1 skipped, 102 warnings** in the final successful run.
+
+This verifies the current repository hardening commit. It does **not** remove the real-data certification blockers documented above.
+
+The backtest audit now additionally enforces:
+- timestamp ordering/uniqueness when timestamps are supplied,
+- single-symbol consistency when symbol metadata is supplied,
+- malformed OHLC rejection,
+- explicit fee integration,
+- gap-through-stop behavior,
+- conservative same-bar stop/target ordering,
+- daily-loss entry halting.
+
+The production/deployment hardening now includes explicit PostgreSQL password/CORS requirements, backend readiness health checks, Compose dependency ordering, Python 3.12 alignment with CI, and a documented backup/restore/runtime-drill procedure.
+
+### Current certification state
+
+**PARTIALLY CERTIFIED / NOT READY TO MERGE**
+
+Engineering CI is green for the current head. The remaining research blocker is still source-backed corporate-action adjustment metadata (or a separately documented dataset with explicit adjustment state). Production runtime/backup/restore drills remain environment-dependent. Live execution remains locked.
