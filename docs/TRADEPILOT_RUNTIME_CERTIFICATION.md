@@ -117,3 +117,28 @@ The current branch is **PARTIALLY CERTIFIED**:
 - Live execution: **LOCKED**
 
 The next legitimate research-enablement step is to obtain source-backed corporate-action adjustment metadata for the dataset (or import a separately documented dataset whose adjustment state is explicit). The lineage contract should not be weakened to make the current source pass.
+
+## 2026-09-30 engineering audit continuation
+
+The certification branch was extended with additional research-engine integrity hardening:
+
+- Backtest session-boundary safety: pending signals cannot cross an NSE session; intraday positions flatten at session end by default.
+- Walk-forward exact-fit handling: a dataset whose length exactly equals train + validation now yields one valid window.
+- Walk-forward overlap protection: validation windows cannot overlap.
+- India-equity fee model: explicit/versioned fee inputs now exist for brokerage, NSE transaction/IPFT, SEBI turnover, STT, stamp duty and GST. The fee model does not by itself certify a historical fee schedule; the effective-date schedule must match the research period.
+- ML temporal ordering: simultaneous event timestamps are allowed when deterministic event-time-plus-ID ordering is preserved; only backwards event-time movement is rejected.
+- Paper reconciliation: learning events attached to still-open Dhan paper trades are no longer falsely classified as orphan events.
+
+These changes are engineering hardening only. They do not establish strategy profitability or real-market qualification.
+
+### Certification status remains unchanged
+
+- Historical importer safety: PASS by source/code evidence; current-head CI must be verified.
+- Strict raw NSE session classification: PASS for the classifier contract.
+- Broad Dhan-derived five-minute dataset: DATA QUALITY FAILURE due source timestamp irregularities.
+- Corporate-action state for the certified Dhan-derived dataset: UNKNOWN.
+- Real-data backtest performance evidence: NOT ESTABLISHED.
+- Walk-forward performance evidence: NOT ESTABLISHED.
+- ML performance evidence: NOT ESTABLISHED.
+- PaperTrade → ML → Validation reconciliation: code contract exists; real-data execution evidence NOT ESTABLISHED.
+- Live execution: LOCKED.
