@@ -29,11 +29,28 @@ class PortfolioRiskDecision:
     position_count: int=0
 
 def evaluate_new_position(*,capital: float,proposed_market_value: float,proposed_risk_value: float,proposed_sector: str|None,existing_positions: Iterable[PortfolioPosition],config: PortfolioRiskConfig=PortfolioRiskConfig(),current_drawdown_fraction: float=0.0)->PortfolioRiskDecision:
-    if capital<=0 or proposed_market_value<=0 or proposed_risk_value<0 or current_drawdown_fraction<0:
-        return PortfolioRiskDecision(False,"INVALID_PORTFOLIO_INPUT",0,0,0,0)
-    positions=list(existing_positions); count=len(positions)
-    total_value=sum(max(0,p.market_value) for p in positions)+proposed_market_value
-    total_risk=sum(max(0,p.stop_loss_value) for p in positions)+proposed_risk_value
+    if capital <= 0 or proposed_market_value <= 0 or proposed_risk_value < 0 or current_drawdown_fraction < 0:
+        return PortfolioRiskDecision(False, "INVALID_PORTFOLIO_INPUT", 0, 0, 0, 0)
+    if not (
+        0 < config.max_total_exposure_fraction <= 1
+        and 0 < config.max_total_risk_fraction <= 1
+        and 0 < config.max_sector_exposure_fraction <= 1
+        and 0 < config.max_single_symbol_fraction <= 1
+        and config.max_positions >= 1
+        and 0 <= config.max_drawdown_fraction <= 1
+    ):
+        return PortfolioRiskDecision(False, "INVALID_PORTFOLIO_CONFIG", 0, 0, 0, 0)
+    positions = list(existing_positions)
+    if any(
+        not p.symbol.strip()
+        or p.market_value <= 0
+        or p.stop_loss_value < 0
+        for p in positions
+    ):
+        return PortfolioRiskDecision(False, "INVALID_EXISTING_POSITION", 0, 0, 0, len(positions))
+    count = len(positions)
+    total_value = sum(p.market_value for p in positions) + proposed_market_value
+    total_risk = sum(p.stop_loss_value for p in positions) + proposed_risk_value
     exposure=total_value/capital; risk=total_risk/capital
     if count>=config.max_positions: return PortfolioRiskDecision(False,"MAX_POSITIONS_LIMIT",exposure,risk,0,count)
     if current_drawdown_fraction>=config.max_drawdown_fraction: return PortfolioRiskDecision(False,"PORTFOLIO_DRAWDOWN_LIMIT",exposure,risk,0,count)
