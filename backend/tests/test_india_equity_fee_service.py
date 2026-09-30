@@ -22,7 +22,7 @@ def test_intraday_fee_model_breaks_out_each_charge() -> None:
     assert fees["stt"] == pytest.approx(25.25)
     assert fees["stamp_duty"] == pytest.approx(3.0)
     assert fees["gst"] == pytest.approx((60.3 + 6.1707 + 0.201) * 0.18)
-    assert fees["total"] == pytest.approx(sum(fees.values()))
+    assert fees["total"] == pytest.approx(sum(value for key, value in fees.items() if key != "total"))
 
 
 def test_fee_model_rejects_negative_turnover() -> None:
