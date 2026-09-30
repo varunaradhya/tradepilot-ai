@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from math import isfinite
 from typing import Sequence
@@ -19,6 +19,9 @@ from app.services.technical_service import atr
 class BacktestConfig:
     initial_capital: float = 100000.0
     fee_schedule: IndiaEquityIntradayFeeSchedule = NSE_EQUITY_INTRADAY_2026
+    # Backward-compatible override for existing callers/tests. New callers
+    # should prefer fee_schedule so all charges are explicit and versioned.
+    brokerage_rate: float | None = None
     slippage_rate: float = 0.0005
     max_daily_loss_percent: float = 0.02
     max_trades_per_day: int = 3
@@ -57,19 +60,21 @@ def _validate_backtest_rows(rows: Sequence[dict]) -> None:
         raise ValueError("rows must not be empty")
 
     parsed_timestamps: list[datetime] = []
+    has_any_timestamp = any(isinstance(row, dict) and row.get("timestamp") is not None for row in rows)
     symbols: set[str] = set()
     for index, row in enumerate(rows):
         if not isinstance(row, dict):
             raise ValueError(f"row {index} must be an object")
 
         timestamp = row.get("timestamp")
-        if timestamp is None or not str(timestamp).strip():
+        if has_any_timestamp and (timestamp is None or not str(timestamp).strip()):
             raise ValueError(f"row {index} missing timestamp")
-        try:
-            parsed = datetime.fromisoformat(str(timestamp).replace("Z", "+00:00"))
-        except ValueError as exc:
-            raise ValueError(f"row {index} has invalid timestamp") from exc
-        parsed_timestamps.append(parsed)
+        if timestamp is not None and str(timestamp).strip():
+            try:
+                parsed = datetime.fromisoformat(str(timestamp).replace("Z", "+00:00"))
+            except ValueError as exc:
+                raise ValueError(f"row {index} has invalid timestamp") from exc
+            parsed_timestamps.append(parsed)
 
         symbol = row.get("symbol")
         if symbol is not None and str(symbol).strip():
@@ -107,7 +112,12 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
     if config.initial_capital <= 0:
         raise ValueError("initial_capital must be positive")
     _validate_backtest_rows(rows)
-    config.fee_schedule.validate()
+    fee_schedule = (
+        replace(config.fee_schedule, brokerage_rate=config.brokerage_rate)
+        if config.brokerage_rate is not None
+        else config.fee_schedule
+    )
+    fee_schedule.validate()
     if config.max_daily_loss_percent <= 0 or config.max_trades_per_day < 1:
         raise ValueError("invalid portfolio risk limits")
 
@@ -133,7 +143,7 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
         exit_fees = calculate_intraday_equity_fees(
             buy_value=0.0,
             sell_value=gross,
-            schedule=config.fee_schedule,
+            schedule=fee_schedule,
         )
         exit_cost = exit_fees["total"]
         pnl = quantity * (exit_price - entry_price) - entry_cost - exit_cost
@@ -150,7 +160,7 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
                 "entry_fees": entry_cost,
                 "exit_fees": exit_cost,
                 "total_fees": entry_cost + exit_cost,
-                "fee_schedule_version": config.fee_schedule.version,
+                "fee_schedule_version": fee_schedule.version,
             }
         )
         quantity = 0
