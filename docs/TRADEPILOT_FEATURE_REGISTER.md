@@ -159,3 +159,10 @@
 - The fee schedule is explicit/versioned rather than silently treating brokerage-only simulation as complete statutory-cost modeling.
 - Backtest session-boundary hardening is recorded in the engineering ledger and dedicated audit document.
 - Status: IMPLEMENTED — CI PENDING.
+
+
+### 2026-09-30 — ML/reconciliation audit continuation
+- ML temporal ordering now permits equal event timestamps under deterministic event-time-plus-ID ordering.
+- Paper reconciliation orphan detection now includes learning events attached to open Dhan paper trades.
+- No new performance qualification is granted by these code changes.
+- Status: IMPLEMENTED — CI PENDING.
