@@ -2,7 +2,7 @@ name: TradePilot CI
 
 on:
   push:
-    branches: [main, 'feat/**', 'feature/**']
+    branches: [main, 'certification-sync', 'feat/**', 'feature/**']
   pull_request:
     branches: [main]
   workflow_dispatch:
