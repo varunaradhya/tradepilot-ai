@@ -4,6 +4,7 @@ from typing import Sequence
 
 from app.services.intraday_backtest import IntradayBacktestConfig, run_intraday_backtest
 from app.services.research_store import ResearchStore, research_store
+from app.services.research_dataset_gate import require_certified_dataset
 
 
 def _year(row: dict) -> int:
@@ -15,7 +16,7 @@ def _year(row: dict) -> int:
 
 def _rows(store: ResearchStore, symbol: str, interval: str) -> list[dict]:
     dataset = f"nse/{symbol.strip().upper()}_intraday_{interval}m"
-    bars = store.load(dataset)
+    bars, _ = require_certified_dataset(dataset, store=store)
     rows = []
     for bar in bars:
         row = bar.as_row()
