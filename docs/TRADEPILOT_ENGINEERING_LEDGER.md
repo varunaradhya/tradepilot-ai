@@ -307,3 +307,10 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - Password-reset debug-token output is now forcibly disabled when `TRADEPILOT_ENV` is production/prod, even if the debug environment variable is accidentally enabled.
 - Live execution remains hard-disabled.
 - Status: IMPLEMENTED — CI PENDING.
+
+
+### 2026-10-01 — Deployment verification automation
+- CI now provisions PostgreSQL 16 and runs Alembic upgrade/downgrade/re-upgrade against a real PostgreSQL service.
+- Added a guarded PostgreSQL custom-format backup/restore drill script. It refuses source-to-source restoration and requires explicit `CONFIRM_RESTORE=YES` plus a dedicated restore target.
+- These changes make PostgreSQL migration and recovery verification executable; an actual production backup/restore drill still requires a deployed environment.
+- Status: IMPLEMENTED — CI PENDING.
