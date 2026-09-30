@@ -67,6 +67,8 @@ Across all accepted full sessions, TCS had 1,196 strict sessions and 19 irregula
 
 The current import/provenance implementation uses `HistoricalImportRequest`, `DatasetProvenance`, deterministic `fingerprint_market_bars`, and the `import_rows`/format-specific import functions in `app.services.historical_data_import_service`. It persists imported data and provenance only to a caller-selected `ResearchStore`; source data is not altered.
 
+Importer safety follow-up on `certification-sync`: **JSONL PASS** — one JSON object per non-empty line is accepted through the same normalization, generic/NSE validation, fingerprint, provenance, and `ResearchStore` pipeline as CSV. Malformed JSONL and invalid/missing market-bar fields are rejected; no malformed line is silently skipped. **SQLite READ-ONLY PASS** — SQLite sources are opened with SQLite's `mode=ro` URI mechanism, and regression coverage verifies that the importer reads the expected rows while source schema and rows remain unchanged and write statements are rejected. **Parquet OPTIONAL / NOT RUNTIME-TESTED** — support remains conditional on `pyarrow`; its absence produces a clear dependency error. **PostgreSQL IMPLEMENTED / NOT RUNTIME-TESTED** — the interface remains available, but no external PostgreSQL server was used for certification.
+
 ## Backtest, walk-forward, and paper evidence
 
 The previously executed one-session real-data backtest made zero trades and is not performance evidence. Walk-forward remains **NOT TESTED / DATA LIMITATION** for that single session. End-to-end real historical paper-to-ML-to-validation reconciliation remains **NOT TESTED** because the real source fails strict interval certification; no broker credentials or orders were used.
