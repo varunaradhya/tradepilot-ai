@@ -73,7 +73,7 @@ def authorize_order(
         return ExecutionDecision(False, "KILL_SWITCH_ACTIVE", broker, mode)
 
     idempotency_key = context.idempotency_key or uuid4().hex
-    if not state.authorize_idempotency_key(idempotency_key):
+    if context.idempotency_key and context.idempotency_key.strip() in state.accepted_idempotency_keys:
         return ExecutionDecision(False, "DUPLICATE_ORDER_INTENT", broker, mode)
 
     try:
@@ -112,4 +112,6 @@ def authorize_order(
         return ExecutionDecision(False, "BROKER_UNSUPPORTED", broker, mode)
     if not capabilities.paper_orders:
         return ExecutionDecision(False, "PAPER_ORDERS_UNSUPPORTED", broker, mode)
+    if context.idempotency_key and not state.authorize_idempotency_key(idempotency_key):
+        return ExecutionDecision(False, "DUPLICATE_ORDER_INTENT", broker, mode)
     return ExecutionDecision(True, "PAPER_ORDER_AUTHORIZED", broker, mode)
