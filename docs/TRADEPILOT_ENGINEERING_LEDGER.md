@@ -258,3 +258,11 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - Legacy brokerage-rate compatibility, session-boundary behavior, walk-forward boundaries, equal ML event timestamps, and open-trade reconciliation scope remain covered by regression tests.
 - Live execution remains LOCKED. Corporate-action state remains UNKNOWN. Production runtime drills remain environment-dependent.
 - Status: **DONE — current-head engineering CI verified; research/production certification blockers remain.**
+
+
+### 2026-09-30 — Research certification gate hardening
+- Added a shared fail-closed research dataset gate requiring persisted provenance, VALID quality status, matching SHA-256 content fingerprint, and explicit corporate-action adjustment state for performance research.
+- Stored intraday backtests now require this certification boundary before analytics execute.
+- Research API performance, walk-forward, experiment, research-lab, and regime analytics now use the certification boundary; data-quality inspection remains available separately so uncertified datasets can still be diagnosed.
+- Added regression coverage for missing provenance, fingerprint mismatch, unknown corporate-action state, and successful explicit-state certification.
+- Status: IMPLEMENTED — CI pending on current head; real-data qualification remains blocked until source-backed corporate-action state is available.
