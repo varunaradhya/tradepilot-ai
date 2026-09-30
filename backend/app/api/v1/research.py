@@ -62,10 +62,10 @@ def _dataset_rows(symbol: str, interval: str, *, certified: bool = False):
         row = bar.as_row(); row["session"] = row["timestamp"].date().isoformat(); rows.append(row)
     return dataset, rows
 
-def _requested_rows(symbols: str, interval: str):
+def _requested_rows(symbols: str, interval: str, *, certified: bool = False):
     datasets = {}; missing = []
     for symbol in dict.fromkeys(s.strip().upper() for s in symbols.split(",") if s.strip()):
-        _, rows = _dataset_rows(symbol, interval)
+        _, rows = _dataset_rows(symbol, interval, certified=certified)
         if rows: datasets[symbol] = rows
         else: missing.append(symbol)
     return datasets, missing
@@ -189,7 +189,7 @@ def batch_research_intraday(symbols: str=Query(min_length=1, max_length=1000), i
 @router.get("/intraday/scorecard")
 def intraday_scorecard(symbols: str=Query(min_length=1, max_length=2000), interval: str=Query(default="5",pattern="^(1|5|15|25|60)$"), min_trades: int=Query(default=20, ge=1, le=100000), slippage: float=Query(default=0.001, ge=0, le=0.01), current_user: User = Depends(get_current_user)):
     del current_user
-    datasets, missing = _requested_rows(symbols, interval)
+    datasets, missing = _requested_rows(symbols, interval, certified=True)
     result = build_intraday_scorecard(datasets, ScorecardConfig(minimum_trades=min_trades, slippage_rate=slippage)); result["missing_datasets"] = missing; result["interval"] = interval
     return result
 
@@ -197,7 +197,7 @@ def intraday_scorecard(symbols: str=Query(min_length=1, max_length=2000), interv
 def intraday_evidence(symbols: str=Query(min_length=1, max_length=2000), interval: str=Query(default="5",pattern="^(1|5|15|25|60)$"), min_trades: int=Query(default=20, ge=1, le=100000), slippage: float=Query(default=0.001, ge=0, le=0.01), current_user: User = Depends(get_current_user)):
     del current_user
     requested = _requested_symbols(symbols)
-    datasets, missing = _requested_rows(symbols, interval)
+    datasets, missing = _requested_rows(symbols, interval, certified=True)
     scorecard = build_intraday_scorecard(datasets, ScorecardConfig(minimum_trades=min_trades, slippage_rate=slippage))
     result = aggregate_scorecards(scorecard.get("ranked", []), interval=interval, requested_symbols=requested, missing_symbols=missing)
     result["assumptions"] = scorecard.get("assumptions", {})
