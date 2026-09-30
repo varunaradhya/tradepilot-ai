@@ -82,7 +82,7 @@ def _validate_backtest_rows(rows: Sequence[dict]) -> None:
         elif any("symbol" in item for item in rows):
             raise ValueError("all rows must provide symbol when any row does")
 
-        for field in ("open", "high", "low", "close"):
+        for field in ("high", "low", "close"):
             if field not in row:
                 raise ValueError(f"row {index} missing {field}")
             try:
@@ -94,6 +94,13 @@ def _validate_backtest_rows(rows: Sequence[dict]) -> None:
 
         if float(row["low"]) > float(row["high"]):
             raise ValueError(f"row {index} has low above high")
+        if "open" in row:
+            try:
+                open_value = float(row["open"])
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"row {index} has invalid open") from exc
+            if not isfinite(open_value) or open_value <= 0:
+                raise ValueError(f"row {index} has non-positive or non-finite open")
 
     if len(symbols) > 1:
         raise ValueError("backtest rows must contain exactly one symbol")
