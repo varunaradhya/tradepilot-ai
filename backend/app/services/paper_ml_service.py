@@ -244,8 +244,6 @@ def train_model(db: Session, user_id: int, strategy_version: str = "V1") -> dict
             "reason": "NON_CHRONOLOGICAL_FEATURE_EVENTS",
             "samples": len(events),
         }
-    if any(events[index].event_at == events[index + 1].event_at for index in range(len(events) - 1)):
-        return {"trained": False, "reason": "NON_UNIQUE_FEATURE_EVENT_TIME", "samples": len(events)}
     lineage_strategy = {event.strategy_fingerprint for event in events}
     if len(lineage_strategy) != 1 or None in lineage_strategy:
         return {"trained": False, "reason": "MIXED_OR_MISSING_STRATEGY_LINEAGE", "samples": len(events)}
