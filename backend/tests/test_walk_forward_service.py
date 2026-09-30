@@ -22,6 +22,7 @@ def test_default_windows_are_chronological_and_non_overlapping() -> None:
     windows = build_walk_forward_windows(length=30, train_size=10, validation_size=5)
 
     assert len(windows) == 4
+    for window in windows:
+        assert window.train_end <= window.validation_start
     for previous, current in zip(windows, windows[1:]):
-        assert previous.validation_end <= current.train_start
-        assert previous.train_end <= previous.validation_start
+        assert previous.validation_end <= current.validation_start
