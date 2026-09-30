@@ -277,3 +277,11 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - Added regression coverage for weekend, negative-volume, and outside-session certification failures.
 - Large price moves remain a diagnostic/manual-review signal rather than an automatic rejection, because genuine corporate actions can create large discontinuities.
 - Status: IMPLEMENTED — current-head CI pending; supplied real dataset remains NOT CERTIFIED until rebuilt/revalidated with source-backed session/calendar and corporate-action evidence.
+
+
+### 2026-10-01 — Research analytics bypass audit
+- Audited remaining intraday research routes after the shared certification gate was introduced.
+- Batch research now enforces certification inside the batch service itself rather than relying only on an API pre-check.
+- Scorecard and evidence aggregation now load requested datasets through the certified dataset helper.
+- This closes the identified API/service paths that could otherwise consume stored bars without provenance, structural-data, and corporate-action certification.
+- Status: IMPLEMENTED — current-head CI result still not observable.
