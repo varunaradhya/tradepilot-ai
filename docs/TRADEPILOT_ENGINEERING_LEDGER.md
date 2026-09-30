@@ -293,3 +293,11 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - Added strict validation for existing positions and portfolio risk configuration bounds.
 - Added regression coverage for invalid exposure, invalid risk, and invalid configuration.
 - Status: IMPLEMENTED — current-head CI pending.
+
+
+### 2026-10-01 — Execution and operational boundary hardening
+- Hardened execution idempotency ordering: an explicit idempotency key is consumed only after every authorization/validation gate succeeds, so a rejected intent can be safely retried with the same key.
+- Added regression coverage for retry-after-rejection and duplicate-after-success behavior.
+- Hardened operational audit-event reads to scope results to the authenticated user; cross-user audit records are no longer exposed by the operations API.
+- No change to the research-certification/data-quality workstream.
+- Status: IMPLEMENTED — CI PENDING.
