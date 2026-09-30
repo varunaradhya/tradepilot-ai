@@ -223,3 +223,18 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - Closed-trade reconciliation invariants remain strict for missing/broken links, symbol/session contamination, P&L mismatch and validation evidence.
 - Added regression coverage for open-trade event scope.
 - Status: IMPLEMENTED — CI PENDING.
+
+
+### 2026-09-30 — Backtest input/fee hardening continuation
+- Backtest input validation now fails closed on missing/invalid timestamps, duplicate or backward timestamps, mixed timezone awareness, malformed OHLC values, and mixed symbols.
+- Integrated the explicit India-equity fee schedule into actual backtest cash/P&L accounting; entry and exit fee breakdowns are persisted in trade evidence.
+- Added regression coverage for duplicate/backward timestamps, symbol mixing, malformed OHLC, fee integration, gap-through-stop behavior, same-bar stop/target ordering, and daily-loss halting.
+- The configured fee schedule is versioned and surfaced in the result. Historical research must select a schedule appropriate to the data period; no historical statutory rates are inferred.
+- Status: IMPLEMENTED — CI PENDING.
+
+### 2026-09-30 — Deployment/CI hardening continuation
+- CI now triggers on `certification-sync` pushes as well as main/feature branches.
+- Production backend Docker image is aligned to Python 3.12, matching CI.
+- Production Compose now requires explicit PostgreSQL password and CORS configuration, adds backend readiness health checks, and waits for backend readiness before starting the frontend.
+- Added `docs/TRADEPILOT_PRODUCTION_READINESS.md` covering backup/restore and environment-dependent runtime drills.
+- Status: IMPLEMENTED — runtime deployment verification remains pending.
