@@ -63,6 +63,18 @@ Across all accepted full sessions, TCS had 1,196 strict sessions and 19 irregula
 
 **DATA QUALITY FAILURE — strict 5-minute data contract.** The original source’s epoch timestamps are irregular before any TradePilot processing, and the issue affects multiple symbols on the same dates. The dataset must not be used as one strict 5-minute historical series. Strictly on-grid sessions may be selected only after per-session validation, preserving the raw source and the rejection evidence. The validator should **not change**: accepting row counts/boundaries alone is insufficient, and no legitimate documented source convention was demonstrated.
 
+### Strict-valid session certification
+
+**PASS — deterministic raw-session classification.** `scripts/certify_strict_nse_sessions.py` reads the existing symbol-partitioned JSONL source and records, for every symbol/date, row count, first/last timestamp, exact 300-second interval evidence, generic quality diagnostics, NSE calendar diagnostics, per-session SHA-256 content/dataset fingerprint, and corporate-action state. It does not modify source data or timestamps. The local reproducible manifest was written to the ignored runtime path `backend/.runtime-certification/strict_nse_5m_session_manifest.json`.
+
+The scan classified 2,840 of 24,274 sessions as `STRICT_VALID` and 21,434 as `INVALID`. Each of the 20 symbols had 142 strict-valid sessions; the remaining invalid-session counts range from 1,066 (ITC) to 1,073. The strict subset is an eligibility filter, not a repair of the broader **DATA QUALITY FAILURE**.
+
+### Strict-subset research and validation status
+
+**NOT TESTED / DATA LIMITATION — lineage-aware real-data backtest, walk-forward, and PaperTrade → PaperMlLearningEvent → ValidationEvidence reconciliation.** A fixed three-session TCS strict-valid sample (`2026-01-01`, `2026-01-02`, `2026-01-05`) was selected deterministically. Each session has 75 exact-grid bars and a per-session fingerprint, but all carry corporate-action state `UNKNOWN`. The existing backtest lineage contract correctly rejects a fingerprinted run without explicit `corporate_action_adjusted` state. Assigning `True` or `False` would fabricate unavailable source metadata, so no P&L result, walk-forward result, paper/ML linkage, or performance claim was produced.
+
+The implementation continues to enforce completed-bar signals with `NEXT_BAR_OPEN` execution and prohibits a final-bar executable trade. Existing focused regression coverage validates those guards, but it does not turn the blocked real-data lineage exercise into performance evidence.
+
 ## Historical import and provenance
 
 The current import/provenance implementation uses `HistoricalImportRequest`, `DatasetProvenance`, deterministic `fingerprint_market_bars`, and the `import_rows`/format-specific import functions in `app.services.historical_data_import_service`. It persists imported data and provenance only to a caller-selected `ResearchStore`; source data is not altered.
