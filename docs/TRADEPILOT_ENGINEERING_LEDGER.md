@@ -248,3 +248,13 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - Release gate passed.
 - Earlier failed CI iterations exposed and fixed: explicit CORS CI environment, legacy brokerage compatibility, optional legacy open field, and the ML duplicate-timestamp test contract.
 - Status: **DONE — current-head CI verified**.
+
+
+### 2026-09-30 — Final current-head CI verification (run 1649)
+- PR #46 current head is `70a1ee5fbbbd9bd1a31c461c84a430dd30471985` on `certification-sync`.
+- GitHub Actions run **1649** (`36755021474`) completed successfully for that exact SHA.
+- Backend, frontend, deployment-config, and release-gate jobs all passed; backend reported 835 passed, 1 skipped, 102 warnings.
+- Engineering audit found no fee double-counting in cash accounting: entry/exit fees are deducted once from cash, while trade P&L uses the same fee evidence for reporting only.
+- Legacy brokerage-rate compatibility, session-boundary behavior, walk-forward boundaries, equal ML event timestamps, and open-trade reconciliation scope remain covered by regression tests.
+- Live execution remains LOCKED. Corporate-action state remains UNKNOWN. Production runtime drills remain environment-dependent.
+- Status: **DONE — current-head engineering CI verified; research/production certification blockers remain.**
