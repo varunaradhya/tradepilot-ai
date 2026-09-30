@@ -23,19 +23,23 @@ The audit covers the existing backend/app/services/backtest_service.py intraday 
 | Overnight exposure | A position could previously remain open across NSE sessions in the intraday engine. | FIXED by default; explicit opt-out exists |
 | Indicator history | Indicators are calculated only from rows through the completed signal bar. | PASS by code inspection |
 | Trailing stop | Current-bar high updates the trailing stop only after current-bar exit evaluation; the updated stop applies to later bars. | PASS by code inspection |
-| Dataset ordering | The service does not independently perform complete timestamp-order/session-grid validation. | OPEN — upstream data contract |
+| Dataset ordering | When timestamps are supplied, the service rejects malformed, duplicate, or backward timestamps; upstream NSE session-grid certification remains authoritative. | PASS — entry-boundary guard added |
 | Corporate actions | Fingerprinted research requires explicit corporate-action state. | PASS — existing lineage hardening |
 | Dataset fingerprint | Fingerprint is propagated through lineage-backed research results. | PASS — existing lineage hardening |
-| Multi-symbol contamination | The service accepts a row sequence without independently asserting a single symbol. | OPEN — upstream dataset contract |
-| Statutory charges | The engine models brokerage + slippage, not a complete NSE statutory fee schedule. | OPEN — implement configurable fee model |
+| Multi-symbol contamination | When symbol metadata is supplied, the service requires a single consistent symbol across the input. | PASS — entry-boundary guard added |
+| Statutory charges | The engine now supports an explicit/versioned India-equity fee schedule covering brokerage, exchange/IPFT, SEBI turnover, STT, stamp duty and GST, integrated into entry/exit cash and P&L. | PASS — integrated; historical effective-date schedule remains caller responsibility |
 
 ## Regression coverage added
 
-backend/tests/test_backtest_session_boundaries.py verifies:
+Regression coverage verifies:
 
 1. A signal created on the last bar of one session cannot execute on the next session.
 2. An open intraday position is flattened at the previous session close when the next session begins.
 3. Overnight carry is possible only through an explicit configuration opt-out.
+4. Gap-through-stop exits use the reachable next-bar open rather than an unreachable stop price.
+5. Same-bar stop/target ambiguity resolves conservatively to the stop.
+6. Daily-loss breach halts additional entries.
+7. Duplicate/backward timestamps, mixed symbols, malformed OHLC, and fee integration are rejected/verified.
 
 ## Research qualification boundary
 
