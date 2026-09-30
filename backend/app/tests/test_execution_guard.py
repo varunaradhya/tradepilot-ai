@@ -97,3 +97,48 @@ def test_order_value_limit_requires_verifiable_price():
     )
     assert result.allowed is False
     assert result.reason == "ORDER_VALUE_UNVERIFIABLE"
+
+
+def test_rejected_intent_does_not_poison_idempotency_key():
+    from app.services.execution_guard import ExecutionSafetyState
+
+    state = ExecutionSafetyState()
+    context = ExecutionContext(
+        "Dhan",
+        strategy_ready=False,
+        risk_approved=True,
+        idempotency_key="retry-me",
+    )
+    first = authorize_order(context, _order(), safety_state=state)
+    assert first.allowed is False
+    assert first.reason == "STRATEGY_NOT_READY"
+
+    retry = authorize_order(
+        ExecutionContext(
+            "Dhan",
+            strategy_ready=True,
+            risk_approved=True,
+            idempotency_key="retry-me",
+        ),
+        _order(),
+        safety_state=state,
+    )
+    assert retry.allowed is True
+    assert retry.reason == "PAPER_ORDER_AUTHORIZED"
+
+
+def test_authorized_intent_is_rejected_on_duplicate_key():
+    from app.services.execution_guard import ExecutionSafetyState
+
+    state = ExecutionSafetyState()
+    context = ExecutionContext(
+        "Dhan",
+        strategy_ready=True,
+        risk_approved=True,
+        idempotency_key="same-intent",
+    )
+    first = authorize_order(context, _order(), safety_state=state)
+    second = authorize_order(context, _order(), safety_state=state)
+    assert first.allowed is True
+    assert second.allowed is False
+    assert second.reason == "DUPLICATE_ORDER_INTENT"
