@@ -301,3 +301,9 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - Hardened operational audit-event reads to scope results to the authenticated user; cross-user audit records are no longer exposed by the operations API.
 - No change to the research-certification/data-quality workstream.
 - Status: IMPLEMENTED — CI PENDING.
+
+
+### 2026-10-01 — Authentication debug-surface hardening
+- Password-reset debug-token output is now forcibly disabled when `TRADEPILOT_ENV` is production/prod, even if the debug environment variable is accidentally enabled.
+- Live execution remains hard-disabled.
+- Status: IMPLEMENTED — CI PENDING.
