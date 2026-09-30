@@ -145,7 +145,7 @@ These changes are engineering hardening only. They do not establish strategy pro
 
 ## 2026-09-30 — Current-head CI and hardening verification
 
-The certification-sync branch was re-verified through GitHub Actions run **1640** for commit `29a8cb3bb829aab45c0d7ec53238ce457d8213f1`.
+The certification-sync branch was re-verified through GitHub Actions run **1646** for commit `f7fd9af8848087014f7aab29e8e2f6a4f5b5fda9`.
 
 - Backend: **PASS** — dependency installation, compile, fresh Alembic migration, and full backend test suite completed successfully.
 - Frontend: **PASS** — dependency installation and production build completed successfully.
