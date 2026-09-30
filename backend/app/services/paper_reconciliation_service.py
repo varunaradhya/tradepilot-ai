@@ -29,11 +29,11 @@ def _trade_session(trade: PaperTrade) -> str | None:
 
 def reconcile_paper_learning(db: Session, user_id: int) -> dict:
     """Reconcile Dhan paper trades across trade, learning, and validation ledgers."""
-    trades = db.query(PaperTrade).filter(
+    all_dhan_trades = db.query(PaperTrade).filter(
         PaperTrade.user_id == user_id,
-        PaperTrade.status == "CLOSED",
         PaperTrade.reason.like("DHAN:%"),
     ).all()
+    trades = [trade for trade in all_dhan_trades if trade.status == "CLOSED"]
     events = db.query(PaperTradeLearningEvent).filter(
         PaperTradeLearningEvent.user_id == user_id,
     ).all()
@@ -50,8 +50,12 @@ def reconcile_paper_learning(db: Session, user_id: int) -> dict:
     ]
 
     linked_trade_ids = {trade.id for trade in trades if trade.learning_event_id in events_by_id}
+    all_dhan_learning_event_ids = {
+        trade.learning_event_id for trade in all_dhan_trades
+        if trade.learning_event_id is not None
+    }
     orphan_learning_event_ids = [
-        event.id for event in events if event.id not in linked_event_ids
+        event.id for event in events if event.id not in all_dhan_learning_event_ids
     ]
 
     contamination_trade_ids: list[int] = []
