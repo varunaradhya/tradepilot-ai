@@ -59,3 +59,40 @@ def test_safe_position_is_approved():
     )
     assert result.allowed
     assert result.reason == "APPROVED"
+
+
+def test_invalid_existing_negative_exposure_is_rejected():
+    result = evaluate_new_position(
+        capital=100000,
+        proposed_market_value=10000,
+        proposed_risk_value=200,
+        proposed_sector="IT",
+        existing_positions=[PortfolioPosition("BAD", -5000, 100, "IT")],
+    )
+    assert not result.allowed
+    assert result.reason == "INVALID_EXISTING_POSITION"
+
+
+def test_invalid_existing_negative_risk_is_rejected():
+    result = evaluate_new_position(
+        capital=100000,
+        proposed_market_value=10000,
+        proposed_risk_value=200,
+        proposed_sector="IT",
+        existing_positions=[PortfolioPosition("BAD", 5000, -100, "IT")],
+    )
+    assert not result.allowed
+    assert result.reason == "INVALID_EXISTING_POSITION"
+
+
+def test_invalid_portfolio_config_is_rejected():
+    result = evaluate_new_position(
+        capital=100000,
+        proposed_market_value=10000,
+        proposed_risk_value=200,
+        proposed_sector="IT",
+        existing_positions=[],
+        config=PortfolioRiskConfig(max_total_risk_fraction=1.5),
+    )
+    assert not result.allowed
+    assert result.reason == "INVALID_PORTFOLIO_CONFIG"
