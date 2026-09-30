@@ -1,6 +1,7 @@
 from datetime import date, datetime
 
 from app.services.historical_data_service import MarketBar
+from app.services.dataset_provenance import fingerprint_market_bars
 from app.services.intraday_research_service import backtest_intraday_dataset, download_intraday_dataset
 
 
@@ -32,6 +33,7 @@ class FakeClient:
 class FakeStore:
     def __init__(self):
         self.saved = {}
+        self.provenance = {}
 
     def save(self, dataset, bars):
         self.saved[dataset] = list(bars)
@@ -39,6 +41,9 @@ class FakeStore:
 
     def load(self, dataset):
         return self.saved.get(dataset, [])
+
+    def get_provenance(self, dataset):
+        return self.provenance.get(dataset)
 
 
 def test_download_intraday_dataset_uses_nse_security_id():
@@ -70,6 +75,45 @@ def test_backtest_intraday_dataset_adds_sessions():
         price = 100 + i * 0.1
         rows.append(MarketBar(base.replace(minute=15 + i), price, price + 0.2, price - 0.2, price, 1000))
     store.saved["nse/TCS_intraday_5m"] = rows
+    store.provenance["nse/TCS_intraday_5m"] = {
+        "dataset_id": "nse/TCS_intraday_5m",
+        "symbol": "TCS",
+        "timeframe": "5m",
+        "quality_status": "VALID",
+        "content_fingerprint": fingerprint_market_bars(rows, symbol="TCS", timeframe="5m"),
+        "corporate_action_adjusted": False,
+    }
     result = backtest_intraday_dataset("TCS", store=store)
     assert result["symbol"] == "TCS"
     assert "trades" in result
+
+
+def test_backtest_intraday_dataset_rejects_unknown_corporate_action_state():
+    store = FakeStore()
+    base = datetime(2026, 1, 2, 9, 15)
+    rows = [MarketBar(base.replace(minute=15 + i), 100, 100.2, 99.8, 100, 1000) for i in range(35)]
+    store.saved["nse/TCS_intraday_5m"] = rows
+    store.provenance["nse/TCS_intraday_5m"] = {
+        "dataset_id": "nse/TCS_intraday_5m", "symbol": "TCS", "timeframe": "5m",
+        "quality_status": "VALID",
+        "content_fingerprint": fingerprint_market_bars(rows, symbol="TCS", timeframe="5m"),
+        "corporate_action_adjusted": None,
+    }
+    try:
+        backtest_intraday_dataset("TCS", store=store)
+    except ValueError as exc:
+        assert "corporate-action" in str(exc)
+    else:
+        raise AssertionError("Expected unknown corporate-action state to block research")
+
+
+def test_backtest_intraday_dataset_rejects_missing_provenance():
+    store = FakeStore()
+    base = datetime(2026, 1, 2, 9, 15)
+    store.saved["nse/TCS_intraday_5m"] = [MarketBar(base, 100, 100.2, 99.8, 100, 1000)]
+    try:
+        backtest_intraday_dataset("TCS", store=store)
+    except ValueError as exc:
+        assert "missing provenance" in str(exc)
+    else:
+        raise AssertionError("Expected missing provenance to block research")
