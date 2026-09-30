@@ -214,7 +214,7 @@ def run_daily_backtest(rows: Sequence[dict], config: BacktestConfig = BacktestCo
                 entry_fees = calculate_intraday_equity_fees(
                     buy_value=new_entry_value,
                     sell_value=0.0,
-                    schedule=config.fee_schedule,
+                    schedule=fee_schedule,
                 )
                 new_entry_cost = entry_fees["total"]
                 total_entry_cash = new_entry_value + new_entry_cost
