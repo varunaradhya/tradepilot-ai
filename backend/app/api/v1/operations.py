@@ -96,7 +96,7 @@ def audit_events(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict:
-    return {"events": list_recent_events(db, limit=limit)}
+    return {"events": list_recent_events(db, limit=limit, user_id=current_user.id)}
 
 
 @router.get("/broker-sandbox/{broker_name}")
