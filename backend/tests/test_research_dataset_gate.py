@@ -78,3 +78,45 @@ def test_certified_dataset_accepts_explicit_adjustment_state(tmp_path):
     loaded, provenance = require_certified_dataset("nse/TCS_5m", store=store)
     assert len(loaded) == 2
     assert provenance["corporate_action_adjusted"] is False
+
+
+def _save_certified(store, bars, corporate_action_adjusted=False):
+    store.save_with_provenance(
+        "nse/TCS_5m",
+        bars,
+        type("P", (), {
+            "dataset_id": "nse/TCS_5m",
+            "as_dict": lambda self: _provenance(bars, corporate_action_adjusted),
+        })(),
+    )
+
+
+def test_certified_dataset_rejects_weekend_bars(tmp_path):
+    store = ResearchStore(tmp_path)
+    bars = [
+        MarketBar(datetime(2026, 1, 3, 9, 15, tzinfo=timezone.utc), 100, 101, 99, 100.5, 10),
+        MarketBar(datetime(2026, 1, 3, 9, 20, tzinfo=timezone.utc), 100.5, 102, 100, 101.5, 12),
+    ]
+    _save_certified(store, bars)
+    with pytest.raises(ValueError, match="weekend_bars=2"):
+        require_certified_dataset("nse/TCS_5m", store=store)
+
+
+def test_certified_dataset_rejects_negative_volume(tmp_path):
+    store = ResearchStore(tmp_path)
+    bars = _bars()
+    bars[1] = MarketBar(bars[1].timestamp, bars[1].open, bars[1].high, bars[1].low, bars[1].close, -1)
+    _save_certified(store, bars)
+    with pytest.raises(ValueError, match="negative_volume_bars=1"):
+        require_certified_dataset("nse/TCS_5m", store=store)
+
+
+def test_certified_dataset_rejects_outside_regular_session(tmp_path):
+    store = ResearchStore(tmp_path)
+    bars = [
+        MarketBar(datetime(2026, 1, 5, 3, 0, tzinfo=timezone.utc), 100, 101, 99, 100.5, 10),
+        MarketBar(datetime(2026, 1, 5, 3, 5, tzinfo=timezone.utc), 100.5, 102, 100, 101.5, 12),
+    ]
+    _save_certified(store, bars)
+    with pytest.raises(ValueError, match="outside_session_bars=2"):
+        require_certified_dataset("nse/TCS_5m", store=store)
