@@ -29,6 +29,7 @@ class NSESessionClassification:
 # These exceptional dates are source-backed against the NSE circulars captured
 # in docs/REAL_DATA_VALIDATION_2026-10-01.md. Mock sessions are never researchable.
 NSE_SPECIAL_SESSION_WINDOWS = {
+    date(2022, 10, 24): (NSESessionWindow(time(18, 15), time(19, 15)),),
     date(2023, 11, 12): (NSESessionWindow(time(18, 15), time(19, 15)),),
     date(2024, 1, 20): (NSESessionWindow(REGULAR_OPEN, REGULAR_CLOSE),),
     date(2024, 3, 2): (
@@ -39,6 +40,7 @@ NSE_SPECIAL_SESSION_WINDOWS = {
         NSESessionWindow(time(9, 15), time(10, 0)),
         NSESessionWindow(time(11, 30), time(12, 30)),
     ),
+    date(2024, 11, 1): (NSESessionWindow(time(18, 0), time(19, 0)),),
     date(2025, 2, 1): (NSESessionWindow(REGULAR_OPEN, REGULAR_CLOSE),),
     date(2026, 2, 1): (NSESessionWindow(REGULAR_OPEN, REGULAR_CLOSE),),
 }
