@@ -203,7 +203,12 @@ jobs:
           TRADEPILOT_BROKER_ENCRYPTION_KEY: ci-deployment-broker-key-32-bytes-minimum!!
           TRADEPILOT_CORS_ORIGINS: http://localhost:8080
           TRADEPILOT_AI_PROVIDER: mock
-        run: docker compose up -d --build
+        run: |
+          if ! docker compose up -d --build; then
+            docker compose ps || true
+            docker compose logs database backend || true
+            exit 1
+          fi
       - name: Wait for application readiness
         env:
           POSTGRES_PASSWORD: ci-deployment-postgres
@@ -267,6 +272,12 @@ jobs:
           exit 1
       - name: Tear down deployed stack
         if: always()
+        env:
+          POSTGRES_PASSWORD: ci-deployment-postgres
+          TRADEPILOT_JWT_SECRET: ci-deployment-jwt-secret-32-bytes-minimum!!
+          TRADEPILOT_BROKER_ENCRYPTION_KEY: ci-deployment-broker-key-32-bytes-minimum!!
+          TRADEPILOT_CORS_ORIGINS: http://localhost:8080
+          TRADEPILOT_AI_PROVIDER: mock
         run: docker compose down -v
 
 
