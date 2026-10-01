@@ -20,6 +20,8 @@ export default function TradeDecisionPage() {
   const [decision, setDecision] = useState<Decision | null>(null);
   const closeValues = useMemo(() => closes.split(",").map(Number).filter(Number.isFinite), [closes]);
   const [generated,setGenerated] = useState<{symbol:string;session:string;action:string;confidence:number;entry:number;stop:number;target:number}|null>(null);
+  const [paperResult,setPaperResult] = useState<{accepted?:boolean;reason?:string;idempotent_replay?:boolean;mode?:string}|null>(null);
+  const [sending,setSending] = useState(false);
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem("tradepilot:generatedSignal");
@@ -50,6 +52,22 @@ export default function TradeDecisionPage() {
   }
   const ready = decision?.status === "PAPER_READY";
   const confidence = decision?.confidence ?? 0;
+  async function sendToPaper() {
+    if (!decision || decision.status !== "PAPER_READY" || decision.action !== "BUY") return;
+    setSending(true); setError(""); setPaperResult(null);
+    try {
+      const source = generated ?? {
+        symbol, session: new Date().toISOString().slice(0, 10), action: decision.action,
+        confidence: decision.confidence, entry: decision.entry ?? 0, stop: decision.stop ?? 0, target: decision.target ?? 0
+      };
+      const result = await api.post<{accepted?:boolean;reason?:string;idempotent_replay?:boolean;mode?:string}>(
+        "/paper-trading/session/signal",
+        { ...source, interval: "5", strategy_version: "V1", lot_size: 1 }
+      );
+      setPaperResult(result);
+    } catch (e) { setError(e instanceof Error ? e.message : "Paper handoff failed"); }
+    finally { setSending(false); }
+  }
 
   return <main className="tp-page">
     <header className="flex flex-wrap items-end justify-between gap-5"><div><div className="tp-live-line">Decision engine · paper only</div><h1 className="tp-page-title mt-2 text-4xl font-black">Trade Decision</h1><p className="tp-page-subtitle mt-2 max-w-2xl text-sm">One auditable path from market evidence to position sizing and paper authorization. Live execution is locked.</p></div><div className="rounded-xl border border-emerald-400/15 bg-emerald-400/[.05] px-4 py-2.5 text-right"><p className="tp-section-label">Safety boundary</p><p className="mt-1 text-xs font-black text-emerald-300">🔒 LIVE ORDERS DISABLED</p></div></header>
@@ -63,7 +81,7 @@ export default function TradeDecisionPage() {
           <div className="mt-6 grid gap-3 sm:grid-cols-3">{[["ENTRY",fmt(decision.entry)],["STOP",fmt(decision.stop)],["TARGET",fmt(decision.target)]].map(([label,value])=><div key={label} className="rounded-2xl border border-white/10 bg-white/[.025] p-4"><p className="tp-section-label">{label}</p><p className="tp-number mt-2 text-xl font-black text-white">{value}</p></div>)}</div>
           <div className="mt-3 grid gap-3 sm:grid-cols-3">{[["RISK / REWARD",decision.risk_reward?`1 : ${decision.risk_reward.toFixed(2)}`:"—"],["QUANTITY",String(decision.quantity)],["MAX LOSS",fmt(decision.max_loss)]].map(([label,value])=><div key={label} className="rounded-2xl border border-white/10 bg-white/[.025] p-4"><p className="tp-section-label">{label}</p><p className="tp-number mt-2 text-lg font-black text-white">{value}</p></div>)}</div>
           <div className="mt-5 grid gap-3 md:grid-cols-2"><div className="rounded-2xl bg-gradient-to-br from-violet-600/20 to-violet-400/[.03] p-5 ring-1 ring-violet-400/10"><p className="tp-section-label">Capital required</p><p className="tp-number mt-2 text-2xl font-black text-white">{fmt(decision.capital_required)}</p></div><div className="rounded-2xl border border-white/10 bg-white/[.02] p-5"><p className="tp-section-label">Decision rationale</p><p className="mt-2 text-sm font-semibold leading-6 text-slate-300">{decision.reason.replaceAll("_", " ")}</p><p className="mt-2 text-[10px] font-bold uppercase tracking-wider text-slate-600">{decision.broker} · {decision.mode}</p></div></div>
-          <div className={`mt-5 flex flex-col gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center sm:justify-between ${ready?"border-emerald-400/15 bg-emerald-400/[.05]":"border-amber-400/15 bg-amber-400/[.05]"}`}><div><p className={`text-sm font-black ${ready?"text-emerald-300":"text-amber-300"}`}>{ready?"Paper trade ready":"No paper authorization"}</p><p className="mt-1 text-xs text-slate-500">TradePilot does not send broker orders from this screen.</p></div><button type="button" onClick={evaluate} disabled={loading} className="rounded-xl border border-white/10 bg-white/[.04] px-4 py-2.5 text-xs font-black text-white hover:border-white/20">Re-evaluate</button></div>
+          <div className={`mt-5 flex flex-col gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center sm:justify-between ${ready?"border-emerald-400/15 bg-emerald-400/[.05]":"border-amber-400/15 bg-amber-400/[.05]"}`}><div><p className={`text-sm font-black ${ready?"text-emerald-300":"text-amber-300"}`}>{ready?"Paper trade ready":"No paper authorization"}</p><p className="mt-1 text-xs text-slate-500">TradePilot does not send broker orders from this screen.</p></div>{paperResult&&<div className="mt-3 rounded-xl border border-violet-400/15 bg-violet-400/[.05] p-4 text-xs font-semibold text-violet-200">{paperResult.accepted===false?`Paper gate blocked: ${paperResult.reason??"not authorized"}`:`Paper session accepted${paperResult.idempotent_replay?" (idempotent replay)":""}.`}</div>}<button type="button" onClick={evaluate} disabled={loading} className="rounded-xl border border-white/10 bg-white/[.04] px-4 py-2.5 text-xs font-black text-white hover:border-white/20">Re-evaluate</button>{ready&&<button type="button" onClick={()=>void sendToPaper()} disabled={sending} className="rounded-xl bg-emerald-500 px-4 py-2.5 text-xs font-black text-slate-950 disabled:opacity-50">{sending?"Sending…":"Send to Paper →"}</button>}</div>
         </div>}
       </section>
     </div>
