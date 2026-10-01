@@ -71,11 +71,17 @@ async function request<T>(url: string, options: RequestInit = {}, timeoutMs = RE
   const token = localStorage.getItem(ACCESS_TOKEN_KEY);
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+  const callerSignal = options.signal;
+  const abortFromCaller = () => controller.abort();
+  if (callerSignal) {
+    if (callerSignal.aborted) controller.abort();
+    else callerSignal.addEventListener("abort", abortFromCaller, { once: true });
+  }
 
   try {
     const response = await fetch(url, {
       ...options,
-      signal: options.signal ?? controller.signal,
+      signal: controller.signal,
       headers: {
         "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -113,6 +119,7 @@ async function request<T>(url: string, options: RequestInit = {}, timeoutMs = RE
     throw error;
   } finally {
     window.clearTimeout(timeout);
+    callerSignal?.removeEventListener("abort", abortFromCaller);
   }
 }
 
