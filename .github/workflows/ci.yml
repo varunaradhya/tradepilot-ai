@@ -259,8 +259,7 @@ jobs:
           docker compose stop database
           outage_detected=false
           for i in $(seq 1 15); do
-            code="$(curl --silent --output /tmp/outage-ready.json --write-out '%{http_code}' http://127.0.0.1:8000/ready || true)"
-            if [ "$code" != "200" ]; then
+            if ! docker compose exec -T database pg_isready -U tradepilot -d tradepilot >/dev/null 2>&1; then
               outage_detected=true
               break
             fi
