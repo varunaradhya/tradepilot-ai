@@ -272,7 +272,7 @@ jobs:
 
   release-gate:
     if: always()
-    needs: [backend, frontend, deployment-config, postgres-migrations, postgres-backup-restore]
+    needs: [backend, frontend, deployment-config, deployment-recovery, postgres-migrations, postgres-backup-restore]
     runs-on: ubuntu-latest
     steps:
       - name: Enforce release gate
@@ -282,14 +282,17 @@ jobs:
           POSTGRES_RESULT: ${{ needs.postgres-migrations.result }}
           FRONTEND_RESULT: ${{ needs.frontend.result }}
           DEPLOYMENT_RESULT: ${{ needs.deployment-config.result }}
+          RECOVERY_RESULT: ${{ needs.deployment-recovery.result }}
         run: |
           echo "postgres-backup-restore=${BACKUP_RESTORE_RESULT}"
           echo "backend=${BACKEND_RESULT}"
           echo "postgres-migrations=${POSTGRES_RESULT}"
           echo "frontend=${FRONTEND_RESULT}"
           echo "deployment-config=${DEPLOYMENT_RESULT}"
+          echo "deployment-recovery=${RECOVERY_RESULT}"
           test "${BACKUP_RESTORE_RESULT}" = "success"
           test "${BACKEND_RESULT}" = "success"
           test "${POSTGRES_RESULT}" = "success"
           test "${FRONTEND_RESULT}" = "success"
           test "${DEPLOYMENT_RESULT}" = "success"
+          test "${RECOVERY_RESULT}" = "success"
