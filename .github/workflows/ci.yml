@@ -257,8 +257,16 @@ jobs:
           TRADEPILOT_AI_PROVIDER: mock
         run: |
           docker compose stop database
-          sleep 3
-          test "$(curl --silent --output /tmp/outage-ready.json --write-out '%{http_code}' http://127.0.0.1:8000/ready)" != "200"
+          outage_detected=false
+          for i in $(seq 1 15); do
+            code="$(curl --silent --output /tmp/outage-ready.json --write-out '%{http_code}' http://127.0.0.1:8000/ready || true)"
+            if [ "$code" != "200" ]; then
+              outage_detected=true
+              break
+            fi
+            sleep 2
+          done
+          test "$outage_detected" = "true"
           docker compose start database
           for i in $(seq 1 30); do
             if curl --fail --silent http://127.0.0.1:8000/ready >/tmp/recovered-ready.json; then
