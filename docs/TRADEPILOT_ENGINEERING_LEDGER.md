@@ -27,3 +27,12 @@
 - Reused shared premium cards, controls, typography, status treatments and responsive page spacing so the major user workflows now present as one cohesive trading cockpit.
 - Preserved existing API behavior, paper-only execution boundaries and broker safety controls while changing presentation only.
 - CI deployment recovery and release-gate validation remain green after the database-outage drill hardening.
+
+
+## 2026-10-01 — Product scope reset toward the core algo-trading tool
+- User review of the local UI identified that the product had expanded beyond the intended near-term goal.
+- Refocused the frontend navigation and dashboard around the core algorithm workflow: Strategy Lab → Signal Scanner → Trade Decision → Paper Trading.
+- Removed portfolio, transaction, broker-center, F&O and general utility workflows from the primary navigation without deleting their backend capabilities, preserving them for possible later phases.
+- Replaced the portfolio-oriented dashboard with an algorithm command center showing paper performance, execution guard status and direct access to the core workflow.
+- Fixed a paper-trading readiness response-shape mismatch that could crash the Paper Trading screen during render.
+- Live broker execution remains disabled.
