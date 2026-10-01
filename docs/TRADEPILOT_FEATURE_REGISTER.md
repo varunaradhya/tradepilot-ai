@@ -189,3 +189,9 @@
 - Completed the source-backed NSE exceptional-session boundary used by research certification, including documented Muhurat sessions and explicit rejection of unknown weekend sessions.
 - Re-ran structural checks against the supplied intraday dataset: 0 unknown weekend rows and 0 outside-known-window rows; 18 negative-volume rows remain.
 - The dataset is still not certified. No profitability or strategy-performance qualification is granted.
+
+
+### 2026-10-01 — NSE holiday calendar completion
+- Added the remaining NSE-published 2026 equity holidays currently relevant to the loaded annual calendar: 19-Feb, 19-Mar, 01-Apr and 26-Aug.
+- Added regression coverage and verified current HEAD with GitHub Actions run 1753.
+- Future special-session timing is not invented when the exchange has not published the window.
