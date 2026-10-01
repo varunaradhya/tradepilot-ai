@@ -58,7 +58,11 @@ The 722 weekday outside-session rows are concentrated on:
 - 2022-10-24 — 240 rows, 18:15–19:10 IST
 - 2024-11-01 — 228 rows, 18:00–18:55 IST
 
-These dates still require exchange-calendar/session evidence before being accepted. They should remain quarantined for now.
+These are now source-resolved Muhurat sessions:
+- **2022-10-24 — LIVE SPECIAL:** NSE Capital Market circular NSE/CMTR/54023 specifies normal market 18:15–19:15. The dataset observations fall inside that window. citeturn2search2
+- **2024-11-01 — LIVE SPECIAL:** NSE Capital Market circular NSE/CMTR/64628 specifies normal market 18:00–19:00. The dataset observations fall inside that window. citeturn0search19
+
+Therefore these 468 rows should not be quarantined merely for being outside normal 09:15–15:30 hours. They are now represented in the source-backed session calendar.
 
 ## Timestamp spacing
 
@@ -74,21 +78,27 @@ However, the weekend finding is now more precise:
 
 - 2022-04-09 and 2022-04-30 are documented mock sessions and must be excluded from live-market research.
 - 2023-11-12, 2024-01-20, 2024-03-02, 2024-05-18, 2025-02-01, and 2026-02-01 are documented live/special trading dates and should not be rejected solely because they fall on Saturday/Sunday.
-- The current hard-coded weekend rejection in TradePilot therefore needs a source-backed session-calendar model before certification can be finalized.
+- 2022-10-24 and 2024-11-01 are also documented live Muhurat sessions and are now included in the source-backed session calendar. citeturn2search2turn0search19
+- The certification gate now uses explicit REGULAR, LIVE_SPECIAL, MOCK, HOLIDAY, and UNKNOWN session classifications.
 - The 2022-04-09 negative-volume records remain a separate structural failure.
-- The weekday after-hours records remain unresolved and quarantined.
+- After applying the session calendar, the previously unresolved 468 weekday after-hours rows are explained by documented Muhurat sessions; no unknown weekend rows remain in the analyzed dataset.
 - Persisted provenance and explicit corporate-action adjustment state are still required.
 
-## Next engineering action
+## Session-calendar implementation status
 
-Implement a source-backed NSE equity session calendar abstraction that distinguishes:
+The source-backed NSE equity session calendar is now implemented in backend/app/services/nse_equity_calendar.py and consumed by the research certification gate.
+
+It distinguishes:
 
 1. regular trading dates;
 2. documented live special-session dates and their permitted windows;
 3. documented mock/non-live sessions;
-4. unknown exceptional dates, which fail closed.
+4. holidays;
+5. unknown exceptional dates, which fail closed.
 
-The certification gate should consume this calendar rather than using a blanket weekend rejection. No raw data should be deleted or repaired as part of this change.
+Regression tests cover Muhurat sessions, mock sessions, multi-window special sessions, unknown weekends, and out-of-window observations.
+
+No raw data was deleted or repaired as part of this change.
 
 ## Important safety constraint
 
