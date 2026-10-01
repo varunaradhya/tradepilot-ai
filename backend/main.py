@@ -23,7 +23,6 @@ from app.api.v1.paper_evidence import router as paper_evidence_router
 from app.api.v1.paper_ml import router as paper_ml_router
 from app.api.v1.paper_monitoring import router as paper_monitoring_router
 from app.api.v1.paper_replay import router as paper_replay_router
-from app.api.v1.paper_session import router as paper_session_router
 from app.api.v1.paper_trading import router as paper_trading_router
 from app.api.v1.paper_validation import router as paper_validation_router
 from app.api.v1.portfolio import router as portfolio_router
@@ -114,7 +113,6 @@ for router in [
     observability_router,
     paper_ml_router,
     paper_replay_router,
-    paper_session_router,
     paper_validation_router,
 ]:
     app.include_router(router, prefix="/api/v1")
