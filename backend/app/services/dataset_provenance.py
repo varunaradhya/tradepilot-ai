@@ -75,11 +75,11 @@ def fingerprint_market_bars(
     payload = [
         {
             "timestamp": bar.timestamp.isoformat(),
-            "open": bar.open,
-            "high": bar.high,
-            "low": bar.low,
-            "close": bar.close,
-            "volume": bar.volume,
+            "open": float(bar.open),
+            "high": float(bar.high),
+            "low": float(bar.low),
+            "close": float(bar.close),
+            "volume": None if bar.volume is None else float(bar.volume),
         }
         for bar in bars
     ]
