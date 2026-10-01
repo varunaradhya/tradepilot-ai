@@ -1,11 +1,11 @@
 """Fail-closed eligibility checks for research analytics datasets."""
 from __future__ import annotations
 
-from datetime import time
 from typing import Any
 from zoneinfo import ZoneInfo
 
 from app.services.dataset_provenance import fingerprint_market_bars
+from app.services.nse_equity_calendar import DEFAULT_NSE_EQUITY_CALENDAR
 from app.services.research_store import ResearchStore, research_store
 
 
@@ -68,28 +68,52 @@ def require_certified_dataset(
 def _structural_dataset_issues(bars: list[Any]) -> list[str]:
     """Return hard-fail structural defects that make research unsafe."""
     ist = ZoneInfo("Asia/Kolkata")
-    regular_start = time(9, 15)
-    regular_end = time(15, 30)
     weekend_bars = 0
+    holiday_bars = 0
+    mock_session_bars = 0
+    unknown_session_bars = 0
     outside_session_bars = 0
     negative_volume_bars = 0
     mixed_source_offsets = set()
 
+    bars_by_date: dict[Any, list[Any]] = defaultdict(list)
     for bar in bars:
         timestamp = getattr(bar, "timestamp", None)
         if timestamp is None:
             return ["missing_timestamp"]
         local = timestamp.astimezone(ist)
+        bars_by_date[local.date()].append(bar)
         weekend_bars += int(local.weekday() >= 5)
-        outside_session_bars += int(local.time() < regular_start or local.time() > regular_end)
         volume = getattr(bar, "volume", None)
         if volume is not None and volume < 0:
             negative_volume_bars += 1
         mixed_source_offsets.add(timestamp.utcoffset())
 
+    for day, day_bars in bars_by_date.items():
+        classification = DEFAULT_NSE_EQUITY_CALENDAR.classify_session(day)
+        if classification.status == "MOCK":
+            mock_session_bars += len(day_bars)
+            continue
+        if classification.status == "HOLIDAY":
+            holiday_bars += len(day_bars)
+            continue
+        if classification.status == "UNKNOWN":
+            unknown_session_bars += len(day_bars)
+            continue
+        for bar in day_bars:
+            local = bar.timestamp.astimezone(ist)
+            if not DEFAULT_NSE_EQUITY_CALENDAR.is_timestamp_in_session(local.time(), classification):
+                outside_session_bars += 1
+
     issues: list[str] = []
     if weekend_bars:
         issues.append(f"weekend_bars={weekend_bars}")
+    if holiday_bars:
+        issues.append(f"holiday_bars={holiday_bars}")
+    if mock_session_bars:
+        issues.append(f"mock_session_bars={mock_session_bars}")
+    if unknown_session_bars:
+        issues.append(f"unknown_session_bars={unknown_session_bars}")
     if outside_session_bars:
         issues.append(f"outside_session_bars={outside_session_bars}")
     if negative_volume_bars:
