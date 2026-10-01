@@ -69,6 +69,7 @@ def _structural_dataset_issues(bars: list[Any]) -> list[str]:
     """Return hard-fail structural defects that make research unsafe."""
     ist = ZoneInfo("Asia/Kolkata")
     weekend_bars = 0
+    unknown_weekend_bars = 0
     holiday_bars = 0
     mock_session_bars = 0
     unknown_session_bars = 0
@@ -99,6 +100,7 @@ def _structural_dataset_issues(bars: list[Any]) -> list[str]:
             continue
         if classification.status == "UNKNOWN":
             unknown_session_bars += len(day_bars)
+            unknown_weekend_bars += len(day_bars)
             continue
         for bar in day_bars:
             local = bar.timestamp.astimezone(ist)
@@ -106,8 +108,8 @@ def _structural_dataset_issues(bars: list[Any]) -> list[str]:
                 outside_session_bars += 1
 
     issues: list[str] = []
-    if weekend_bars:
-        issues.append(f"weekend_bars={weekend_bars}")
+    if unknown_weekend_bars:
+        issues.append(f"weekend_bars={unknown_weekend_bars}")
     if holiday_bars:
         issues.append(f"holiday_bars={holiday_bars}")
     if mock_session_bars:
