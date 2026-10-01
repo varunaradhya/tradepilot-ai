@@ -14,8 +14,10 @@ def _year(row: dict) -> int:
     return int(str(value)[:4])
 
 
-def _rows(store: ResearchStore, symbol: str, interval: str) -> list[dict]:
+def _rows(store: ResearchStore, symbol: str, interval: str) -> list[dict] | None:
     dataset = f"nse/{symbol.strip().upper()}_intraday_{interval}m"
+    if not store.load(dataset):
+        return None
     bars, _ = require_certified_dataset(dataset, store=store)
     rows = []
     for bar in bars:
@@ -71,7 +73,7 @@ def run_multi_stock_research(
     missing = []
     for symbol in requested:
         rows = _rows(store, symbol, interval)
-        if not rows:
+        if rows is None:
             missing.append(symbol)
             continue
         result = run_intraday_backtest(rows, IntradayBacktestConfig(initial_capital=initial_capital))
