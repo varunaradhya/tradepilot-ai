@@ -18,7 +18,9 @@ export default function StrategyBuilderPage(){
   }catch(e){setError(e instanceof Error?e.message:"Strategy discovery failed.");}finally{setLoading(false);}
  }
  function useInScanner(candidate: Candidate){
-  sessionStorage.setItem("tradepilot:selectedStrategy", JSON.stringify(candidate));
+  let fingerprint: string | undefined;
+  try { fingerprint = (JSON.parse(sessionStorage.getItem("tradepilot:selectedStrategy") || "{}") as {strategy_fingerprint?:string}).strategy_fingerprint; } catch { fingerprint = undefined; }
+  sessionStorage.setItem("tradepilot:selectedStrategy", JSON.stringify({...candidate, ...(fingerprint ? {strategy_fingerprint:fingerprint} : {})}));
   window.location.hash = "#/scanner";
 }
 
