@@ -183,3 +183,19 @@ def test_certified_dataset_rejects_outside_special_session_window(tmp_path):
     _save_certified(store, bars)
     with pytest.raises(ValueError, match="outside_session_bars=2"):
         require_certified_dataset("nse/TCS_5m", store=store)
+
+
+def test_certified_dataset_accepts_2022_muhurat_session(tmp_path):
+    store = ResearchStore(tmp_path)
+    bars = _bars_for_day(datetime(2022, 10, 24).date(), 18, 15, 12)
+    _save_certified(store, bars)
+    loaded, _ = require_certified_dataset("nse/TCS_5m", store=store)
+    assert len(loaded) == 12
+
+
+def test_certified_dataset_accepts_2024_muhurat_session(tmp_path):
+    store = ResearchStore(tmp_path)
+    bars = _bars_for_day(datetime(2024, 11, 1).date(), 18, 0, 12)
+    _save_certified(store, bars)
+    loaded, _ = require_certified_dataset("nse/TCS_5m", store=store)
+    assert len(loaded) == 12
