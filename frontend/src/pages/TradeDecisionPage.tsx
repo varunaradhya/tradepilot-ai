@@ -30,8 +30,22 @@ export default function TradeDecisionPage() {
 
   async function evaluate() {
     setLoading(true); setError("");
-    try { const highs = closeValues.map(v => v + 0.5); const lows = closeValues.map(v => v - 0.5); const volumes = closeValues.map((_, i) => i === closeValues.length - 1 ? 1500 : 1000); setDecision(await api.post<Decision>("/trade-decision/paper", { symbol, session: new Date().toISOString().slice(0, 10), closes: closeValues, highs, lows, volumes, equity: Number(equity), broker: "DHAN", opening_high: Number(openingHigh) })); }
-    catch (e) { setError(e instanceof Error ? e.message : "Decision failed"); }
+    try {
+      if (generated) {
+        const data = await api.post<Decision>("/trade-decision/paper/generated-signal", {
+          ...generated, equity: Number(equity), broker: "DHAN", min_confidence: 65
+        });
+        setDecision(data);
+      } else {
+        const highs = closeValues.map(v => v + 0.5);
+        const lows = closeValues.map(v => v - 0.5);
+        const volumes = closeValues.map((_, i) => i === closeValues.length - 1 ? 1500 : 1000);
+        setDecision(await api.post<Decision>("/trade-decision/paper", {
+          symbol, session: new Date().toISOString().slice(0, 10), closes: closeValues,
+          highs, lows, volumes, equity: Number(equity), broker: "DHAN", opening_high: Number(openingHigh)
+        }));
+      }
+    } catch (e) { setError(e instanceof Error ? e.message : "Decision failed"); }
     finally { setLoading(false); }
   }
   const ready = decision?.status === "PAPER_READY";
