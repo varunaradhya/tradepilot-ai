@@ -8,6 +8,7 @@ from app.services.dhan_historical_service import HistoricalRequest, fetch_intrad
 from app.services.instrument_master_service import InstrumentMaster, instrument_master, resolve_nse_equity
 from app.services.intraday_backtest import IntradayBacktestConfig, run_intraday_backtest
 from app.services.research_store import ResearchStore, research_store
+from app.services.research_dataset_gate import require_certified_dataset
 
 
 @dataclass(frozen=True)
@@ -70,9 +71,8 @@ def backtest_intraday_dataset(
     config: IntradayBacktestConfig = IntradayBacktestConfig(),
 ) -> dict:
     dataset = f"nse/{symbol.strip().upper()}_intraday_{interval}m"
-    bars = store.load(dataset)
-    if not bars:
-        raise ValueError(f"Intraday dataset not found: {dataset}")
+    bars, provenance = require_certified_dataset(dataset, store=store)
+
     rows = []
     for bar in bars:
         row = bar.as_row()
@@ -80,4 +80,4 @@ def backtest_intraday_dataset(
         row["session"] = timestamp.date().isoformat()
         rows.append(row)
     result = run_intraday_backtest(rows, config)
-    return {"symbol": symbol.strip().upper(), "interval": interval, "dataset": dataset, **result}
+    return {"symbol": symbol.strip().upper(), "interval": interval, "dataset": dataset, "provenance": provenance, **result}

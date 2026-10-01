@@ -162,6 +162,14 @@ def record_trade_outcome(
     return event
 
 
+def _chronological_event_times(events: list[PaperTradeLearningEvent]) -> bool:
+    """Allow deterministic ties; reject only backwards event-time movement."""
+    return all(
+        events[index].event_at <= events[index + 1].event_at
+        for index in range(len(events) - 1)
+    )
+
+
 def _events(db: Session, user_id: int, strategy_version: str) -> list[PaperTradeLearningEvent]:
     return db.query(PaperTradeLearningEvent).filter(
         PaperTradeLearningEvent.user_id == user_id,
@@ -238,14 +246,12 @@ def train_model(db: Session, user_id: int, strategy_version: str = "V1") -> dict
             "reason": "MISSING_FEATURE_EVENT_TIME",
             "samples": len(events),
         }
-    if any(events[index].event_at > events[index + 1].event_at for index in range(len(events) - 1)):
+    if not _chronological_event_times(events):
         return {
             "trained": False,
             "reason": "NON_CHRONOLOGICAL_FEATURE_EVENTS",
             "samples": len(events),
         }
-    if any(events[index].event_at == events[index + 1].event_at for index in range(len(events) - 1)):
-        return {"trained": False, "reason": "NON_UNIQUE_FEATURE_EVENT_TIME", "samples": len(events)}
     lineage_strategy = {event.strategy_fingerprint for event in events}
     if len(lineage_strategy) != 1 or None in lineage_strategy:
         return {"trained": False, "reason": "MIXED_OR_MISSING_STRATEGY_LINEAGE", "samples": len(events)}

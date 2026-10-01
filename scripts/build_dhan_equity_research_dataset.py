@@ -110,7 +110,7 @@ def build_research_dataset(
     for (symbol, session_date), session_rows in sorted(sessions.items()):
         regular_rows = [(row, dt) for row, dt in session_rows if _is_regular(dt)]
 
-        session_bad = False
+        invalid_timestamps: set[int] = set()
         for row, dt in session_rows:
             reasons = []
             if dt.weekday() >= 5:
@@ -122,7 +122,7 @@ def build_research_dataset(
             if not _valid_ohlc(row):
                 reasons.append("INVALID_OHLC")
             if reasons:
-                session_bad = True
+                invalid_timestamps.add(row[1])
                 payload = {
                     "symbol": symbol,
                     "session_date": session_date,
@@ -156,13 +156,10 @@ def build_research_dataset(
                     )
             continue
 
-        if session_bad:
-            session_counts["EXCLUDED_INVALID_SESSION"] += 1
-            continue
-
         complete_sessions[symbol] += 1
         for row, dt in regular_rows:
-            clean_by_symbol[symbol].append(_bar_payload(row, dt))
+            if row[1] not in invalid_timestamps:
+                clean_by_symbol[symbol].append(_bar_payload(row, dt))
 
     clean_rows = 0
     quarantine_rows = 0

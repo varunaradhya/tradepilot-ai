@@ -21,25 +21,19 @@ type NavItem = { id: Page; label: string; hint: string };
 type NavGroup = { label: string; items: NavItem[] };
 
 const navGroups: NavGroup[] = [
-  { label: "Research", items: [
-    { id: "research", label: "Research", hint: "Stock research workspace" },
-    { id: "evidence", label: "Evidence", hint: "Cross-stock validation" },
-    { id: "scanner", label: "Opportunity Scanner", hint: "Find qualified setups" },
+  { label: "Algo Trading", items: [
+    { id: "dashboard", label: "Algo Command Center", hint: "Strategy status and trading loop" },
+    { id: "strategy", label: "Strategy Lab", hint: "Build and backtest the algorithm" },
+    { id: "scanner", label: "Signal Scanner", hint: "Find qualified setups" },
+    { id: "decision", label: "Trade Decision", hint: "Validate a generated signal" },
+    { id: "paper", label: "Paper Trading", hint: "Run the algorithm without real orders" },
   ]},
-  { label: "Trading", items: [
-    { id: "fno", label: "F&O Intelligence", hint: "NSE derivatives decision engine" },
-    { id: "strategy", label: "Strategy Builder", hint: "Build and qualify strategies" },
-    { id: "decision", label: "Trade Decision", hint: "Evaluate a trade" },
-    { id: "paper", label: "Paper Trading", hint: "Simulation cockpit" },
+  { label: "Market Data", items: [
+    { id: "market", label: "Market Data", hint: "Inspect current market context" },
+    { id: "research", label: "Research Data", hint: "Manage research and evidence" },
   ]},
-  { label: "Portfolio", items: [
-    { id: "portfolio", label: "Portfolio", hint: "Holdings and returns" },
-    { id: "transactions", label: "Transactions", hint: "Transaction history" },
-  ]},
-  { label: "Market", items: [{ id: "market", label: "Markets", hint: "Market data" }] },
-  { label: "Tools", items: [{ id: "tools", label: "Trading Tools", hint: "Trading utilities" }] },
-  { label: "Connections", items: [{ id: "brokers", label: "Broker Center", hint: "Connections and safety" }] },
 ];
+
 const allNavItems = navGroups.flatMap(g => g.items);
 const validPages = new Set<Page>(["dashboard","research","evidence","scanner","strategy","decision","paper","fno","transactions","market","portfolio","brokers","tools","profile"]);
 
@@ -50,14 +44,13 @@ function pageFromHash(): Page {
 
 function Workflow({ page, setPage }: { page: Page; setPage: (p: Page) => void }) {
   const steps: Array<{ id: Page; label: string }> = [
-    { id: "research", label: "Research" },
-    { id: "evidence", label: "Validate" },
     { id: "strategy", label: "Strategy" },
+    { id: "scanner", label: "Signals" },
     { id: "decision", label: "Decision" },
     { id: "paper", label: "Paper" },
   ];
   const active = steps.findIndex(x => x.id === page);
-  if (page === "dashboard" || page === "profile" || page === "portfolio" || page === "transactions" || page === "market" || page === "brokers" || page === "tools" || page === "fno" || page === "scanner") return null;
+  if (page === "dashboard" || page === "market" || page === "research") return null;
   return <div className="tp-workflow" aria-label="Trading research workflow">{steps.map((step, index) => <button type="button" key={step.id} onClick={() => setPage(step.id)} className={index === active ? "tp-workflow-step tp-workflow-active" : index < active ? "tp-workflow-step tp-workflow-done" : "tp-workflow-step"}><span>{index + 1}</span>{step.label}</button>)}</div>;
 }
 
@@ -101,11 +94,9 @@ function Navigation({ page, setPage, onCommand, onProfile }: { page: Page; setPa
       <button type="button" className="tp-brand mr-2" onClick={() => setPage("dashboard")} aria-label="Go to TradePilot overview"><img src="/tradepilot-mark.svg" alt="" /><span><span className="tp-brand-name block">TradePilot AI</span><span className="tp-brand-sub block">Intelligent trading cockpit</span></span></button>
       <nav aria-label="Primary navigation" className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
         {([
-          ["dashboard", "Overview", page === "dashboard"],
-          ["research", "Research", ["research", "evidence", "scanner"].includes(page)],
-          ["fno", "Trade", ["fno", "strategy", "decision", "paper"].includes(page)],
-          ["portfolio", "Portfolio", ["portfolio", "transactions"].includes(page)],
-          ["market", "Markets", page === "market"],
+          ["dashboard", "Algo", page === "dashboard"],
+          ["strategy", "Strategy", ["strategy", "scanner", "decision", "paper"].includes(page)],
+          ["market", "Market", page === "market"],
         ] as Array<[Page, string, boolean]>).map(([id, label, active]) => (
           <button type="button" key={id} onClick={() => setPage(id)} className={`tp-nav-item whitespace-nowrap rounded-xl px-3 py-2 text-[12px] font-bold ${active ? "tp-nav-item-active" : ""}`}>{label}</button>
         ))}
@@ -149,7 +140,7 @@ export default function App() {
     <Workflow page={page} setPage={setPage} />
     <CommandPalette open={commandOpen} onClose={() => setCommandOpen(false)} setPage={setPage} />
     <main>
-      {page === "dashboard" && <DashboardPage onLogout={logout} onTransactions={() => setPage("transactions")} />}
+      {page === "dashboard" && <DashboardPage />}
       {page === "fno" && <FNOPage />}
       {page === "research" && <ResearchPage />}
       {page === "evidence" && <IntradayEvidencePage />}

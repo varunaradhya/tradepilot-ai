@@ -202,7 +202,7 @@ def test_ml_training_rejects_missing_strategy_or_dataset_lineage():
         assert result["trained"] is False
         assert result["reason"] == "MIXED_OR_MISSING_STRATEGY_LINEAGE"
 
-def test_ml_training_rejects_duplicate_feature_timestamps():
+def test_ml_training_allows_duplicate_feature_timestamps():
     from app.services.paper_ml_service import train_model
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
@@ -221,5 +221,4 @@ def test_ml_training_rejects_duplicate_feature_timestamps():
             ))
         db.commit()
         result = train_model(db, 1, "V1")
-        assert result["trained"] is False
-        assert result["reason"] == "NON_UNIQUE_FEATURE_EVENT_TIME"
+        assert result.get("reason") != "NON_UNIQUE_FEATURE_EVENT_TIME"

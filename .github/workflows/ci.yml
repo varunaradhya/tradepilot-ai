@@ -2,7 +2,7 @@ name: TradePilot CI
 
 on:
   push:
-    branches: [main, 'feat/**', 'feature/**']
+    branches: [main, 'certification-sync', 'feat/**', 'feature/**']
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -22,8 +22,8 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
@@ -40,8 +40,124 @@ jobs:
         env:
           TRADEPILOT_ENV: test
           TRADEPILOT_AUTO_CREATE_SCHEMA: "true"
-          TRADEPILOT_JWT_SECRET: ci-test-jwt-secret
+          TRADEPILOT_JWT_SECRET: ci-test-jwt-secret-32-bytes-minimum!!
         run: python -m pytest -q
+
+  postgres-migrations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: tradepilot_ci
+          POSTGRES_USER: tradepilot
+          POSTGRES_PASSWORD: ci-postgres-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U tradepilot -d tradepilot_ci"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: python -m pip install --upgrade pip && pip install -r requirements.txt
+      - name: Upgrade PostgreSQL database to head
+        env:
+          TRADEPILOT_DATABASE_URL: postgresql+psycopg://tradepilot:ci-postgres-password@127.0.0.1:5432/tradepilot_ci
+        run: python -m alembic upgrade head
+      - name: Downgrade and re-upgrade PostgreSQL database
+        env:
+          TRADEPILOT_DATABASE_URL: postgresql+psycopg://tradepilot:ci-postgres-password@127.0.0.1:5432/tradepilot_ci
+        run: |
+          python -m alembic downgrade 20260929_0015
+          python -m alembic upgrade head
+
+
+  postgres-backup-restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: tradepilot_ci
+          POSTGRES_USER: tradepilot
+          POSTGRES_PASSWORD: ci-postgres-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U tradepilot -d tradepilot_ci"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: python -m pip install --upgrade pip && pip install -r requirements.txt
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+      - name: Prepare source and dedicated restore databases
+        env:
+          PGPASSWORD: ci-postgres-password
+        run: |
+          psql -h 127.0.0.1 -U tradepilot -d tradepilot_ci -v ON_ERROR_STOP=1 -c "CREATE TABLE backup_drill_probe(id integer PRIMARY KEY, marker text NOT NULL); INSERT INTO backup_drill_probe VALUES (1, 'tradepilot-backup-restore-ok');"
+          createdb -h 127.0.0.1 -U tradepilot tradepilot_restore
+      - name: Run guarded backup and restore drill
+        env:
+          TRADEPILOT_PGURL: postgresql://tradepilot:ci-postgres-password@127.0.0.1:5432/tradepilot_ci
+          TRADEPILOT_RESTORE_PGURL: postgresql://tradepilot:ci-postgres-password@127.0.0.1:5432/tradepilot_restore
+          CONFIRM_RESTORE: "YES"
+          BACKUP_FILE: ./ci-tradepilot-backup.dump
+        run: bash ../scripts/postgres_backup_restore_drill.sh
+      - name: Verify restored data
+        env:
+          PGPASSWORD: ci-postgres-password
+        run: |
+          psql -h 127.0.0.1 -U tradepilot -d tradepilot_restore -v ON_ERROR_STOP=1 -c "SELECT 1 FROM backup_drill_probe WHERE id = 1 AND marker = 'tradepilot-backup-restore-ok';"
+      - name: Upgrade restored database
+        env:
+          TRADEPILOT_DATABASE_URL: postgresql+psycopg://tradepilot:ci-postgres-password@127.0.0.1:5432/tradepilot_restore
+        run: python -m alembic upgrade head
+      - name: Smoke test restored application
+        env:
+          TRADEPILOT_DATABASE_URL: postgresql+psycopg://tradepilot:ci-postgres-password@127.0.0.1:5432/tradepilot_restore
+          TRADEPILOT_AUTO_CREATE_SCHEMA: "false"
+          TRADEPILOT_ENV: test
+          TRADEPILOT_JWT_SECRET: ci-test-jwt-secret-32-bytes-minimum!!
+        run: |
+          python - <<'PY'
+          from fastapi.testclient import TestClient
+          from main import app
+
+          with TestClient(app) as client:
+              health = client.get("/health")
+              ready = client.get("/ready")
+              assert health.status_code == 200, health.text
+              assert health.json() == {"status": "healthy"}
+              assert ready.status_code == 200, ready.text
+              assert ready.json() == {"status": "ok", "database": "available"}
+          PY
 
   frontend:
     runs-on: ubuntu-latest
@@ -50,8 +166,8 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -65,28 +181,136 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Validate Docker Compose configuration
         env:
           POSTGRES_PASSWORD: ci-placeholder-password
-          TRADEPILOT_JWT_SECRET: ci-placeholder-jwt-secret
+          TRADEPILOT_JWT_SECRET: ci-placeholder-jwt-secret-32-bytes-minimum!!
           TRADEPILOT_BROKER_ENCRYPTION_KEY: ci-placeholder-broker-key
+          TRADEPILOT_CORS_ORIGINS: http://localhost:8080
         run: docker compose config --quiet
+
+  deployment-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [deployment-config]
+    steps:
+      - uses: actions/checkout@v5
+      - name: Start deployed stack
+        env:
+          POSTGRES_PASSWORD: ci-deployment-postgres
+          TRADEPILOT_JWT_SECRET: ci-deployment-jwt-secret-32-bytes-minimum!!
+          TRADEPILOT_BROKER_ENCRYPTION_KEY: ci-deployment-broker-key-32-bytes-minimum!!
+          TRADEPILOT_CORS_ORIGINS: http://localhost:8080
+          TRADEPILOT_AI_PROVIDER: mock
+        run: |
+          if ! docker compose up -d --build; then
+            docker compose ps || true
+            docker compose logs database backend || true
+            exit 1
+          fi
+      - name: Wait for application readiness
+        env:
+          POSTGRES_PASSWORD: ci-deployment-postgres
+          TRADEPILOT_JWT_SECRET: ci-deployment-jwt-secret-32-bytes-minimum!!
+          TRADEPILOT_BROKER_ENCRYPTION_KEY: ci-deployment-broker-key-32-bytes-minimum!!
+          TRADEPILOT_CORS_ORIGINS: http://localhost:8080
+          TRADEPILOT_AI_PROVIDER: mock
+        run: |
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8000/ready >/tmp/ready.json; then
+              cat /tmp/ready.json
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose ps
+          docker compose logs backend
+          exit 1
+      - name: Verify frontend
+        run: curl --fail --silent http://127.0.0.1:8080/ >/tmp/frontend.html
+      - name: Verify backend restart recovery
+        env:
+          POSTGRES_PASSWORD: ci-deployment-postgres
+          TRADEPILOT_JWT_SECRET: ci-deployment-jwt-secret-32-bytes-minimum!!
+          TRADEPILOT_BROKER_ENCRYPTION_KEY: ci-deployment-broker-key-32-bytes-minimum!!
+          TRADEPILOT_CORS_ORIGINS: http://localhost:8080
+          TRADEPILOT_AI_PROVIDER: mock
+        run: |
+          docker compose restart backend
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8000/ready >/tmp/restarted-ready.json; then
+              cat /tmp/restarted-ready.json
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose ps
+          docker compose logs backend
+          exit 1
+      - name: Verify database outage and recovery
+        env:
+          POSTGRES_PASSWORD: ci-deployment-postgres
+          TRADEPILOT_JWT_SECRET: ci-deployment-jwt-secret-32-bytes-minimum!!
+          TRADEPILOT_BROKER_ENCRYPTION_KEY: ci-deployment-broker-key-32-bytes-minimum!!
+          TRADEPILOT_CORS_ORIGINS: http://localhost:8080
+          TRADEPILOT_AI_PROVIDER: mock
+        run: |
+          docker compose stop database
+          outage_detected=false
+          for i in $(seq 1 15); do
+            if ! docker compose exec -T database pg_isready -U tradepilot -d tradepilot >/dev/null 2>&1; then
+              outage_detected=true
+              break
+            fi
+            sleep 2
+          done
+          test "$outage_detected" = "true"
+          docker compose start database
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8000/ready >/tmp/recovered-ready.json; then
+              cat /tmp/recovered-ready.json
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose ps
+          docker compose logs database backend
+          exit 1
+      - name: Tear down deployed stack
+        if: always()
+        env:
+          POSTGRES_PASSWORD: ci-deployment-postgres
+          TRADEPILOT_JWT_SECRET: ci-deployment-jwt-secret-32-bytes-minimum!!
+          TRADEPILOT_BROKER_ENCRYPTION_KEY: ci-deployment-broker-key-32-bytes-minimum!!
+          TRADEPILOT_CORS_ORIGINS: http://localhost:8080
+          TRADEPILOT_AI_PROVIDER: mock
+        run: docker compose down -v
+
 
   release-gate:
     if: always()
-    needs: [backend, frontend, deployment-config]
+    needs: [backend, frontend, deployment-config, deployment-recovery, postgres-migrations, postgres-backup-restore]
     runs-on: ubuntu-latest
     steps:
       - name: Enforce release gate
         env:
+          BACKUP_RESTORE_RESULT: ${{ needs.postgres-backup-restore.result }}
           BACKEND_RESULT: ${{ needs.backend.result }}
+          POSTGRES_RESULT: ${{ needs.postgres-migrations.result }}
           FRONTEND_RESULT: ${{ needs.frontend.result }}
           DEPLOYMENT_RESULT: ${{ needs.deployment-config.result }}
+          RECOVERY_RESULT: ${{ needs.deployment-recovery.result }}
         run: |
+          echo "postgres-backup-restore=${BACKUP_RESTORE_RESULT}"
           echo "backend=${BACKEND_RESULT}"
+          echo "postgres-migrations=${POSTGRES_RESULT}"
           echo "frontend=${FRONTEND_RESULT}"
           echo "deployment-config=${DEPLOYMENT_RESULT}"
+          echo "deployment-recovery=${RECOVERY_RESULT}"
+          test "${BACKUP_RESTORE_RESULT}" = "success"
           test "${BACKEND_RESULT}" = "success"
+          test "${POSTGRES_RESULT}" = "success"
           test "${FRONTEND_RESULT}" = "success"
           test "${DEPLOYMENT_RESULT}" = "success"
+          test "${RECOVERY_RESULT}" = "success"

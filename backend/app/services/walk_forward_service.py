@@ -22,11 +22,13 @@ def build_walk_forward_windows(
     step: int | None = None,
 ) -> list[WalkForwardWindow]:
     """Create chronological train/validation windows with no look-ahead."""
-    if train_size <= 0 or validation_size <= 0 or length <= train_size + validation_size:
+    if train_size <= 0 or validation_size <= 0 or length < train_size + validation_size:
         return []
     step = validation_size if step is None else step
     if step <= 0:
         raise ValueError("step must be positive")
+    if step < validation_size:
+        raise ValueError("step must be at least validation_size to prevent overlapping validation windows")
 
     windows: list[WalkForwardWindow] = []
     start = 0

@@ -26,6 +26,7 @@ from app.services.research_experiment_service import list_experiments, record_ex
 from app.services.corporate_action_service import CorporateActionFactor, cumulative_adjustment_factor, adjust_ohlcv
 from app.services.benchmark_research_service import download_intraday_benchmark_dataset
 from app.services.strategy_registry import list_strategies
+from app.services.research_dataset_gate import require_certified_dataset
 
 router = APIRouter(prefix="/research", tags=["Research"])
 
@@ -47,18 +48,24 @@ def _dhan_client(db: Session, current_user: User) -> DhanClient:
     if connection is None: raise HTTPException(status_code=404, detail="Dhan is not connected.")
     return DhanClient(connection.client_id, get_access_token(connection))
 
-def _dataset_rows(symbol: str, interval: str):
+def _dataset_rows(symbol: str, interval: str, *, certified: bool = False):
     dataset = f"nse/{symbol.strip().upper()}_intraday_{interval}m"
-    bars = research_store.load(dataset)
+    if certified:
+        try:
+            bars, _ = require_certified_dataset(dataset)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+    else:
+        bars = research_store.load(dataset)
     rows = []
     for bar in bars:
         row = bar.as_row(); row["session"] = row["timestamp"].date().isoformat(); rows.append(row)
     return dataset, rows
 
-def _requested_rows(symbols: str, interval: str):
+def _requested_rows(symbols: str, interval: str, *, certified: bool = False):
     datasets = {}; missing = []
     for symbol in dict.fromkeys(s.strip().upper() for s in symbols.split(",") if s.strip()):
-        _, rows = _dataset_rows(symbol, interval)
+        _, rows = _dataset_rows(symbol, interval, certified=certified)
         if rows: datasets[symbol] = rows
         else: missing.append(symbol)
     return datasets, missing
@@ -149,7 +156,7 @@ def intraday_walk_forward(
     current_user: User=Depends(get_current_user),
     db: Session=Depends(get_db),
 ):
-    dataset, rows = _dataset_rows(symbol, interval)
+    dataset, rows = _dataset_rows(symbol, interval, certified=True)
     if not rows: raise HTTPException(status_code=404, detail=f"Intraday dataset not found: {dataset}")
     try:
         result = run_fixed_parameter_walk_forward(rows, train_size=train_bars, validation_size=validation_bars)
@@ -162,14 +169,14 @@ def intraday_walk_forward(
 @router.get("/intraday/performance")
 def intraday_performance(symbol: str=Query(min_length=1,max_length=30), interval: str=Query(default="5",pattern="^(1|5|15|25|60)$"), current_user: User=Depends(get_current_user)):
     del current_user
-    dataset, rows = _dataset_rows(symbol, interval)
+    dataset, rows = _dataset_rows(symbol, interval, certified=True)
     if not rows: raise HTTPException(status_code=404, detail=f"Intraday dataset not found: {dataset}")
     return {"symbol": symbol.strip().upper(), "interval": interval, "dataset": dataset, **build_intraday_performance_report(rows, IntradayBacktestConfig())}
 
 @router.get("/intraday/experiment")
 def experiment_research_intraday(symbol: str=Query(min_length=1,max_length=30), interval: str=Query(default="5",pattern="^(1|5|15|25|60)$"), current_user: User=Depends(get_current_user)):
     del current_user
-    dataset, rows = _dataset_rows(symbol, interval)
+    dataset, rows = _dataset_rows(symbol, interval, certified=True)
     if not rows: raise HTTPException(status_code=404,detail=f"Intraday dataset not found: {dataset}")
     return {"symbol": symbol.strip().upper(),"interval":interval,"dataset":dataset,**run_intraday_experiment(rows)}
 
@@ -182,7 +189,7 @@ def batch_research_intraday(symbols: str=Query(min_length=1, max_length=1000), i
 @router.get("/intraday/scorecard")
 def intraday_scorecard(symbols: str=Query(min_length=1, max_length=2000), interval: str=Query(default="5",pattern="^(1|5|15|25|60)$"), min_trades: int=Query(default=20, ge=1, le=100000), slippage: float=Query(default=0.001, ge=0, le=0.01), current_user: User = Depends(get_current_user)):
     del current_user
-    datasets, missing = _requested_rows(symbols, interval)
+    datasets, missing = _requested_rows(symbols, interval, certified=True)
     result = build_intraday_scorecard(datasets, ScorecardConfig(minimum_trades=min_trades, slippage_rate=slippage)); result["missing_datasets"] = missing; result["interval"] = interval
     return result
 
@@ -190,7 +197,7 @@ def intraday_scorecard(symbols: str=Query(min_length=1, max_length=2000), interv
 def intraday_evidence(symbols: str=Query(min_length=1, max_length=2000), interval: str=Query(default="5",pattern="^(1|5|15|25|60)$"), min_trades: int=Query(default=20, ge=1, le=100000), slippage: float=Query(default=0.001, ge=0, le=0.01), current_user: User = Depends(get_current_user)):
     del current_user
     requested = _requested_symbols(symbols)
-    datasets, missing = _requested_rows(symbols, interval)
+    datasets, missing = _requested_rows(symbols, interval, certified=True)
     scorecard = build_intraday_scorecard(datasets, ScorecardConfig(minimum_trades=min_trades, slippage_rate=slippage))
     result = aggregate_scorecards(scorecard.get("ranked", []), interval=interval, requested_symbols=requested, missing_symbols=missing)
     result["assumptions"] = scorecard.get("assumptions", {})
@@ -199,27 +206,27 @@ def intraday_evidence(symbols: str=Query(min_length=1, max_length=2000), interva
 @router.get("/intraday/research-lab")
 def intraday_research_lab(symbol: str=Query(min_length=1,max_length=30), interval: str=Query(default="5",pattern="^(1|5|15|25|60)$"), current_user: User=Depends(get_current_user)):
     del current_user
-    dataset, rows = _dataset_rows(symbol, interval)
+    dataset, rows = _dataset_rows(symbol, interval, certified=True)
     if not rows: raise HTTPException(status_code=404, detail=f"Intraday dataset not found: {dataset}")
     return {"symbol": symbol.strip().upper(), "interval": interval, "dataset": dataset, **run_research_lab(rows)}
 
 @router.get("/intraday/regime-analysis")
 def intraday_regime_analysis(benchmark: str=Query(default="NIFTY", min_length=1, max_length=30), interval: str=Query(default="5",pattern="^(1|5|15|25|60)$"), lookback: int=Query(default=50, ge=20, le=500), step: int=Query(default=25, ge=1, le=500), current_user: User=Depends(get_current_user)):
     del current_user
-    dataset, rows = _dataset_rows(benchmark, interval)
+    dataset, rows = _dataset_rows(benchmark, interval, certified=True)
     if not rows: raise HTTPException(status_code=404, detail=f"Benchmark dataset not found: {dataset}")
     return {"benchmark": benchmark.strip().upper(), "interval": interval, **build_benchmark_regime_analysis(rows, lookback=lookback, step=step)}
 
 @router.get("/intraday/regime-report")
 def intraday_regime_report(symbol: str=Query(min_length=1,max_length=30), benchmark: str=Query(default="NIFTY", min_length=1,max_length=30), sector: str | None=Query(default=None,max_length=30), interval: str=Query(default="5",pattern="^(1|5|15|25|60)$"), current_user: User=Depends(get_current_user)):
     del current_user
-    _, rows = _dataset_rows(symbol, interval)
+    _, rows = _dataset_rows(symbol, interval, certified=True)
     if not rows: raise HTTPException(status_code=404,detail=f"Intraday dataset not found: {symbol.strip().upper()}")
-    _, benchmark_rows = _dataset_rows(benchmark, interval)
+    _, benchmark_rows = _dataset_rows(benchmark, interval, certified=True)
     if not benchmark_rows: raise HTTPException(status_code=404,detail=f"Benchmark dataset not found: {benchmark.strip().upper()}")
     sector_rows = None
     if sector:
-        _, sector_rows = _dataset_rows(sector, interval)
+        _, sector_rows = _dataset_rows(sector, interval, certified=True)
         if not sector_rows: raise HTTPException(status_code=404,detail=f"Sector dataset not found: {sector.strip().upper()}")
     return {"symbol":symbol.strip().upper(),"benchmark":benchmark.strip().upper(),"sector":sector.strip().upper() if sector else None,"interval":interval,**build_intraday_regime_report(rows, benchmark_rows, sector_rows)}
 

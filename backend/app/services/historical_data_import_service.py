@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import csv
 from datetime import date, datetime
+import json
 import re
 import sqlite3
 from pathlib import Path
@@ -89,6 +90,23 @@ def _read_csv(path: Path) -> list[dict]:
         return list(csv.DictReader(handle))
 
 
+def _read_jsonl(path: Path) -> list[dict]:
+    """Read JSON objects line-by-line without silently dropping bad records."""
+    rows: list[dict] = []
+    with path.open("r", encoding="utf-8") as handle:
+        for line_number, line in enumerate(handle, start=1):
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"Invalid JSONL record on line {line_number}") from exc
+            if not isinstance(row, dict):
+                raise ValueError(f"JSONL record on line {line_number} must be an object")
+            rows.append(row)
+    return rows
+
+
 def _read_parquet(path: Path) -> list[dict]:
     try:
         import pyarrow.parquet as parquet
@@ -102,7 +120,8 @@ def _read_sqlite(path: Path, table: str) -> list[dict]:
     if not path.exists():
         raise FileNotFoundError(path)
     quoted = _validated_table_name(table)
-    with sqlite3.connect(path) as connection:
+    source_uri = f"{path.resolve().as_uri()}?mode=ro"
+    with sqlite3.connect(source_uri, uri=True) as connection:
         cursor = connection.execute(f"SELECT * FROM {quoted}")
         columns = [description[0] for description in cursor.description or ()]
         return [dict(zip(columns, row)) for row in cursor.fetchall()]
@@ -182,6 +201,12 @@ def import_csv(request: HistoricalImportRequest, store: ResearchStore = research
     if not request.path:
         raise ValueError("CSV path is required")
     return import_rows(_read_csv(Path(request.path)), request, store)
+
+
+def import_jsonl(request: HistoricalImportRequest, store: ResearchStore = research_store) -> DatasetProvenance:
+    if not request.path:
+        raise ValueError("JSONL path is required")
+    return import_rows(_read_jsonl(Path(request.path)), request, store)
 
 
 def import_parquet(request: HistoricalImportRequest, store: ResearchStore = research_store) -> DatasetProvenance:

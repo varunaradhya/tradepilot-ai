@@ -131,3 +131,57 @@ def build_paper_trade_decision(
         return TradeDecision(signal_id, normalized_symbol, "BUY", "BLOCKED", execution.reason, signal.confidence, plan.entry, plan.stop, plan.target, risk_reward, plan.quantity, plan.capital_required, plan.max_loss, execution.normalized_broker)
 
     return TradeDecision(signal_id, normalized_symbol, "BUY", "PAPER_READY", "PAPER_ORDER_AUTHORIZED", signal.confidence, plan.entry, plan.stop, plan.target, risk_reward, plan.quantity, plan.capital_required, plan.max_loss, execution.normalized_broker)
+
+
+def build_paper_trade_decision_from_signal(
+    *,
+    symbol: str,
+    session: str,
+    action: str,
+    confidence: float,
+    entry: float,
+    stop: float,
+    target: float,
+    equity: float,
+    broker: str = "DHAN",
+    in_market_session: bool = True,
+    market_data_healthy: bool = True,
+    strategy_ready: bool = True,
+    risk_approved: bool = True,
+    daily_risk_used: float = 0.0,
+    paper_state: PaperRiskState | None = None,
+    paper_config: PaperRiskConfig | None = None,
+    position_config: PositionRiskConfig | None = None,
+    min_confidence: float = 65.0,
+    existing_portfolio_positions: Sequence[PortfolioPosition] | None = None,
+    portfolio_risk_config: PortfolioRiskConfig | None = None,
+    proposed_sector: str | None = None,
+    portfolio_drawdown_fraction: float = 0.0,
+) -> TradeDecision:
+    """Validate an already-generated strategy signal without recomputing it."""
+    normalized_symbol = symbol.strip().upper()
+    raw = "|".join([normalized_symbol, session.strip(), action, str(entry), str(stop), str(target), str(confidence)])
+    signal_id = hashlib.sha256(raw.encode()).hexdigest()[:20]
+    if action != "BUY" or confidence < min_confidence:
+        return TradeDecision(signal_id, normalized_symbol, "NEUTRAL", "NO_TRADE", "SIGNAL_NOT_BUY", confidence, None, None, None, None, 0, 0.0, 0.0, broker.upper())
+    if not strategy_ready:
+        return TradeDecision(signal_id, normalized_symbol, "BUY", "BLOCKED", "STRATEGY_NOT_READY", confidence, entry, stop, target, None, 0, 0.0, 0.0, broker.upper())
+    if not (entry > stop and target > entry):
+        return TradeDecision(signal_id, normalized_symbol, "BUY", "BLOCKED", "INVALID_SIGNAL_LEVELS", confidence, entry, stop, target, None, 0, 0.0, 0.0, broker.upper())
+    state = paper_state or PaperRiskState(trading_date=date.today())
+    paper_gate = evaluate_paper_entry(side="BUY", symbol=normalized_symbol, signal_id=signal_id, in_market_session=in_market_session, state=state, config=paper_config or PaperRiskConfig())
+    if not paper_gate.allowed:
+        return TradeDecision(signal_id, normalized_symbol, "BUY", "BLOCKED", paper_gate.reason, confidence, entry, stop, target, round((target-entry)/(entry-stop),2), 0, 0.0, 0.0, broker.upper())
+    plan = calculate_long_position(entry=entry, stop=stop, target=target, equity=equity, daily_risk_used=daily_risk_used, config=position_config)
+    if not plan.approved:
+        return TradeDecision(signal_id, normalized_symbol, "BUY", "BLOCKED", plan.reason, confidence, entry, stop, target, plan.risk_reward, plan.quantity, plan.capital_required, plan.max_loss, broker.upper())
+    risk_reward = round(plan.risk_reward, 2) if plan.risk_reward is not None else None
+    if existing_portfolio_positions is not None:
+        gate = evaluate_new_position(capital=equity, proposed_market_value=plan.capital_required, proposed_risk_value=plan.max_loss, proposed_sector=proposed_sector, existing_positions=existing_portfolio_positions, config=portfolio_risk_config or PortfolioRiskConfig(), current_drawdown_fraction=portfolio_drawdown_fraction)
+        if not gate.allowed:
+            return TradeDecision(signal_id, normalized_symbol, "BUY", "BLOCKED", gate.reason, confidence, entry, stop, target, risk_reward, plan.quantity, plan.capital_required, plan.max_loss, broker.upper())
+    position_config = position_config or PositionRiskConfig()
+    execution = authorize_order(ExecutionContext(broker=broker, mode="PAPER", market_data_healthy=market_data_healthy, strategy_ready=True, risk_approved=risk_approved, long_only=True, max_quantity=position_config.max_quantity, max_order_value=position_config.max_order_value), CanonicalOrder(symbol=normalized_symbol, side="BUY", quantity=plan.quantity, order_type="LIMIT", product="INTRADAY", price=entry, stop_loss=stop, target=target))
+    if not execution.allowed:
+        return TradeDecision(signal_id, normalized_symbol, "BUY", "BLOCKED", execution.reason, confidence, entry, stop, target, risk_reward, plan.quantity, plan.capital_required, plan.max_loss, execution.normalized_broker)
+    return TradeDecision(signal_id, normalized_symbol, "BUY", "PAPER_READY", "PAPER_ORDER_AUTHORIZED", confidence, entry, stop, target, risk_reward, plan.quantity, plan.capital_required, plan.max_loss, execution.normalized_broker)
