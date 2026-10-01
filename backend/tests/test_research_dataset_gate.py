@@ -98,7 +98,7 @@ def test_certified_dataset_rejects_weekend_bars(tmp_path):
         MarketBar(datetime(2026, 1, 3, 9, 20, tzinfo=timezone.utc), 100.5, 102, 100, 101.5, 12),
     ]
     _save_certified(store, bars)
-    with pytest.raises(ValueError, match="weekend_bars=2"):
+    with pytest.raises(ValueError, match="unknown_session_bars=2"):
         require_certified_dataset("nse/TCS_5m", store=store)
 
 
@@ -127,6 +127,59 @@ def test_certified_dataset_rejects_outside_regular_session(tmp_path):
         MarketBar(datetime(2026, 1, 5, 3, 0, tzinfo=timezone.utc), 100, 101, 99, 100.5, 10),
         MarketBar(datetime(2026, 1, 5, 3, 5, tzinfo=timezone.utc), 100.5, 102, 100, 101.5, 12),
     ]
+    _save_certified(store, bars)
+    with pytest.raises(ValueError, match="outside_session_bars=2"):
+        require_certified_dataset("nse/TCS_5m", store=store)
+
+
+def _bars_for_day(day, start_hour, start_minute, count):
+    from datetime import timedelta
+    from zoneinfo import ZoneInfo
+    start = datetime(
+        day.year, day.month, day.day, start_hour, start_minute,
+        tzinfo=ZoneInfo("Asia/Kolkata"),
+    )
+    return [
+        MarketBar(start + timedelta(minutes=5 * index), 100, 101, 99, 100.5, 10)
+        for index in range(count)
+    ]
+
+
+def test_certified_dataset_accepts_known_live_muhurat_session(tmp_path):
+    store = ResearchStore(tmp_path)
+    bars = _bars_for_day(datetime(2023, 11, 12).date(), 18, 15, 12)
+    _save_certified(store, bars)
+    loaded, _ = require_certified_dataset("nse/TCS_5m", store=store)
+    assert len(loaded) == 12
+
+
+def test_certified_dataset_rejects_known_mock_session(tmp_path):
+    store = ResearchStore(tmp_path)
+    bars = _bars_for_day(datetime(2022, 4, 9).date(), 11, 15, 2)
+    _save_certified(store, bars)
+    with pytest.raises(ValueError, match="mock_session_bars=2"):
+        require_certified_dataset("nse/TCS_5m", store=store)
+
+
+def test_certified_dataset_accepts_multi_window_live_special_session(tmp_path):
+    store = ResearchStore(tmp_path)
+    bars = _bars_for_day(datetime(2024, 3, 2).date(), 11, 30, 12)
+    _save_certified(store, bars)
+    loaded, _ = require_certified_dataset("nse/TCS_5m", store=store)
+    assert len(loaded) == 12
+
+
+def test_certified_dataset_rejects_unknown_weekend_session(tmp_path):
+    store = ResearchStore(tmp_path)
+    bars = _bars_for_day(datetime(2026, 10, 3).date(), 9, 15, 2)
+    _save_certified(store, bars)
+    with pytest.raises(ValueError, match="unknown_session_bars=2"):
+        require_certified_dataset("nse/TCS_5m", store=store)
+
+
+def test_certified_dataset_rejects_outside_special_session_window(tmp_path):
+    store = ResearchStore(tmp_path)
+    bars = _bars_for_day(datetime(2024, 3, 2).date(), 10, 5, 2)
     _save_certified(store, bars)
     with pytest.raises(ValueError, match="outside_session_bars=2"):
         require_certified_dataset("nse/TCS_5m", store=store)
