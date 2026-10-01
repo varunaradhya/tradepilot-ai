@@ -102,11 +102,21 @@ def test_certified_dataset_rejects_weekend_bars(tmp_path):
         require_certified_dataset("nse/TCS_5m", store=store)
 
 
+class RawCertifiedStore:
+    def __init__(self, bars):
+        self.bars = bars
+
+    def load(self, dataset):
+        return self.bars
+
+    def get_provenance(self, dataset):
+        return _provenance(self.bars, False)
+
+
 def test_certified_dataset_rejects_negative_volume(tmp_path):
-    store = ResearchStore(tmp_path)
     bars = _bars()
     bars[1] = MarketBar(bars[1].timestamp, bars[1].open, bars[1].high, bars[1].low, bars[1].close, -1)
-    _save_certified(store, bars)
+    store = RawCertifiedStore(bars)
     with pytest.raises(ValueError, match="negative_volume_bars=1"):
         require_certified_dataset("nse/TCS_5m", store=store)
 
