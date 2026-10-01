@@ -36,3 +36,11 @@
 - Replaced the portfolio-oriented dashboard with an algorithm command center showing paper performance, execution guard status and direct access to the core workflow.
 - Fixed a paper-trading readiness response-shape mismatch that could crash the Paper Trading screen during render.
 - Live broker execution remains disabled.
+
+
+## 2026-10-01 — Algorithm-first strategy discovery
+- Added a chronological holdout discovery service for the existing NSE 5-minute ORB family.
+- Discovery evaluates a deliberately bounded, interpretable parameter grid across the selected stored symbols, splitting history chronologically into train and unseen holdout segments.
+- Screening reports holdout return, profit factor, drawdown, trade sufficiency and cross-symbol robustness; it is explicitly research-only and cannot authorize broker execution.
+- Strategy Lab UI was reduced to the core workflow: select an NSE universe, discover candidate configurations, inspect parameters and run a focused backtest.
+- Existing backtesting, walk-forward, robustness and paper-trading infrastructure remains in place for subsequent validation.
