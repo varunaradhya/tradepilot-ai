@@ -19,7 +19,7 @@ export default function TradeDecisionPage() {
   const [error, setError] = useState("");
   const [decision, setDecision] = useState<Decision | null>(null);
   const closeValues = useMemo(() => closes.split(",").map(Number).filter(Number.isFinite), [closes]);
-  const [generated,setGenerated] = useState<{symbol:string;session:string;action:string;confidence:number;entry:number;stop:number;target:number}|null>(null);
+  const [generated,setGenerated] = useState<{symbol:string;session:string;action:string;confidence:number;entry:number;stop:number;target:number;strategy_fingerprint?:string}|null>(null);
   const [paperResult,setPaperResult] = useState<{accepted?:boolean;reason?:string;idempotent_replay?:boolean;mode?:string}|null>(null);
   const [sending,setSending] = useState(false);
   useEffect(() => {
@@ -62,7 +62,7 @@ export default function TradeDecisionPage() {
       };
       const result = await api.post<{accepted?:boolean;reason?:string;idempotent_replay?:boolean;mode?:string}>(
         "/paper-trading/session/signal",
-        { ...source, interval: "5", strategy_version: "V1", lot_size: 1 }
+        { ...source, interval: "5", strategy_version: "V1", strategy_fingerprint: source.strategy_fingerprint, lot_size: 1 }
       );
       setPaperResult(result);
     } catch (e) { setError(e instanceof Error ? e.message : "Paper handoff failed"); }
