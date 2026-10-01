@@ -20,3 +20,10 @@
 - Fixed frontend request cancellation semantics so the global timeout remains active even when a caller supplies an AbortSignal; caller cancellation now aborts the same request controller.
 - No live-trading execution was enabled by this product UX work.
 - The next product batches remain focused on connecting the existing Market → Strategy → Risk → Decision → Paper Trading workflow and broker read-only architecture rather than reopening completed research-certification work.
+
+
+## 2026-10-01 — Premium workspace consolidation
+- Extended the premium TradePilot visual system beyond Portfolio to Paper Trading, Strategy Builder, Broker Connections, Transactions and F&O.
+- Reused shared premium cards, controls, typography, status treatments and responsive page spacing so the major user workflows now present as one cohesive trading cockpit.
+- Preserved existing API behavior, paper-only execution boundaries and broker safety controls while changing presentation only.
+- CI deployment recovery and release-gate validation remain green after the database-outage drill hardening.
