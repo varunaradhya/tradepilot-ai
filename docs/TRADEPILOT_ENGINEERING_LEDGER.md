@@ -321,3 +321,10 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - Root causes were test fixtures/helpers not aligned with the stricter certification contract, plus fingerprint instability between integer/float representations after normalization.
 - Canonicalized dataset fingerprint numeric fields and updated structural-gate fixtures without weakening production certification rules.
 - Status: FIXED — CI verification in progress.
+
+
+### 2026-10-01 — CI restored green
+- Latest GitHub Actions run 1725 for the corrected head passed all jobs: backend, frontend, PostgreSQL migrations, deployment-config, and release-gate.
+- Backend result: 850 passed, 1 skipped, with existing warnings only.
+- Root causes of the prior seven backend failures were corrected without weakening research certification: canonical fingerprint numeric normalization, raw structural-defect fixture coverage, certified batch-store fixtures, explicit Asia/Kolkata batch timestamps, and correct missing-dataset handling.
+- Current CI status: GREEN.
