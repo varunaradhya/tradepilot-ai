@@ -15,6 +15,7 @@ from app.services.research_store import research_store
 from app.services.intraday_scorecard import build_intraday_scorecard, ScorecardConfig
 from app.services.intraday_evidence_aggregation import aggregate_scorecards
 from app.services.intraday_historical_validation import HistoricalValidationConfig, validate_historical_datasets
+from app.services.intraday_strategy_discovery import discover_intraday_strategies
 from app.models.paper_trade import PaperTrade
 
 router = APIRouter(prefix="/strategy-builder", tags=["Strategy Builder"])
@@ -86,6 +87,35 @@ def _basket(symbols: str, interval: str):
         else:
             missing.append(item)
     return requested, datasets, missing
+
+@router.post("/discover")
+def discover_strategy(
+    symbols: str = Query(default="TCS,INFY,RELIANCE,HDFCBANK,ICICIBANK,SBIN", max_length=2000),
+    interval: str = Query(default="5", pattern="^(5)$"),
+    train_fraction: float = Query(default=0.70, ge=0.5, lt=1.0),
+    min_test_trades: int = Query(default=10, ge=1, le=1000),
+    request: StrategyBuildRequest = ...,
+    current_user: User = Depends(get_current_user),
+):
+    del current_user
+    requested, datasets, missing = _basket(symbols, interval)
+    if not requested:
+        raise HTTPException(status_code=422, detail="At least one symbol is required")
+    strategy = _strategy(request)
+    result = discover_intraday_strategies(
+        datasets,
+        base=strategy,
+        initial_capital=request.initial_capital,
+        train_fraction=train_fraction,
+        min_test_trades=min_test_trades,
+    )
+    return {
+        "interval": interval,
+        "requested_symbols": requested,
+        "missing_symbols": missing,
+        **result,
+    }
+
 
 @router.post("/backtest")
 def build_and_backtest(symbol: str = Query(min_length=1, max_length=30), interval: str = Query(default="5", pattern="^(1|5|15|25|60)$"), request: StrategyBuildRequest = ..., current_user: User = Depends(get_current_user)):
