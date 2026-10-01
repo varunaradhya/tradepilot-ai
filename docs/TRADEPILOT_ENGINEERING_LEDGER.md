@@ -314,3 +314,10 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - Added a guarded PostgreSQL custom-format backup/restore drill script. It refuses source-to-source restoration and requires explicit `CONFIRM_RESTORE=YES` plus a dedicated restore target.
 - These changes make PostgreSQL migration and recovery verification executable; an actual production backup/restore drill still requires a deployed environment.
 - Status: IMPLEMENTED — CI PENDING.
+
+
+### 2026-10-01 — CI failure remediation
+- Investigated GitHub Actions run 1713: frontend, Docker Compose validation, and PostgreSQL migration verification passed; backend failed 7 tests.
+- Root causes were test fixtures/helpers not aligned with the stricter certification contract, plus fingerprint instability between integer/float representations after normalization.
+- Canonicalized dataset fingerprint numeric fields and updated structural-gate fixtures without weakening production certification rules.
+- Status: FIXED — CI verification in progress.
