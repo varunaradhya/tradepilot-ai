@@ -138,7 +138,7 @@ def scan_with_selected_strategy(
     if not requested:
         raise HTTPException(status_code=422, detail="At least one symbol is required")
     strategy = _strategy(request)
-    fingerprint = strategy_fingerprint(strategy, strategy_version="V1")
+    fingerprint = strategy_fingerprint(strategy, strategy_version="V1", execution={"brokerage_rate": request.brokerage_rate, "slippage_rate": request.slippage_rate, "max_daily_loss_percent": request.max_daily_loss_percent, "max_trades_per_session": request.max_trades_per_session})
     results = []
     missing = []
     for symbol in requested:
