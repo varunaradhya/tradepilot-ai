@@ -40,7 +40,7 @@ jobs:
         env:
           TRADEPILOT_ENV: test
           TRADEPILOT_AUTO_CREATE_SCHEMA: "true"
-          TRADEPILOT_JWT_SECRET: ci-test-jwt-secret
+          TRADEPILOT_JWT_SECRET: ci-test-jwt-secret-32-bytes-minimum!!
         run: python -m pytest -q
 
   postgres-migrations:
@@ -109,7 +109,7 @@ jobs:
       - name: Validate Docker Compose configuration
         env:
           POSTGRES_PASSWORD: ci-placeholder-password
-          TRADEPILOT_JWT_SECRET: ci-placeholder-jwt-secret
+          TRADEPILOT_JWT_SECRET: ci-placeholder-jwt-secret-32-bytes-minimum!!
           TRADEPILOT_BROKER_ENCRYPTION_KEY: ci-placeholder-broker-key
           TRADEPILOT_CORS_ORIGINS: http://localhost:8080
         run: docker compose config --quiet
