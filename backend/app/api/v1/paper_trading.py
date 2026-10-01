@@ -40,7 +40,7 @@ class PaperMarkRequest(BaseModel):
 class PaperCloseRequest(BaseModel):
     exit_price: float = Field(gt=0); reason: str = Field(default="MANUAL", min_length=1, max_length=40)
 class PaperSignalRequest(BaseModel):
-    session: str = Field(min_length=1, max_length=40); action: str = Field(min_length=1, max_length=20); entry: float = Field(gt=0); stop: float = Field(gt=0); target: float = Field(gt=0); symbol: str = Field(min_length=1, max_length=30); interval: str = Field(default="5", pattern="^(1|5|15|25|60)$"); strategy_version: str = Field(default="V1", pattern="^(V1|V2)$"); lot_size: int = Field(default=1, gt=0, le=100000); request_id: str | None = Field(default=None, min_length=1, max_length=100)
+    session: str = Field(min_length=1, max_length=40); action: str = Field(min_length=1, max_length=20); entry: float = Field(gt=0); stop: float = Field(gt=0); target: float = Field(gt=0); symbol: str = Field(min_length=1, max_length=30); interval: str = Field(default="5", pattern="^(1|5|15|25|60)$"); strategy_version: str = Field(default="V1", pattern="^(V1|V2)$"); lot_size: int = Field(default=1, gt=0, le=100000); request_id: str | None = Field(default=None, min_length=1, max_length=100); strategy_fingerprint: str | None = Field(default=None, min_length=8, max_length=64)
 class PaperBarRequest(BaseModel):
     session: str = Field(min_length=1, max_length=40); high: float = Field(gt=0); low: float = Field(gt=0); close: float = Field(gt=0)
 class MarketBarRequest(BaseModel):
@@ -150,7 +150,7 @@ def _authorize_from_research(db: Session, user_id: int, symbol: str, symbols: st
     return {"authorized": True, "authorization_id": record.id, "symbol": record.symbol, "interval": record.interval, "strategy_version": record.strategy_version, "fingerprint": record.fingerprint, "authorized_at": record.authorized_at}
 
 
-def _load_authorization(db: Session, user_id: int, symbol: str, interval: str, strategy_version: str) -> bool:
+def _load_authorization(db: Session, user_id: int, symbol: str, interval: str, strategy_version: str, expected_fingerprint: str | None = None) -> bool:
     orchestrator = _orchestrator(user_id, db)
     record = get_active_authorization(db, user_id, symbol=symbol, interval=interval, strategy_version=strategy_version)
     if record is None:
