@@ -67,7 +67,7 @@ export default function BrokerPage() {
   const cards = useMemo(() => BROKERS.map(card => ({ ...card, connection: brokers.find(b => b.broker_name === card.key) })), [brokers]);
 
   return (
-    <main className="min-h-screen bg-slate-50 p-6 text-slate-900">
+    <main className="tp-page">
       <div className="mx-auto max-w-6xl">
         <header className="rounded-3xl bg-slate-950 p-6 text-white shadow-lg sm:p-8">
           <div className="flex flex-wrap items-start justify-between gap-5">
@@ -93,7 +93,7 @@ export default function BrokerPage() {
         <section className="mt-6 grid gap-4 md:grid-cols-3">
           {cards.map(card => {
             const connected = Boolean(card.connection);
-            return <article key={card.key} className="group rounded-2xl border bg-white p-5 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg">
+            return <article key={card.key} className="group tp-premium-card rounded-2xl p-5 transition duration-300 hover:-translate-y-1 hover:shadow-lg">
               <div className="flex items-start justify-between gap-3">
                 <div><p className="text-xs font-bold uppercase tracking-wider text-slate-400">{card.key}</p><h2 className="mt-1 text-xl font-black">{card.name}</h2></div>
                 <span className={`rounded-full px-2.5 py-1 text-[11px] font-extrabold ${card.phase === "READY" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{card.phase}</span>
@@ -109,17 +109,17 @@ export default function BrokerPage() {
         </section>
 
         <section className="mt-6 grid gap-6 lg:grid-cols-[1fr_320px]">
-          <div className="rounded-2xl border bg-white p-6 shadow-sm">
+          <div className="tp-premium-card rounded-2xl p-6">
             <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-wider text-slate-400">Account connection</p><h2 className="mt-1 text-xl font-black">Dhan</h2><p className="mt-1 text-sm text-slate-500">Read-only portfolio synchronization. Your access token is never displayed after submission.</p></div>{dhan && <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">{dhan.status}</span>}</div>
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
               <label className="text-xs font-bold text-slate-600">Client ID<input value={clientId} onChange={e => setClientId(e.target.value)} placeholder="Dhan Client ID" autoComplete="off" className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition focus:ring-2 focus:ring-slate-200" /></label>
               <label className="text-xs font-bold text-slate-600">Access token<input type="password" value={accessToken} onChange={e => setAccessToken(e.target.value)} placeholder="Dhan Access Token" autoComplete="new-password" className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition focus:ring-2 focus:ring-slate-200" /></label>
             </div>
-            <div className="mt-4 flex flex-wrap gap-3"><button type="button" disabled={loading} onClick={() => void connect()} className="rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-bold text-white transition hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50">{loading ? "Working…" : dhan ? "Reconnect Dhan" : "Connect Dhan"}</button>{dhan && <button type="button" disabled={loading} onClick={() => void synchronize()} className="rounded-xl border px-5 py-2.5 text-sm font-bold transition hover:-translate-y-0.5 disabled:opacity-50">Sync Portfolio</button>}</div>
+            <div className="mt-4 flex flex-wrap gap-3"><button type="button" disabled={loading} onClick={() => void connect()} className="tp-button-primary transition hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50">{loading ? "Working…" : dhan ? "Reconnect Dhan" : "Connect Dhan"}</button>{dhan && <button type="button" disabled={loading} onClick={() => void synchronize()} className="rounded-xl border px-5 py-2.5 text-sm font-bold transition hover:-translate-y-0.5 disabled:opacity-50">Sync Portfolio</button>}</div>
             {dhan && <div className="mt-5 rounded-xl bg-slate-50 p-4 text-xs text-slate-500"><p>Client: <span className="font-bold text-slate-700">{dhan.client_id}</span></p>{dhan.last_sync_at && <p className="mt-1">Last sync: {dhan.last_sync_at} · {dhan.last_sync_status ?? "unknown"}</p>}</div>}
           </div>
 
-          <aside className="rounded-2xl border bg-white p-6 shadow-sm"><p className="text-xs font-bold uppercase tracking-wider text-slate-400">Safety model</p><h2 className="mt-1 text-xl font-black">Connection is not execution</h2><div className="mt-5 space-y-3 text-sm">{["Credentials stay server-side", "Broker capability is tracked separately", "Strategy readiness is independent", "Paper trading remains the default", "Live orders remain globally locked"].map((item, i) => <div key={item} className="flex gap-2"><span className="font-bold text-emerald-600">{i < 4 ? "✓" : "🔒"}</span><span className="text-slate-600">{item}</span></div>)}</div><div className="mt-5 rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-900"><strong>Security:</strong> Never commit broker tokens, encryption keys, or secrets to GitHub.</div></aside>
+          <aside className="tp-premium-card rounded-2xl p-6"><p className="text-xs font-bold uppercase tracking-wider text-slate-400">Safety model</p><h2 className="mt-1 text-xl font-black">Connection is not execution</h2><div className="mt-5 space-y-3 text-sm">{["Credentials stay server-side", "Broker capability is tracked separately", "Strategy readiness is independent", "Paper trading remains the default", "Live orders remain globally locked"].map((item, i) => <div key={item} className="flex gap-2"><span className="font-bold text-emerald-600">{i < 4 ? "✓" : "🔒"}</span><span className="text-slate-600">{item}</span></div>)}</div><div className="mt-5 rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-900"><strong>Security:</strong> Never commit broker tokens, encryption keys, or secrets to GitHub.</div></aside>
         </section>
       </div>
     </main>
