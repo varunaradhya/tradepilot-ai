@@ -105,3 +105,10 @@ No raw data was deleted or repaired as part of this change.
 No performance/backtest conclusion should be treated as certified research from this raw dataset until the certification requirements are satisfied. In particular, the data's corporate-action adjustment state must come from authoritative provenance rather than being inferred from observed price jumps.
 
 No source rows were silently repaired or removed.
+
+
+## Corporate-action provenance implementation — 2026-10-01
+
+A source-backed provenance contract is now implemented in `backend/app/services/corporate_action_provenance.py`. It records the dataset/provider, explicit adjustment state, provider contract reference, authoritative corporate-action source/version, and symbol/date-scoped action records with source references.
+
+The implementation deliberately does **not** infer adjustment state from price jumps. For the current Dhan-derived dataset, the available Dhan historical-data documentation does not establish whether the intraday OHLCV series is corporate-action adjusted. Therefore the dataset remains `corporate_action_adjusted=None` until Dhan or another authoritative source explicitly establishes that state. This is a provenance/control improvement, not certification of the current dataset.
