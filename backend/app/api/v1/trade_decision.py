@@ -27,7 +27,7 @@ def _validated_indian_symbol(symbol: str) -> str:
     exact = [item for item in matches if item.symbol.upper() == normalized]
     if not exact:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"{normalized or 'SYMBOL'} is not available in the Indian NSE/BSE equity universe.",
         )
     return exact[0].symbol.upper()
