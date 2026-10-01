@@ -338,3 +338,11 @@ Current HEAD: certification-sync `8828c96a99f6d3e0ca997530408184866a3d359a`
 - The dataset remains **NOT CERTIFIED** because 18 negative-volume rows remain and corporate-action adjustment provenance is still not established. Raw data was not repaired or deleted.
 - Strict 5-minute certification remains separate and is not weakened by the calendar work.
 - Status: DONE — implementation and current-head CI verification complete; real-data certification remains blocked by data/provenance evidence.
+
+
+### 2026-10-01 — NSE 2026 holiday-calendar completion
+- Updated the NSE equity holiday set with the additional 2026 exchange holidays documented by NSE: 2026-02-19, 2026-03-19, 2026-04-01, and 2026-08-26.
+- Added regression coverage for the newly included dates.
+- GitHub Actions **run 1753** passed for current HEAD `5258a5466250b77cb25a86db4547cae0d9ade42e`.
+- This calendar update does not infer or invent a future Muhurat window where NSE timings have not been published.
+- Status: DONE — implementation and current-head CI verification complete.
