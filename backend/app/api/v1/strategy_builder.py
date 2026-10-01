@@ -5,7 +5,8 @@ from app.dependencies.auth import get_current_user
 from app.db.database import get_db
 from app.models.user import User
 from app.services.intraday_backtest import IntradayBacktestConfig, run_intraday_backtest
-from app.services.intraday_strategy import IntradayConfig
+from app.services.intraday_strategy import IntradayConfig, generate_intraday_signal
+from app.services.strategy_identity import strategy_fingerprint
 from app.services.intraday_strategy_comparison import compare_intraday_strategies
 from app.services.intraday_walk_forward import run_fixed_parameter_walk_forward
 from app.services.intraday_robustness import run_robustness_analysis
@@ -116,6 +117,68 @@ def discover_strategy(
         **result,
     }
 
+
+@router.post("/signal-scan")
+def scan_with_selected_strategy(
+    symbols: str = Query(default="TCS,INFY,RELIANCE,HDFCBANK,ICICIBANK,SBIN", max_length=2000),
+    interval: str = Query(default="5", pattern="^(5)$"),
+    request: StrategyBuildRequest = ...,
+    current_user: User = Depends(get_current_user),
+):
+    """Generate research-only signals from the explicitly selected strategy.
+
+    This endpoint evaluates the latest stored session for each requested NSE
+    dataset. It never places broker orders and is intentionally separate from
+    the live execution path.
+    """
+    del current_user
+    requested = list(dict.fromkeys(item.strip().upper() for item in symbols.split(",") if item.strip()))
+    if not requested:
+        raise HTTPException(status_code=422, detail="At least one symbol is required")
+    strategy = _strategy(request)
+    fingerprint = strategy_fingerprint(strategy, strategy_version="V1")
+    results = []
+    missing = []
+    for symbol in requested:
+        dataset, rows = _rows(symbol, interval)
+        if not rows:
+            missing.append(symbol)
+            continue
+        latest_session = rows[-1].get("session")
+        session_rows = [row for row in rows if row.get("session") == latest_session]
+        if len(session_rows) < max(strategy.slow_period, strategy.volume_period, strategy.atr_period + 1, strategy.opening_bars + 1):
+            results.append({"symbol": symbol, "action": "WAIT", "reason": "INSUFFICIENT_SESSION_DATA", "session": latest_session})
+            continue
+        opening = session_rows[: strategy.opening_bars]
+        signal = generate_intraday_signal(
+            [float(x["open"]) for x in session_rows],
+            [float(x["high"]) for x in session_rows],
+            [float(x["low"]) for x in session_rows],
+            [float(x["close"]) for x in session_rows],
+            [float(x["volume"]) for x in session_rows],
+            opening_high=max(float(x["high"]) for x in opening),
+            opening_low=min(float(x["low"]) for x in opening),
+            config=strategy,
+        )
+        action = "BUY" if signal.get("action") == "BUY" else "WAIT"
+        results.append({
+            "symbol": symbol,
+            "action": action,
+            "reason": signal.get("reason", "NO_SETUP"),
+            "session": latest_session,
+            "timestamp": session_rows[-1].get("timestamp", session_rows[-1].get("time")),
+            "signal": signal,
+        })
+    return {
+        "status": "RESEARCH_ONLY",
+        "interval": interval,
+        "strategy_version": "V1",
+        "strategy": strategy.__dict__,
+        "strategy_fingerprint": fingerprint,
+        "results": results,
+        "missing_symbols": missing,
+        "warning": "Signals use stored historical research data only. They do not authorize or place live broker orders.",
+    }
 
 @router.post("/backtest")
 def build_and_backtest(symbol: str = Query(min_length=1, max_length=30), interval: str = Query(default="5", pattern="^(1|5|15|25|60)$"), request: StrategyBuildRequest = ..., current_user: User = Depends(get_current_user)):
