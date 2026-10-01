@@ -1,4 +1,7 @@
 from datetime import datetime, timedelta
+from pathlib import Path
+
+from app.services.dataset_provenance import fingerprint_market_bars
 
 from app.services.historical_data_service import MarketBar
 from app.services.intraday_batch_research import run_multi_stock_research
@@ -8,9 +11,27 @@ from app.services.research_store import ResearchStore
 class FakeStore(ResearchStore):
     def __init__(self, datasets):
         self.datasets = datasets
+        self.root = Path("/tmp/fake-research")
 
     def load(self, dataset):
         return self.datasets.get(dataset, [])
+
+    def get_provenance(self, dataset):
+        bars = self.datasets.get(dataset, [])
+        if not bars:
+            return None
+        symbol = dataset.split("/", 1)[-1].split("_", 1)[0]
+        interval = dataset.rsplit("_", 1)[-1].removesuffix("m")
+        return {
+            "dataset_id": dataset,
+            "symbol": symbol,
+            "timeframe": f"{interval}m",
+            "quality_status": "VALID",
+            "content_fingerprint": fingerprint_market_bars(
+                bars, symbol=symbol, timeframe=f"{interval}m"
+            ),
+            "corporate_action_adjusted": False,
+        }
 
 
 def _bars(start=100.0):
