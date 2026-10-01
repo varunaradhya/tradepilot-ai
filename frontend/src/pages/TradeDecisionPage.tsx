@@ -23,7 +23,7 @@ export default function TradeDecisionPage() {
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem("tradepilot:generatedSignal");
-      if (raw) setGenerated(JSON.parse(raw));
+      if (raw) { const value = JSON.parse(raw); setGenerated(value); setSymbol(value.symbol); }
     } catch { setGenerated(null); }
   }, []);
 
