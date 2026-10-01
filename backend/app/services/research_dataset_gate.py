@@ -1,6 +1,7 @@
 """Fail-closed eligibility checks for research analytics datasets."""
 from __future__ import annotations
 
+from collections import defaultdict
 from typing import Any
 from zoneinfo import ZoneInfo
 
