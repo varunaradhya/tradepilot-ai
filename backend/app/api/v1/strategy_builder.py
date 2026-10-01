@@ -17,6 +17,8 @@ from app.services.intraday_scorecard import build_intraday_scorecard, ScorecardC
 from app.services.intraday_evidence_aggregation import aggregate_scorecards
 from app.services.intraday_historical_validation import HistoricalValidationConfig, validate_historical_datasets
 from app.services.intraday_strategy_discovery import discover_intraday_strategies
+from app.services.strategy_identity import strategy_fingerprint
+from app.services.strategy_paper_authorization import authorize_strategy
 from app.models.paper_trade import PaperTrade
 
 router = APIRouter(prefix="/strategy-builder", tags=["Strategy Builder"])
@@ -179,6 +181,27 @@ def scan_with_selected_strategy(
         "missing_symbols": missing,
         "warning": "Signals use stored historical research data only. They do not authorize or place live broker orders.",
     }
+
+@router.post("/authorize-paper")
+def authorize_discovered_strategy_for_paper(
+    symbol: str = Query(min_length=1, max_length=30),
+    interval: str = Query(default="5", pattern="^(5)$"),
+    train_size: int = Query(default=60, ge=10, le=5000),
+    validation_size: int = Query(default=20, ge=5, le=2000),
+    request: StrategyBuildRequest = ...,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    dataset, rows = _rows(symbol, interval)
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"Intraday dataset not found: {dataset}")
+    strategy, config, backtest, robustness, walk_forward, qualification = _qualification(request, rows, train_size, validation_size, None)
+    if not qualification.get("paper_trading_allowed", False):
+        raise HTTPException(status_code=409, detail={"reason": "STRATEGY_NOT_QUALIFIED", "qualification": qualification})
+    fingerprint = strategy_fingerprint(strategy, strategy_version="V1", execution={"brokerage_rate": request.brokerage_rate, "slippage_rate": request.slippage_rate, "max_daily_loss_percent": request.max_daily_loss_percent, "max_trades_per_session": request.max_trades_per_session})
+    evidence = {"qualification": qualification, "backtest": {k: v for k, v in backtest.items() if k != "trades_detail"}, "robustness": robustness.get("summary", {}), "walk_forward": {"windows": walk_forward.get("windows", 0)}}
+    record = authorize_strategy(db, current_user.id, symbol=symbol, interval=interval, strategy_version="V1", fingerprint=fingerprint, evidence=evidence)
+    return {"mode": "SIMULATION_ONLY", "authorized": True, "symbol": symbol.strip().upper(), "interval": interval, "strategy_version": "V1", "fingerprint": fingerprint, "authorization_id": record.id, "qualification": qualification}
 
 @router.post("/backtest")
 def build_and_backtest(symbol: str = Query(min_length=1, max_length=30), interval: str = Query(default="5", pattern="^(1|5|15|25|60)$"), request: StrategyBuildRequest = ..., current_user: User = Depends(get_current_user)):
