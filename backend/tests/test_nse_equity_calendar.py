@@ -11,6 +11,10 @@ def test_2026_nse_equity_calendar_skips_exchange_holidays():
     assert not DEFAULT_NSE_EQUITY_CALENDAR.is_trading_day(date(2026, 10, 2))
     assert not DEFAULT_NSE_EQUITY_CALENDAR.is_trading_day(date(2026, 10, 20))
     assert date(2026, 10, 2) in NSE_EQUITY_HOLIDAYS_2026
+    assert date(2026, 2, 19) in NSE_EQUITY_HOLIDAYS_2026
+    assert date(2026, 3, 19) in NSE_EQUITY_HOLIDAYS_2026
+    assert date(2026, 4, 1) in NSE_EQUITY_HOLIDAYS_2026
+    assert date(2026, 8, 26) in NSE_EQUITY_HOLIDAYS_2026
 
 def test_2026_calendar_does_not_treat_muhurat_as_regular_session():
     assert not DEFAULT_NSE_EQUITY_CALENDAR.is_trading_day(date(2026, 11, 8))
