@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiRequest } from "../services/api";
+import { api } from "../services/api";
 
 type Result = {
   symbol:string; action:string; reason:string; session?:string; timestamp?:string;
@@ -42,9 +42,9 @@ export default function IntradayScannerPage() {
     setLoading(true); setError("");
     try {
       const strategy = { ...defaultStrategy, ...(selected?.parameters ?? {}) };
-      const data = await apiRequest<ScanResponse>(
+      const data = await api.post<ScanResponse>(
         `/strategy-builder/signal-scan?symbols=${encodeURIComponent(symbols)}&interval=5`,
-        { method:"POST", body: JSON.stringify(strategy) }
+        strategy
       );
       setResult(data);
     } catch (e) {
