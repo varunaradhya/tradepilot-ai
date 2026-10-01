@@ -103,7 +103,7 @@ export default function IntradayScannerPage() {
             <span className={`rounded-full px-3 py-2 text-center text-xs font-black ${row.action==="BUY"?"bg-emerald-400/10 text-emerald-300":"bg-white/[.05] text-slate-400"}`}>{row.action}</span>
             <div>
               <p className="text-xs font-bold text-slate-400">{row.reason.replaceAll("_"," ")}</p>
-              {row.signal?.entry && <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500"><span>Entry <b className="text-white">{n(row.signal.entry)}</b></span><span>SL <b className="text-rose-300">{n(row.signal.stop)}</b></span><span>Target <b className="text-emerald-300">{n(row.signal.target)}</b></span><span>Quality <b className="text-white">{n(row.signal.quality_score,0)}</b></span></div>}
+              {row.signal?.entry && <div className="mt-2 flex flex-wrap items-center gap-3"><div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500"><span>Entry <b className="text-white">{n(row.signal.entry)}</b></span><span>SL <b className="text-rose-300">{n(row.signal.stop)}</b></span><span>Target <b className="text-emerald-300">{n(row.signal.target)}</b></span><span>Quality <b className="text-white">{n(row.signal.quality_score,0)}</b></span></div>{row.action==="BUY"&&<button onClick={()=>{sessionStorage.setItem("tradepilot:generatedSignal",JSON.stringify({symbol:row.symbol,session:row.session,action:row.action,confidence:row.signal?.quality_score??0,entry:row.signal?.entry,stop:row.signal?.stop,target:row.signal?.target}));window.location.hash="#/decision";}} className="rounded-lg bg-violet-500/15 px-3 py-1.5 text-[10px] font-black text-violet-200">Trade Decision →</button>}</div>}
             </div>
           </div>)}
         </div>
