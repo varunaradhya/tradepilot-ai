@@ -2,8 +2,8 @@
 
 Repository: varunaradhya/tradepilot-ai
 Branch: main
-Last updated: 2026-09-29
-Current HEAD: lineage-hardening batch in main; exact SHA is reported in the session completion record
+Last updated: 2026-10-01
+Current HEAD: certification-sync `8828c96a99f6d3e0ca997530408184866a3d359a`
 
 ## Status
 - DONE — implementation complete and verified by available evidence
@@ -328,3 +328,13 @@ Current HEAD: lineage-hardening batch in main; exact SHA is reported in the sess
 - Backend result: 850 passed, 1 skipped, with existing warnings only.
 - Root causes of the prior seven backend failures were corrected without weakening research certification: canonical fingerprint numeric normalization, raw structural-defect fixture coverage, certified batch-store fixtures, explicit Asia/Kolkata batch timestamps, and correct missing-dataset handling.
 - Current CI status: GREEN.
+
+
+### 2026-10-01 — Current-head CI and NSE session-calendar verification
+- GitHub Actions run **1746** completed successfully for current HEAD `8828c96a99f6d3e0ca997530408184866a3d359a`.
+- Current-head CI is green across backend, frontend, PostgreSQL migrations, deployment-config, and release-gate jobs.
+- Source-backed NSE exceptional-session classification is now integrated into research certification. Documented Muhurat/special sessions are treated by explicit windows; documented mock sessions remain non-researchable; unknown weekend sessions fail closed.
+- Real-data structural rerun against the supplied `equity_nse_discovery_5m` dataset found **0 unknown weekend rows** and **0 bars outside all known session windows** after resolving the documented 2022-10-24 and 2024-11-01 Muhurat sessions.
+- The dataset remains **NOT CERTIFIED** because 18 negative-volume rows remain and corporate-action adjustment provenance is still not established. Raw data was not repaired or deleted.
+- Strict 5-minute certification remains separate and is not weakened by the calendar work.
+- Status: DONE — implementation and current-head CI verification complete; real-data certification remains blocked by data/provenance evidence.
