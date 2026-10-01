@@ -140,7 +140,7 @@ export default function App() {
     <Workflow page={page} setPage={setPage} />
     <CommandPalette open={commandOpen} onClose={() => setCommandOpen(false)} setPage={setPage} />
     <main>
-      {page === "dashboard" && <DashboardPage onLogout={logout} onTransactions={() => setPage("transactions")} />}
+      {page === "dashboard" && <DashboardPage />}
       {page === "fno" && <FNOPage />}
       {page === "research" && <ResearchPage />}
       {page === "evidence" && <IntradayEvidencePage />}
