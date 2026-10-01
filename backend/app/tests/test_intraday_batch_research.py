@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from app.services.dataset_provenance import fingerprint_market_bars
 
@@ -37,7 +38,7 @@ class FakeStore(ResearchStore):
 def _bars(start=100.0):
     bars = []
     price = start
-    base = datetime(2025, 1, 2, 9, 15)
+    base = datetime(2025, 1, 2, 9, 15, tzinfo=ZoneInfo("Asia/Kolkata"))
     for i in range(60):
         price += 0.2
         bars.append(MarketBar(base + timedelta(minutes=5 * i), price - .1, price + .2, price - .2, price, 1000))
