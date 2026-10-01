@@ -63,7 +63,7 @@ def _run(rows: Sequence[dict], strategy: IntradayConfig, capital: float) -> dict
     )
 
 
-def _candidate_result(strategy: IntradayConfig, train_rows: list[dict], test_rows: list[dict], capital: float) -> dict:
+def _candidate_result(strategy: IntradayConfig, train_rows: list[dict], test_rows: list[dict], capital: float, min_test_trades: int) -> dict:
     train = _run(train_rows, strategy, capital)
     test = _run(test_rows, strategy, capital)
     test_trades = int(test["trades"])
@@ -81,7 +81,7 @@ def _candidate_result(strategy: IntradayConfig, train_rows: list[dict], test_row
         "train": {k: train[k] for k in ("return_percent", "trades", "win_rate_percent", "profit_factor", "expectancy", "max_drawdown_percent")},
         "test": {k: test[k] for k in ("return_percent", "trades", "win_rate_percent", "profit_factor", "expectancy", "max_drawdown_percent")},
         "screening_score": round(score, 4),
-        "sufficient_test_trades": test_trades >= 10,
+        "sufficient_test_trades": test_trades >= min_test_trades,
     }
 
 
@@ -106,7 +106,7 @@ def discover_intraday_strategies(
             if len(rows) < 100:
                 continue
             train_rows, test_rows = _split(rows, train_fraction)
-            result = _candidate_result(strategy, train_rows, test_rows, initial_capital)
+            result = _candidate_result(strategy, train_rows, test_rows, initial_capital, min_test_trades)
             result["symbol"] = symbol
             symbol_results.append(result)
 
