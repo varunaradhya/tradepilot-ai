@@ -1,7 +1,5 @@
 from datetime import datetime
-
 from pydantic import BaseModel
-
 
 class QuoteResponse(BaseModel):
     symbol: str
@@ -15,7 +13,6 @@ class QuoteResponse(BaseModel):
     market_time: datetime | None = None
     data_status: str = "LIVE"
 
-
 class HistoricalPrice(BaseModel):
     timestamp: datetime
     open: float | None = None
@@ -23,7 +20,6 @@ class HistoricalPrice(BaseModel):
     low: float | None = None
     close: float | None = None
     volume: int | None = None
-
 
 class HistoryResponse(BaseModel):
     symbol: str
@@ -33,8 +29,18 @@ class HistoryResponse(BaseModel):
     data: list[HistoricalPrice]
     data_status: str = "LIVE"
 
-
 class SearchInstrumentResponse(BaseModel):
     symbol: str
     name: str
     exchange: str
+
+class TechnicalAnalysisResponse(BaseModel):
+    symbol: str
+    interval: str
+    range: str
+    data_status: str
+    analysis_timestamp: datetime
+    bar_count: int
+    indicators: dict[str, list[float | None]]
+    latest: dict[str, float | None]
+    signal: dict
