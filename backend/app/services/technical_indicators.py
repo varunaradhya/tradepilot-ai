@@ -132,4 +132,7 @@ def build_signal(bars,indicators):
     if ml is not None and ms is not None:
         if ml>ms: bullish+=1; conditions.append("MACD is above its signal line")
         elif ml<ms: bearish+=1; conditions.append("MACD is below its signal line")
-    return {"direction":"bullish" if bullish>bearish else "bearish" if bearish>bullish else "neutral","bullish_conditions":bullish,"bearish_conditions":bearish,"conditions":conditions,"invalidation":["Signal is invalidated if the underlying trend conditions materially reverse."],"sufficient_data":sum(1 for b in bars if b.get("close") is not None)>=26}
+    sufficient=sum(1 for b in bars if b.get("close") is not None)>=35
+    direction="bullish" if bullish>bearish else "bearish" if bearish>bullish else "neutral"
+    if not sufficient: direction="neutral"
+    return {"direction":direction,"bullish_conditions":bullish,"bearish_conditions":bearish,"conditions":conditions,"invalidation":["Signal is invalidated if the underlying trend conditions materially reverse."],"sufficient_data":sufficient}
