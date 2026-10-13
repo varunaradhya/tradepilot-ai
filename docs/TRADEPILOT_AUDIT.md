@@ -164,3 +164,16 @@ The production Docker deployment required a JWT secret but did not explicitly se
 ### AUDIT-046 — Durable paper-state helpers could independently commit inside a mutation
 **Priority:** P1
 The multi-worker refactor removed process-local state, but independent helper commits could still split a request across multiple durable writes. Session-state, signal-completion, ML prediction and market-state paths now support deferred commits, and the primary signal/market-bar request paths commit at the request boundary. This reduces crash windows between simulator state and its supporting ledger records.
+
+
+## 11. Market chart/indicator increment — 2026-10-13
+
+### AUDIT-021 — Market page lacked an interactive OHLC candlestick view and shared indicator response — IMPLEMENTED, CI PENDING
+**Priority:** P1 / product correctness  
+The existing market page displayed a close-price SVG line chart and exposed historical OHLCV through the market provider, but did not display candle bodies/wicks, volume bars, or a consistent technical-indicator response for the chart.
+
+**Change:** Added a deterministic technical-indicator module and `GET /api/v1/market/technical-analysis/{symbol}`, reusing the existing market provider and API router. The market page now displays candlesticks, volume, crosshair/selected OHLC values, drag-to-pan, wheel zoom, SMA20/EMA21 overlays, and a compact indicator/signal summary. Daily/weekly/monthly VWAP is suppressed because VWAP is session-based and is not meaningfully represented by one cumulative series across daily bars.
+
+**Tests/evidence:** Added backend unit tests for SMA, EMA, RSI zero-loss behavior, MACD/Bollinger series lengths, ATR/VWAP validity, relative volume and deterministic output. Repository checkout/build execution was unavailable in this environment; current-head GitHub CI status was not yet exposed when checked. Status remains IMPLEMENTED — CI PENDING.
+
+**Limitations:** The SVG chart is a first functional increment, not a full TradingView replacement. It currently overlays SMA20 and EMA21; other calculated indicators are shown in the indicator response and can be added as selectable chart overlays later. Signal conditions are transparent comparisons, not a qualified strategy or trading recommendation. The latest provider bar may be incomplete; the API explicitly avoids claiming candle-close confirmation. Real market-data accuracy and freshness still depend on the configured provider.
