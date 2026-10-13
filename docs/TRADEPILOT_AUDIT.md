@@ -171,3 +171,16 @@ The multi-worker refactor removed process-local state, but independent helper co
 The paper mutation routes now acquire the same user-row lock before authorization state is loaded or changed, and authorization/revocation endpoints share that serialization boundary. The signal request claim now supports deferred commit so the idempotency record, ML prediction, simulator snapshot and terminal response can commit together. Dhan historical replay now defers successful validation evidence commits until the persisted paper trades and validation result are ready, reducing partial-success crash windows.
 
 Regression contracts were added for these transaction boundaries. Runtime execution remains pending because the repository currently has no reported GitHub Actions run for the latest commits.
+
+
+## 11. Market chart/indicator increment — 2026-10-13
+
+### AUDIT-021 — Market page lacked an interactive OHLC candlestick view and shared indicator response — IMPLEMENTED, CI PENDING
+**Priority:** P1 / product correctness  
+The existing market page displayed a close-price SVG line chart and exposed historical OHLCV through the market provider, but did not display candle bodies/wicks, volume bars, or a consistent technical-indicator response for the chart.
+
+**Change:** Added a deterministic technical-indicator module and `GET /api/v1/market/technical-analysis/{symbol}`, reusing the existing market provider and API router. The market page now displays candlesticks, volume, crosshair/selected OHLC values, drag-to-pan, wheel zoom, SMA20/EMA21 overlays, and a compact indicator/signal summary. VWAP resets at intraday session boundaries and is suppressed for daily/weekly/monthly bars.
+
+**Tests/evidence:** Added backend unit tests for SMA, EMA, RSI zero-loss behavior, MACD/Bollinger series lengths, ATR/VWAP validity, relative volume, deterministic output, and neutral handling for short history. Repository checkout/build execution was unavailable in this environment; current-head GitHub CI status was not yet exposed when checked. Status remains IMPLEMENTED — CI PENDING.
+
+**Limitations:** The SVG chart is a first functional increment, not a full TradingView replacement. It currently overlays SMA20 and EMA21; other calculated indicators are returned by the API and can be added as selectable overlays later. Signal conditions are transparent comparisons, not a qualified strategy or trading recommendation. The latest provider bar may be incomplete; the API does not claim candle-close confirmation. Real market-data accuracy and freshness still depend on the configured provider.
