@@ -30,3 +30,11 @@ def test_relative_volume_uses_prior_window():
 def test_indicator_bundle_is_deterministic():
     bars=[{"close":float(i),"high":float(i+1),"low":float(i-1),"volume":100} for i in range(1,80)]
     assert calculate_indicators(bars)==calculate_indicators(bars)
+
+def test_short_history_does_not_emit_directional_signal():
+    from app.services.technical_indicators import build_signal
+    bars=[{"close":float(i),"high":float(i+1),"low":float(i-1),"volume":100} for i in range(1,25)]
+    indicators=calculate_indicators(bars)
+    signal=build_signal(bars,indicators)
+    assert signal["direction"]=="neutral"
+    assert signal["sufficient_data"] is False
