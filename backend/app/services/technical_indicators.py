@@ -82,9 +82,13 @@ def true_range(high,low,close):
 
 def atr(high,low,close,period:int=14): return sma(true_range(high,low,close),period)
 
-def vwap(high,low,close,volume):
-    highs,lows,closes,volumes=map(_clean,(high,low,close,volume)); result=[None]*len(closes); pv=0.0; vv=0.0
-    for i,(h,l,c,v) in enumerate(zip(highs,lows,closes,volumes)):
+def vwap(high,low,close,volume,timestamps=None):
+    highs,lows,closes,volumes=map(_clean,(high,low,close,volume)); result=[None]*len(closes); pv=0.0; vv=0.0; session=None
+    times=list(timestamps) if timestamps is not None else [None]*len(closes)
+    for i,(h,l,c,v,stamp) in enumerate(zip(highs,lows,closes,volumes,times)):
+        current_session=stamp.date() if hasattr(stamp,"date") else str(stamp)[:10] if stamp is not None else None
+        if current_session is not None and session is not None and current_session!=session: pv=0.0; vv=0.0
+        if current_session is not None: session=current_session
         if h is None or l is None or c is None or v is None or v<=0: continue
         pv+=((h+l+c)/3)*v; vv+=v; result[i]=pv/vv if vv else None
     return result
@@ -103,7 +107,7 @@ def calculate_indicators(bars:list[dict]):
     closes=[b.get("close") for b in bars]; highs=[b.get("high") for b in bars]; lows=[b.get("low") for b in bars]; volumes=[b.get("volume") for b in bars]
     macd_line,macd_signal,macd_hist=macd(closes)
     bb_mid,bb_upper,bb_lower=bollinger(closes)
-    return {"sma20":sma(closes,20),"sma50":sma(closes,50),"sma200":sma(closes,200),"ema9":ema(closes,9),"ema21":ema(closes,21),"rsi14":rsi(closes,14),"macd":macd_line,"macd_signal":macd_signal,"macd_histogram":macd_hist,"bollinger_middle":bb_mid,"bollinger_upper":bb_upper,"bollinger_lower":bb_lower,"atr14":atr(highs,lows,closes,14),"vwap":vwap(highs,lows,closes,volumes),"relative_volume20":relative_volume(volumes,20)}
+    return {"sma20":sma(closes,20),"sma50":sma(closes,50),"sma200":sma(closes,200),"ema9":ema(closes,9),"ema21":ema(closes,21),"rsi14":rsi(closes,14),"macd":macd_line,"macd_signal":macd_signal,"macd_histogram":macd_hist,"bollinger_middle":bb_mid,"bollinger_upper":bb_upper,"bollinger_lower":bb_lower,"atr14":atr(highs,lows,closes,14),"vwap":vwap(highs,lows,closes,volumes,[b.get("timestamp") for b in bars]),"relative_volume20":relative_volume(volumes,20)}
 
 def _last(values):
     return next((x for x in reversed(values) if x is not None),None)
