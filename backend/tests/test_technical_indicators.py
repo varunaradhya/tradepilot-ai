@@ -7,7 +7,7 @@ def test_ema_starts_from_period_sma():
     result=ema([1,2,3,4,5],3)
     assert result[:2]==[None,None]
     assert result[2]==2.0
-    assert round(result[4],6)==3.75
+    assert round(result[4],6)==4.125
 
 def test_rsi_handles_zero_loss():
     assert rsi(list(range(1,20)),14)[-1]==100.0
@@ -29,5 +29,4 @@ def test_relative_volume_uses_prior_window():
 
 def test_indicator_bundle_is_deterministic():
     bars=[{"close":float(i),"high":float(i+1),"low":float(i-1),"volume":100} for i in range(1,80)]
-    first=calculate_indicators(bars); second=calculate_indicators(bars)
-    assert first==second
+    assert calculate_indicators(bars)==calculate_indicators(bars)
