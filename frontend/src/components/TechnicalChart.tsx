@@ -12,15 +12,16 @@ export default function TechnicalChart({data,analysis}:Props){
   const [showSma,setShowSma]=useState(true),[showEma,setShowEma]=useState(true);
   const drag=useRef<{x:number;offset:number}|null>(null);
   const width=1000,height=430,volumeHeight=80;
-  const valid=data.filter(b=>finite(b.open)&&finite(b.high)&&finite(b.low)&&finite(b.close));
-  const count=valid.length,windowSize=Math.max(25,Math.min(count,Math.floor(count/zoom)));
+  const valid=data;
+  const count=valid.length,windowSize=Math.max(1,Math.min(count,Math.floor(count/zoom)));
   const maxOffset=Math.max(0,count-windowSize),start=Math.min(Math.max(offset,0),maxOffset),visible=valid.slice(start,start+windowSize);
-  const prices=visible.flatMap(b=>[b.low!,b.high!]),min=Math.min(...prices),max=Math.max(...prices),span=Math.max(max-min,.01);
+  const prices=visible.flatMap(b=>[b.low,b.high].filter(finite)),min=prices.length?Math.min(...prices):0,max=prices.length?Math.max(...prices):1,span=Math.max(max-min,.01);
   const y=(price:number)=>height-((price-min)/span)*height,x=(i:number)=>(i/Math.max(visible.length-1,1))*width;
-  const volumeMax=Math.max(...visible.map(b=>b.volume??0),1);
+  const volumeMax=Math.max(1,...visible.map(b=>b.volume??0));
   const sma=analysis?.indicators.sma20.slice(start,start+windowSize)??[],ema=analysis?.indicators.ema21.slice(start,start+windowSize)??[];
   const selected=crosshair==null?null:visible[crosshair];
   const label=useMemo(()=>selected?new Date(selected.timestamp).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"}):"Move over a candle",[selected]);
+  if(count===0)return <div className="rounded-xl border border-white/10 p-8 text-center text-sm text-slate-500">No valid OHLC candles were returned by the provider.</div>;
   return <div className="overflow-hidden rounded-xl border border-white/10 bg-slate-950/70">
     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
       <span>{label}</span><span className="flex items-center gap-3 normal-case tracking-normal">
@@ -35,9 +36,9 @@ export default function TechnicalChart({data,analysis}:Props){
       onPointerMove={e=>{const rect=(e.currentTarget as SVGElement).getBoundingClientRect(),px=e.clientX-rect.left;setCrosshair(Math.max(0,Math.min(visible.length-1,Math.round((px/rect.width)*(visible.length-1)))));if(drag.current){const dx=e.clientX-drag.current.x,step=rect.width/Math.max(windowSize-1,1);setOffset(Math.max(0,Math.min(maxOffset,Math.round(drag.current.offset-dx/step))))}}}
       onPointerUp={()=>{drag.current=null}} onPointerLeave={()=>setCrosshair(null)}>
       <rect x="0" y="0" width={width} height={height} fill="transparent"/>
-      {visible.map((b,i)=>{const xx=x(i),candleW=Math.max(2,width/Math.max(windowSize*1.8,1)),bullish=(b.close??0)>=(b.open??0);return <g key={b.timestamp+i}>
+      {visible.map((b,i)=>{if(!finite(b.open)||!finite(b.high)||!finite(b.low)||!finite(b.close))return null;const xx=x(i),candleW=Math.max(2,width/Math.max(windowSize*1.8,1)),bullish=b.close>=b.open;return <g key={b.timestamp+i}>
         <line x1={xx} x2={xx} y1={y(b.high!)} y2={y(b.low!)} stroke="currentColor" className={bullish?"text-emerald-300":"text-rose-300"} strokeWidth="1"/>
-        <rect x={xx-candleW/2} y={Math.min(y(b.open!),y(b.close!))} width={candleW} height={Math.max(1,Math.abs(y(b.open!)-y(b.close!)))} className={bullish?"fill-emerald-300":"fill-rose-300"}/>
+        <rect x={xx-candleW/2} y={Math.min(y(b.open),y(b.close))} width={candleW} height={Math.max(1,Math.abs(y(b.open)-y(b.close)))} className={bullish?"fill-emerald-300":"fill-rose-300"}/>
         {b.volume!=null&&<rect x={xx-candleW/2} y={height+volumeHeight-(b.volume/volumeMax)*volumeHeight} width={candleW} height={(b.volume/volumeMax)*volumeHeight} className="fill-slate-600/60"/>}
       </g>})}
       {showSma&&<path d={pathFor(sma,visible,width,height,min,max)} fill="none" stroke="currentColor" className="text-amber-300" strokeWidth="2"/>}
