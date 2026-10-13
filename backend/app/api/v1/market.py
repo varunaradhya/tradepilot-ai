@@ -43,6 +43,8 @@ def technical_analysis(symbol:str,range_:str=Query(default="1y",alias="range"),i
     except MarketDataProviderError as exc: raise HTTPException(status_code=503,detail=str(exc)) from exc
     bars=[{"timestamp":b["timestamp"],"open":b.get("open"),"high":b.get("high"),"low":b.get("low"),"close":b.get("close"),"volume":b.get("volume")} for b in history.data]
     indicators=calculate_indicators(bars)
+    if interval not in {"5m", "15m", "30m", "60m", "1h"}:
+        indicators["vwap"] = [None] * len(bars)
     latest={key:next((v for v in reversed(values) if v is not None),None) for key,values in indicators.items()}
     signal=build_signal(bars,indicators)
     signal["symbol"]=history.symbol
