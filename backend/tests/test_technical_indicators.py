@@ -7,7 +7,7 @@ def test_ema_starts_from_period_sma():
     result=ema([1,2,3,4,5],3)
     assert result[:2]==[None,None]
     assert result[2]==2.0
-    assert round(result[4],6)==4.125
+    assert round(result[4],6)==4.0
 
 def test_rsi_handles_zero_loss():
     assert rsi(list(range(1,20)),14)[-1]==100.0
